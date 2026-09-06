@@ -1,0 +1,16 @@
+-- Merging decision tree log ---
+manifest
+ADDED from /home/angelo/Documentos/parental_coord-front/shared/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest14034279164779404844.xml:2:13-83
+INJECTED from /home/angelo/Documentos/parental_coord-front/shared/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest14034279164779404844.xml:2:13-83
+	package
+		INJECTED from /home/angelo/Documentos/parental_coord-front/shared/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest14034279164779404844.xml
+	xmlns:android
+		ADDED from /home/angelo/Documentos/parental_coord-front/shared/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest14034279164779404844.xml:2:23-81
+uses-sdk
+INJECTED from /home/angelo/Documentos/parental_coord-front/shared/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest14034279164779404844.xml reason: use-sdk injection requested
+INJECTED from /home/angelo/Documentos/parental_coord-front/shared/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest14034279164779404844.xml
+INJECTED from /home/angelo/Documentos/parental_coord-front/shared/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest14034279164779404844.xml
+	android:targetSdkVersion
+		INJECTED from /home/angelo/Documentos/parental_coord-front/shared/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest14034279164779404844.xml
+	android:minSdkVersion
+		INJECTED from /home/angelo/Documentos/parental_coord-front/shared/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest14034279164779404844.xml
