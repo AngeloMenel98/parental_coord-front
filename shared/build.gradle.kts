@@ -42,6 +42,10 @@ kotlin {
 
                 implementation("co.touchlab:kermit:2.0.4")
 
+                // Koin (DI)
+                implementation(platform("io.insert-koin:koin-bom:4.0.4"))
+                implementation("io.insert-koin:koin-core")
+
                 // Compose Multiplatform
                 implementation(compose.runtime)
                 implementation(compose.foundation)
