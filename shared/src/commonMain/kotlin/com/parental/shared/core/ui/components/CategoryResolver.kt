@@ -19,26 +19,28 @@ data class CategoryInfo(
  * fuera del mapa → null → el caller renderiza chip neutral.
  */
 object CategoryResolver {
+    // namePrefs conserva solo nombre + emoji; los hex DELETED — el color por
+    // nombre vive en CategoryTokens (core/ui/theme/Color.kt) — ADR-6.
     private val namePrefs: Map<String, CategoryInfo> = mapOf(
-        "Salud" to CategoryInfo("Salud", "#E53935", "\u2764\uFE0F"),
-        "Educación" to CategoryInfo("Educación", "#1E88E5", "\uD83D\uDCDA"),
-        "Familiar" to CategoryInfo("Familiar", "#8E24AA", "\uD83D\uDC6A"),
-        "Social" to CategoryInfo("Social", "#43A047", "\uD83E\uDD1D"),
-        "Recreación" to CategoryInfo("Recreación", "#FB8C00", "\uD83C\uDF89"),
-        "Otros" to CategoryInfo("Otros", "#757575", "\u2699\uFE0F"),
+        "Salud" to CategoryInfo("Salud", null, "\u2764\uFE0F"),
+        "Educación" to CategoryInfo("Educación", null, "\uD83D\uDCDA"),
+        "Familiar" to CategoryInfo("Familiar", null, "\uD83D\uDC6A"),
+        "Social" to CategoryInfo("Social", null, "\uD83E\uDD1D"),
+        "Recreación" to CategoryInfo("Recreación", null, "\uD83C\uDF89"),
+        "Otros" to CategoryInfo("Otros", null, "\u2699\uFE0F"),
     )
 
     /**
-     * Construye el mapa uuid → CategoryInfo. El color fetcheado (si existe)
-     * gana sobre la preferencia; el emoji siempre viene de la preferencia por
-     * nombre (la API solo expone nombre de icono, no emoji).
+     * Construye el mapa uuid → CategoryInfo. `colorHex` es SOLO del servidor
+     * (cat.color gana, sin cambios de contrato); si no trae color, el badge
+     * hace fallback a CategoryTokens por nombre canónico (modo-aware).
      */
     fun build(categories: List<CategoryDto>): Map<String, CategoryInfo> =
         categories.associate { cat ->
             val pref = namePrefs[cat.name]
             cat.id to CategoryInfo(
                 name = cat.name,
-                colorHex = cat.color ?: pref?.colorHex,
+                colorHex = cat.color,
                 emoji = pref?.emoji,
             )
         }

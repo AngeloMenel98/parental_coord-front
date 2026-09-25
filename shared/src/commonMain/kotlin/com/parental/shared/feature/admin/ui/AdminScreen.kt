@@ -2,6 +2,7 @@ package com.parental.shared.feature.admin.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -11,11 +12,11 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.parental.shared.core.ui.theme.StatusTokens
 import com.parental.shared.feature.admin.domain.model.AdminBond
 import com.parental.shared.feature.admin.domain.model.AdminUser
 
@@ -387,6 +388,11 @@ private fun BondsTab(state: AdminUiState, viewModel: AdminViewModel) {
 @Composable
 private fun BondCard(bond: AdminBond, viewModel: AdminViewModel) {
     val isSelected = viewModel.uiState.collectAsState().value.selectedBondId == bond.id
+    // Tokens Ok/Ko modo-aware (design §9): ACTIVE → Ok.dot, INACTIVE → Ko.dot.
+    // El overlay alpha 0.1f se conserva.
+    val darkTheme = isSystemInDarkTheme()
+    val okDot = StatusTokens.triple(StatusTokens.Status.Ok, darkTheme).dot
+    val koDot = StatusTokens.triple(StatusTokens.Status.Ko, darkTheme).dot
 
     Card(
         modifier = Modifier
@@ -416,12 +422,12 @@ private fun BondCard(bond: AdminBond, viewModel: AdminViewModel) {
                 }
                 Surface(
                     shape = RoundedCornerShape(12.dp),
-                    color = if (bond.isActive) Color(0xFF4CAF50).copy(alpha = 0.1f) else Color(0xFFF44336).copy(alpha = 0.1f),
+                    color = if (bond.isActive) okDot.copy(alpha = 0.1f) else koDot.copy(alpha = 0.1f),
                 ) {
                     Text(
                         text = if (bond.isActive) "Active" else "Inactive",
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                        color = if (bond.isActive) Color(0xFF4CAF50) else Color(0xFFF44336),
+                        color = if (bond.isActive) okDot else koDot,
                         style = MaterialTheme.typography.labelSmall,
                     )
                 }

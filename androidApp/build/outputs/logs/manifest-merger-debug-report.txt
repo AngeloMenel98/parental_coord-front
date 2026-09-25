@@ -90,7 +90,7 @@ MERGED from [androidx.versionedparcelable:versionedparcelable:1.1.1] /home/angel
 	android:allowBackup
 		ADDED from /home/angelo/Documentos/parental_coord-front/androidApp/src/androidMain/AndroidManifest.xml:7:9-35
 	android:theme
-		ADDED from /home/angelo/Documentos/parental_coord-front/androidApp/src/androidMain/AndroidManifest.xml:11:9-72
+		ADDED from /home/angelo/Documentos/parental_coord-front/androidApp/src/androidMain/AndroidManifest.xml:11:9-58
 	android:networkSecurityConfig
 		ADDED from /home/angelo/Documentos/parental_coord-front/androidApp/src/androidMain/AndroidManifest.xml:9:9-69
 activity#com.parental.android.MainActivity

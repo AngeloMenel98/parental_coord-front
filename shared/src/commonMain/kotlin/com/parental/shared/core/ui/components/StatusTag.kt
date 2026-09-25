@@ -1,5 +1,6 @@
 package com.parental.shared.core.ui.components
 
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -10,36 +11,46 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import com.parental.shared.core.ui.theme.StatusTokens
 
+/**
+ * Tag de status: 17 claves MAYÚSCULAS → entry vía [StatusTokens.aliasMap]
+ * (design §9), color = dot modo-aware (ADR-7), patrón de overlay alpha 0.15f
+ * preservado (migración). Status desconocido → outline + texto crudo.
+ */
 @Composable
 fun StatusTag(
     status: String,
     modifier: Modifier = Modifier,
 ) {
-    val (color, label) = when (status.uppercase()) {
+    val darkTheme = isSystemInDarkTheme()
+    val key = status.uppercase()
+    val color: Color = StatusTokens.aliasMap[key]
+        ?.let { StatusTokens.triple(it, darkTheme).dot }
+        ?: MaterialTheme.colorScheme.outline
+    val label = when (key) {
         // Activity statuses
-        "CREATED" -> Color(0xFF9E9E9E) to "Creada"
-        "ASSIGNED" -> Color(0xFF1E88E5) to "Asignada"
-        "IN_PROGRESS" -> Color(0xFFFB8C00) to "En progreso"
-        "VERIFY" -> Color(0xFFFFB300) to "Por verificar"
-        "DONE" -> Color(0xFF43A047) to "Cumplido"
-        "PENDING_VERIFICATION" -> Color(0xFFFFB300) to "Pend. verificación"
-        "COMPLETED" -> Color(0xFF43A047) to "Cumplida"
-        "OVERDUE" -> Color(0xFFE53935) to "Vencida"
-        "CANCELLED" -> Color(0xFF757575) to "Cancelada"
+        "CREATED" -> "Creada"
+        "ASSIGNED" -> "Asignada"
+        "IN_PROGRESS" -> "En progreso"
+        "VERIFY" -> "Por verificar"
+        "DONE" -> "Cumplido"
+        "PENDING_VERIFICATION" -> "Pend. verificación"
+        "COMPLETED" -> "Cumplida"
+        "OVERDUE" -> "Vencida"
+        "CANCELLED" -> "Cancelada"
         // Expense statuses
-        "PENDIENTE" -> Color(0xFFFB8C00) to "Pendiente"
-        "APROBADO" -> Color(0xFF43A047) to "Aprobado"
-        "RECHAZADO" -> Color(0xFFE53935) to "Rechazado"
-        "PAGADO" -> Color(0xFF1E88E5) to "Pagado"
-        "DISPUTA" -> Color(0xFF8E24AA) to "En disputa"
+        "PENDIENTE" -> "Pendiente"
+        "APROBADO" -> "Aprobado"
+        "RECHAZADO" -> "Rechazado"
+        "PAGADO" -> "Pagado"
+        "DISPUTA" -> "En disputa"
         // Third party statuses
-        "ACTIVE" -> Color(0xFF43A047) to "Activo"
-        "INACTIVE" -> Color(0xFF757575) to "Inactivo"
-        "PENDING" -> Color(0xFFFB8C00) to "Pendiente"
+        "ACTIVE" -> "Activo"
+        "INACTIVE" -> "Inactivo"
+        "PENDING" -> "Pendiente"
         // Default
-        else -> MaterialTheme.colorScheme.outline to status
+        else -> status
     }
 
     Surface(
@@ -51,7 +62,6 @@ fun StatusTag(
             text = label,
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
             style = MaterialTheme.typography.labelSmall,
-            fontSize = 11.sp,
             color = color,
             fontWeight = FontWeight.Medium,
         )

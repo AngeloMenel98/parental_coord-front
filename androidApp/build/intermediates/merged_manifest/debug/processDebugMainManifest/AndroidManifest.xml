@@ -24,7 +24,8 @@
         android:label="Parental Coordination"
         android:networkSecurityConfig="@xml/network_security_config"
         android:supportsRtl="true"
-        android:theme="@android:style/Theme.Material.Light.NoActionBar" >
+        android:testOnly="true"
+        android:theme="@style/Theme.ParentalCoordination" >
         <activity
             android:name="com.parental.android.MainActivity"
             android:exported="true"

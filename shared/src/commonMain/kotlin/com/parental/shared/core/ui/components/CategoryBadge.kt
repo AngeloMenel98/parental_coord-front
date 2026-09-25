@@ -1,5 +1,6 @@
 package com.parental.shared.core.ui.components
 
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -10,22 +11,32 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import com.parental.shared.core.ui.theme.CategoryTokens
+import com.parental.shared.core.ui.theme.parseHexColor
 
+/**
+ * Chip de categoría por NOMBRE (canónico ES, ej. "Educación" / "EDUCACION").
+ * El color sale de CategoryTokens (modo-aware, ADR-7); si la categoría no es
+ * conocida → chip neutro (outline). Migración §9: los 6 re-tints de categoría.
+ */
 @Composable
 fun CategoryBadge(
     category: String,
     modifier: Modifier = Modifier,
 ) {
-    val (color, label) = when (category.uppercase()) {
-        "SALUD" -> Color(0xFFE53935) to "Salud"
-        "EDUCACION" -> Color(0xFF1E88E5) to "Educación"
-        "FAMILIAR" -> Color(0xFF8E24AA) to "Familiar"
-        "SOCIAL" -> Color(0xFF43A047) to "Social"
-        "RECREACION" -> Color(0xFFFB8C00) to "Recreación"
-        "OTROS" -> Color(0xFF757575) to "Otros"
-        else -> MaterialTheme.colorScheme.outline to category
+    val darkTheme = isSystemInDarkTheme()
+    val label = when (category.uppercase()) {
+        "SALUD" -> "Salud"
+        "EDUCACION" -> "Educación"
+        "FAMILIAR" -> "Familiar"
+        "SOCIAL" -> "Social"
+        "RECREACION" -> "Recreación"
+        "OTROS" -> "Otros"
+        else -> category
     }
+    val color: Color = CategoryTokens.resolve(category)
+        ?.let { CategoryTokens.triple(it, darkTheme).dot }
+        ?: MaterialTheme.colorScheme.outline
 
     Surface(
         modifier = modifier,
@@ -36,7 +47,6 @@ fun CategoryBadge(
             text = label,
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
             style = MaterialTheme.typography.labelSmall,
-            fontSize = 11.sp,
             color = color,
             fontWeight = FontWeight.Medium,
         )
@@ -45,7 +55,9 @@ fun CategoryBadge(
 
 /**
  * Variante UUID: resuelve categoryId vía [resolve] (CategoryResolver).
- * Sin resolución → chip neutral (outline, "Categoría").
+ * `cat.color` del servidor GANA (parseado con [parseHexColor], no-break);
+ * sin color de servidor → fallback CategoryTokens por nombre (modo-aware);
+ * sin resolución → chip neutral (outline, "Categoría").
  */
 @Composable
 fun CategoryBadge(
@@ -53,8 +65,12 @@ fun CategoryBadge(
     resolve: (String) -> CategoryInfo?,
     modifier: Modifier = Modifier,
 ) {
+    val darkTheme = isSystemInDarkTheme()
     val info = resolve(categoryId)
-    val color = info?.colorHex?.let(::colorFromHex)
+    val color: Color = info?.colorHex?.let(::parseHexColor)
+        ?: info?.name?.let { name ->
+            CategoryTokens.resolve(name)?.let { cat -> CategoryTokens.triple(cat, darkTheme).dot }
+        }
         ?: MaterialTheme.colorScheme.outline
     val label = when {
         info == null -> "Categoría"
@@ -71,14 +87,8 @@ fun CategoryBadge(
             text = label,
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
             style = MaterialTheme.typography.labelSmall,
-            fontSize = 11.sp,
             color = color,
             fontWeight = FontWeight.Medium,
         )
     }
 }
-
-private fun colorFromHex(hex: String): Color? =
-    hex.removePrefix("#")
-        .takeIf { it.length == 6 }
-        ?.let { runCatching { Color(("FF$it").toLong(16)) }.getOrNull() }

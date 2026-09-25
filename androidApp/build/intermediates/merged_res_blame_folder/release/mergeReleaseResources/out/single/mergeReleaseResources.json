@@ -1,0 +1,6 @@
+[
+    {
+        "merged": "com.parental.android.androidApp-release-42:/xml_network_security_config.xml.flat",
+        "source": "com.parental.android.androidApp-androidMain-43:/xml/network_security_config.xml"
+    }
+]

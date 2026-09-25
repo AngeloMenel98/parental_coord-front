@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import com.parental.shared.core.error.ApiResult
 import com.parental.shared.core.network.ApiClient
 import com.parental.shared.core.ui.components.BottomNavBar
+import com.parental.shared.core.ui.theme.ParentalCoordinationTheme
 import com.parental.shared.feature.activities.ui.ActividadesScreen
 import com.parental.shared.feature.activities.ui.ActividadesViewModel
 import com.parental.shared.feature.auth.data.repository.AuthRepository
@@ -55,6 +56,22 @@ fun App() {
         }
     }
 
+    // ADR-10: un único wrap del tema en commonMain — Android hoy, iOS hereda.
+    ParentalCoordinationTheme {
+        AppContent(authRepository = authRepository, sessionManager = sessionManager)
+    }
+}
+
+/**
+ * Contenido de la app (ADR-10): el bloque `when` existente se movió verbatim
+ * desde App() — los `return` tempranos son legales dentro de una composable
+ * función (los lambdas no-inline no los permitirían). Cero delta de layout.
+ */
+@Composable
+private fun AppContent(
+    authRepository: AuthRepository,
+    sessionManager: SessionManager,
+) {
     val currentScreen = if (sessionManager.loginPending) {
         // Login in progress (bonds fetch pending) — keep on Login screen
         Screen.Login
