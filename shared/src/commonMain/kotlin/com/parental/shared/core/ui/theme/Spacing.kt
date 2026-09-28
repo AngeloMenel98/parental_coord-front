@@ -100,6 +100,16 @@ object AgendaGeometry {
      */
     val nodeCardLegacy: Dp = 190.dp
 
+    /**
+     * Nodo del timeline de día — **T2-5 / T2-6** (`OD-1`, 190 → 40).
+     *
+     * **190 → 40 (T2-5).** Es el "timeline de nodos" real (B2), no una tarjeta.
+     * [nodeCardLegacy] **no se borra**: es la casa de 190dp que T4 dejó intacta a
+     * propósito, y T4 vuelve a ella si C9 se confirma como "sin título". Los dos
+     * tokens conviven; el legacy no se toca ni se reescribe.
+     */
+    val nodeCard: Dp = 40.dp
+
     /** Ancho de la celda de día de la tarjeta de semana. Propietario del cambio: A2 (`R7-T1-7`). */
     val dayCellWidth: Dp = 52.dp
 

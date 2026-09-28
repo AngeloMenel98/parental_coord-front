@@ -27,7 +27,9 @@ import kotlinx.datetime.TimeZone
  *
  * Último por una razón concreta: es el único con aristas entrantes desde **dos** archivos ya extraídos
  * — la celda de día (F6) y el cuerpo de fila (archivo 10); los pasos 4/4b/5/6 deben estar verdes antes.
- * `@OptIn(ExperimentalLayoutApi::class)` viaja desde el origen (`FlowRow`, `items`).
+ * `@OptIn(ExperimentalLayoutApi::class)` se conserva aunque T2-7 haya retirado el `FlowRow` de este
+ * archivo: el grupo de misma hora pasó a ser una pila vertical (`RR-2` — si alguien reintroduce un
+ * `FlowRow` aquí, el marcador sigue puesto; si lo reintroduce en F7, debe añadirlo él mismo).
  *
  * ⚠ **OD-1, SETTLED BY USER — T4 NO aplica 190→40.** `nodeCardLegacy` conserva su píxel (190dp) y
  * sólo recibe el nombre legacy; T2-6 reescribe el valor en la declaración nombrada. Eso es lo que
@@ -84,13 +86,11 @@ internal fun WeekTimeline(
                 )
             }
 
-            item(key = "selected-day-label") {
-                Text(
-                    text = formatAgendaDate(selectedDate),
-                    style = TypeTokens.date,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.padding(top = Spacing.md, bottom = Spacing.xs),
+            item(key = "day-agenda-header") {
+                DayAgendaHeader(
+                    date = selectedDate,
+                    activityCount = selectedBucket?.slots?.sumOf { it.rows.size } ?: 0,
+                    zone = zone,
                 )
             }
 
@@ -102,29 +102,31 @@ internal fun WeekTimeline(
                 selectedBucket.slots.forEach { slot ->
                     item(key = "slot-${slot.hour}-${slot.minute}") {
                         Column(modifier = Modifier.fillMaxWidth()) {
-                            Text(
-                                text = formatTime(slot.hour, slot.minute),
-                                style = TypeTokens.time,
-                                color = MaterialTheme.colorScheme.primary,
-                                fontWeight = FontWeight.SemiBold,
-                                modifier = Modifier.padding(vertical = Spacing.xxs),
-                            )
-                            FlowRow(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-                                verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-                            ) {
-                                slot.rows.forEach { row ->
-                                    WeekActivityNode(
-                                        row = row,
-                                        zone = zone,
-                                        resolve = resolve,
-                                        onSelectActividad = onSelectActividad,
-                                        onConfirm = onConfirm,
-                                        isConfirming = isConfirming,
-                                        currentUserId = currentUserId,
-                                    )
-                                }
+                            // R2-T2-7 · El grupo de misma hora es una PILA vertical sobre el
+                            // riel, no el `FlowRow` horizontal de tarjetas de 190dp que T4
+                            // dejó. Cada fila lleva su propia columna de tiempo, así que el
+                            // `Text` de hora que encabezaba el grupo era redundante: se fue
+                            // con el `FlowRow` (misma hora ⇒ misma etiqueta en cada fila).
+                            slot.rows.forEachIndexed { index, row ->
+                                DayAgendaRow(
+                                    timeLabel = formatTime(slot.hour, slot.minute),
+                                    row = row,
+                                    info = resolve(row.actividad.categoryId),
+                                    zone = zone,
+                                    // N filas → N−1 segmentos: la última fila del grupo no
+                                    // emite riel, para que no cuelgue una cola bajo el
+                                    // último nodo.
+                                    showConnector = index < slot.rows.lastIndex,
+                                    // R2-T2-8 · `canConfirm` se EVALÚA AQUÍ, con el
+                                    // `currentUserId` de la pantalla, y se PASA como dato.
+                                    // F7 no lo recalcula ni lo adivina: si mañana la regla
+                                    // de asignación cambia, este es el único sitio que
+                                    // hay que tocar, y la fila no puede discrepar de él.
+                                    canConfirm = row.actividad.canConfirm(currentUserId),
+                                    onSelectActividad = onSelectActividad,
+                                    onConfirm = onConfirm,
+                                    isConfirming = isConfirming,
+                                )
                             }
                         }
                     }
@@ -161,51 +163,7 @@ internal fun WeekTimeline(
         }
     }
 }
-@Composable
-internal fun WeekActivityNode(
-    row: TimelineRow,
-    zone: TimeZone,
-    resolve: (String) -> CategoryInfo?,
-    onSelectActividad: (String) -> Unit,
-    onConfirm: (String) -> Unit,
-    isConfirming: Boolean,
-    currentUserId: String,
-) {
-    val info = resolve(row.actividad.categoryId)
-    val canConfirm = row.actividad.canConfirm(currentUserId)
-    val semanticLabel = activitySemanticLabel(row, info, zone)
 
-    Surface(
-        modifier = Modifier.width(AgendaGeometry.nodeCardLegacy),
-        shape = ParentalShapes.medium,
-        color = MaterialTheme.colorScheme.surface,
-        tonalElevation = Spacing.hairline,
-    ) {
-        Column(modifier = Modifier.padding(Spacing.xs)) {
-            ActivityBody(
-                row = row,
-                info = info,
-                zone = zone,
-                semanticLabel = semanticLabel,
-                showTime = false,
-                showStatusDot = true,
-                canConfirm = canConfirm,
-                onClick = { onSelectActividad(row.actividad.id) },
-                modifier = Modifier.fillMaxWidth(),
-            )
-            if (canConfirm) {
-                ConfirmarChip(
-                    onClick = { onConfirm(row.actividad.id) },
-                    enabled = !isConfirming,
-                    isConfirming = isConfirming,
-                    modifier = Modifier
-                        .align(Alignment.End)
-                        .padding(end = Spacing.xs, bottom = Spacing.xs),
-                )
-            }
-        }
-    }
-}
 /** Chip inline "Confirmar" — hermano del cuerpo clickeable de la fila. */
 @Composable
 internal fun ConfirmarChip(

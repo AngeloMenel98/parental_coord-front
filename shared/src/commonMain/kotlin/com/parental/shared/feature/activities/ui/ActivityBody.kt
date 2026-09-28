@@ -80,7 +80,7 @@ import kotlinx.datetime.TimeZone
  * token en T5. Un nombre no canónico cae en `null` → `Label` en `outline`, que
  * es el fallback correcto de C1, no un error.
  */
-private fun categoryVector(name: String?): ImageVector? = when (name) {
+internal fun categoryVector(name: String?): ImageVector? = when (name) {
     "Salud" -> Icons.Filled.Favorite
     "Educación" -> Icons.Filled.Edit
     "Familiar" -> Icons.Filled.Home
@@ -99,9 +99,15 @@ internal fun ActivityBody(
     semanticLabel: String,
     showTime: Boolean,
     showStatusDot: Boolean = false,
+    showCategoryIcon: Boolean = true,
+    showMetaChips: Boolean = true,
+    showChevron: Boolean = true,
+    showConfirmChip: Boolean = false,
     canConfirm: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    onConfirm: () -> Unit = {},
+    isConfirming: Boolean = false,
 ) {
     val isDone = isDoneStatus(row.actividad.status)
     // R1-T5-1: un vector por fila, en el slot que ocupaba el emoji. R2-T5-2: el
@@ -121,32 +127,41 @@ internal fun ActivityBody(
             .padding(horizontal = Spacing.sm, vertical = Spacing.sm),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(
-            imageVector = vector ?: Icons.AutoMirrored.Filled.Label,
-            // DECORATIVO: el rótulo fusionado de la fila ya nombra la categoría
-            // en palabras, así que un nodo para el icono sería duplicación (AC-5).
-            contentDescription = null,
-            // Categoría conocida → su color de token. Desconocida → `outline`
-            // (4.37:1 claro / 5.83:1 oscuro), NUNCA el `dot` de otra categoría:
-            // el fallback no debe insinuar una categoría que no tiene.
-            tint = if (vector != null) {
-                categoryTagTriple(info)?.dot ?: MaterialTheme.colorScheme.outline
-            } else {
-                MaterialTheme.colorScheme.outline
-            },
-            modifier = Modifier
-                .size(vectorSize)
-                .clearAndSetSemantics { },
-        )
-        if (showStatusDot) {
-            Spacer(modifier = Modifier.width(Spacing.xxs))
-            TagDot(
-                color = statusTagTriple(row.actividad.status)?.dot
-                    ?: MaterialTheme.colorScheme.outline,
-                modifier = Modifier.size(AgendaGeometry.statusBadge),
+        // R1-T5-1: un vector por fila, en el slot que ocupaba el emoji. R2-T5-2: el
+        // fallback NUNCA es un slot vacío — una categoría desconocida se dibuja.
+        //
+        // `showCategoryIcon = false` (T2-6) es la costura con F7: allí el icono lo
+        // pinta `AgendaNode` en su disco de 40dp, y dibujarlo aquí además duplicaría
+        // el glifo. El default `true` deja a F4 exactamente como estaba — T2 no puede
+        // cambiar la anatomía de la fila de Agenda, que es de T5.
+        if (showCategoryIcon) {
+            Icon(
+                imageVector = vector ?: Icons.AutoMirrored.Filled.Label,
+                // DECORATIVO: el rótulo fusionado de la fila ya nombra la categoría
+                // en palabras, así que un nodo para el icono sería duplicación (AC-5).
+                contentDescription = null,
+                // Categoría conocida → su color de token. Desconocida → `outline`
+                // (4.37:1 claro / 5.83:1 oscuro), NUNCA el `dot` de otra categoría:
+                // el fallback no debe insinuar una categoría que no tiene.
+                tint = if (vector != null) {
+                    categoryTagTriple(info)?.dot ?: MaterialTheme.colorScheme.outline
+                } else {
+                    MaterialTheme.colorScheme.outline
+                },
+                modifier = Modifier
+                    .size(vectorSize)
+                    .clearAndSetSemantics { },
             )
+            if (showStatusDot) {
+                Spacer(modifier = Modifier.width(Spacing.xxs))
+                TagDot(
+                    color = statusTagTriple(row.actividad.status)?.dot
+                        ?: MaterialTheme.colorScheme.outline,
+                    modifier = Modifier.size(AgendaGeometry.statusBadge),
+                )
+            }
+            Spacer(modifier = Modifier.width(Spacing.sm))
         }
-        Spacer(modifier = Modifier.width(Spacing.sm))
         Column(modifier = Modifier.weight(1f)) {
             if (showTime && row.localStart != null) {
                 Text(
@@ -195,19 +210,42 @@ internal fun ActivityBody(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            FlowRow(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(Spacing.xxs),
-                verticalArrangement = Arrangement.spacedBy(Spacing.xs),
-            ) {
-                CategoryBadge(
-                    categoryId = row.actividad.categoryId,
-                    resolve = { info },
-                )
-                StatusTag(status = row.actividad.status)
+            // R2-T2-6 · LA FILA DEL DÍA NO LLEVA CHIPS DE CATEGORÍA NI DE ESTADO. En F7 la
+            // categoría ya la dice el nodo de 40dp y el estado, su punto sobre el collar;
+            // repetir ambos como `CategoryBadge`/`StatusTag` sería la misma información
+            // dos veces en la misma fila. `showMetaChips = false` lo apaga SÓLO para F7: el
+            // default `true` deja la fila de Agenda (F4) exactamente como la dejó T5, que
+            // es la anatomía que esa pantalla envía y T2 no puede tocar.
+            if (showMetaChips) {
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.xxs),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.xs),
+                ) {
+                    CategoryBadge(
+                        categoryId = row.actividad.categoryId,
+                        resolve = { info },
+                    )
+                    StatusTag(status = row.actividad.status)
+                }
             }
         }
-        if (!canConfirm) {
+        // R2-T2-8 · EL CHIP DE CONFIRMAR ES HERMANO DEL CUERPO, NO HIJO. Se dibuja
+        // AQUÍ, dentro del `Row` pero FUERA del `Modifier.clickable` del cuerpo, para que
+        // la fila siga siendo UN nodo de semántica y el chip el OTRO — no anidarlos en
+        // un `Column` como hacía `WeekActivityNode`, donde el chip quedaba dentro del
+        // área táctil de la actividad y una pulsación cerca de él abriría el detalle en
+        // vez de confirmar. `showConfirmChip = true` + `canConfirm` reproduce aquí el
+        // mismo par, y F4 sigue sin pasarlos (defaults `false`) ⇒ F4 no cambia.
+        if (showConfirmChip && canConfirm) {
+            Spacer(modifier = Modifier.width(Spacing.xxs))
+            ConfirmarChip(
+                onClick = onConfirm,
+                enabled = !isConfirming,
+                isConfirming = isConfirming,
+            )
+        }
+        if (showChevron && !canConfirm) {
             Spacer(modifier = Modifier.width(Spacing.xxs))
             Text(
                 text = "›",
