@@ -52,6 +52,22 @@ import kotlinx.datetime.LocalDate
  * la caja es 26.286dp. ⚠ `dotTray` 12dp está CONECTADO desde T4-7 como `padding`
  * interior de esta tarjeta (2.º término de la cadena de 56dp) y NO es la bandeja del
  * punto. Los tokens nombran valores, NO los cambian.
+ *
+ * T1-8 · LAS CUATRO MEDICIONES QUE T1 INVALIDÓ, REMEDIDAS. T5-7 las medía
+ * sobre el papel; T1-4 movió el fondo de la selección, así que las cuatro se
+ *derivaron de nuevo sobre el color COMPUESTO (celda sin seleccionar =
+ * `surfaceVariant`@45% sobre `secondaryContainer` = #D2E6E8 claro /
+ * #384B4C oscuro), no sobre el token solo:
+ *     S1  rótulo del mes      `onSurface`/`secondaryContainer`  13.30 / 7.03  PASS
+ *     S2  día de la semana    `onSurfaceVariant`/celda          7.26 / 5.39  PASS
+ *     R3  icono de navegación `onSurfaceVariant`/`secondary..`   7.29 / 5.31  PASS
+ *     S4  celda seleccionada  `onPrimary`/`primary`              6.48 / 7.67  PASS
+ * Contexto, número de día sin seleccionar: 13.24 claro / 7.14 oscuro.
+ * Las cuatro superan 4.5:1; R3 es icono, así que su suelo es 3:1 de
+ * WCAG 1.4.11 y lo cumple por partida doble. ⚠ Si alguien vuelve a pintar
+ * el punto sobre la celda teñida, RC-5 se rompe: ahí los seis valores caen
+ * a 1.86-2.65:1 en oscuro y `Recreacion` a 2.69:1 en claro. Sobre la
+ * bandeja `surface` van 3.40-6.88 claro / 3.75-5.33 oscuro.
  */
 
 @Composable
