@@ -8,18 +8,22 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -40,14 +44,12 @@ import kotlinx.datetime.LocalDate
  * 1.587 líneas; `DayCell` no usa API experimental (DD-2).
  *
  * A2 · `calendar-a11y-and-fit-fixes`: la fila es un `Row` de siete
- * `Box(Modifier.weight(1f))`; la celda NO fija ancho —es función del viewport, luego no
- * puede ser token— ni mínimo de alto. La banda uniforme la da `statusSlotHeight`
- * (mecanismo y derivación en su sitio, más abajo). `+N` vive en ella, en su propia
- * línea y a todo ancho (D-1): a 320dp la caja es 26.286dp.
- *
- * ⚠ `dotTray` 12dp está CONECTADO desde T4-7 como `padding` interior de esta tarjeta —
- * 2.º término de la cadena de 56dp— y NO es la bandeja del punto. Los tokens nombran
- * valores, NO los cambian.
+ * `Box(Modifier.weight(1f))`; la celda NO fija ancho —función del viewport, luego no
+ * puede ser token— ni mínimo de alto. La banda uniforme la da `statusSlotHeight`, cuyo
+ * mecanismo está en su sitio. `+N` va en su propia línea, a todo ancho (D-1): a 320dp
+ * la caja es 26.286dp. ⚠ `dotTray` 12dp está CONECTADO desde T4-7 como `padding`
+ * interior de esta tarjeta (2.º término de la cadena de 56dp) y NO es la bandeja del
+ * punto. Los tokens nombran valores, NO los cambian.
  */
 
 @Composable
@@ -79,12 +81,11 @@ internal fun WeekOverviewCard(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                TextButton(
+                WeekNavButton(
+                    icon = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
+                    description = "Semana anterior",
                     onClick = onPreviousWeek,
-                    modifier = Modifier.heightIn(min = AgendaGeometry.touchTargetLegacy),
-                ) {
-                    Text("Anterior")
-                }
+                )
                 Text(
                     text = formatMonthYear(weekStart),
                     // R1-T1-1: `TypeTokens.date` (24sp serif) → `titleMedium` (16sp).
@@ -96,12 +97,11 @@ internal fun WeekOverviewCard(
                     textAlign = TextAlign.Center,
                     modifier = Modifier.weight(1f),
                 )
-                TextButton(
+                WeekNavButton(
+                    icon = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    description = "Semana siguiente",
                     onClick = onNextWeek,
-                    modifier = Modifier.heightIn(min = AgendaGeometry.touchTargetLegacy),
-                ) {
-                    Text("Siguiente")
-                }
+                )
             }
 
             Row(
@@ -124,6 +124,31 @@ internal fun WeekOverviewCard(
                 }
             }
         }
+    }
+}
+
+/**
+ * Navegación de semana — `R3-T1-3`. Un composable para los dos lados: el contrato
+ * de 48dp y la convención de `contentDescription` viven aquí y no pueden divergir.
+ * 48dp = [AgendaGeometry.touchTargetLegacy] (lo que T3-8 puso en la escala);
+ * [Layout.touchMin], que citan los registros, NO existe en este árbol. `IconButton`
+ * de M3 ya es circular. Los `TextButton` de ~70dp se comían ~35% del ancho.
+ */
+@Composable
+private fun WeekNavButton(
+    icon: ImageVector,
+    description: String,
+    onClick: () -> Unit,
+) {
+    IconButton(
+        onClick = onClick,
+        modifier = Modifier.size(AgendaGeometry.touchTargetLegacy),
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = description,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
