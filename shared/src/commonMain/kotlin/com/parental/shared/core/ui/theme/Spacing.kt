@@ -110,12 +110,6 @@ object AgendaGeometry {
      */
     val nodeCard: Dp = 40.dp
 
-    /** Ancho de la celda de día de la tarjeta de semana. Propietario del cambio: A2 (`R7-T1-7`). */
-    val dayCellWidth: Dp = 52.dp
-
-    /** Alto mínimo de la celda de día. Propietario: A2 (`R7-T1-7`). */
-    val dayCellMinHeight: Dp = 76.dp
-
     /** Punto de categoría dentro de la celda de día. Propietario: T1-6 (7 → 8). */
     val dotLegacy: Dp = 7.dp
 

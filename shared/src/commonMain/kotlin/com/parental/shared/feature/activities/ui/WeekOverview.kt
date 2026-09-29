@@ -3,15 +3,14 @@ package com.parental.shared.feature.activities.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
@@ -21,10 +20,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import com.parental.shared.core.ui.components.CategoryInfo
 import com.parental.shared.core.ui.components.TagDot
 import com.parental.shared.core.ui.components.categoryTagTriple
@@ -38,16 +39,23 @@ import kotlinx.datetime.LocalDate
  * Tarjeta de semana + celda de día — `calendar-design-redesign`, T4 (paso 5). `R7-T1-7`.
  *
  * Aislar la tarjeta es lo que hace T1 revisable contra este archivo y no contra el
- * monolito de 1.587 líneas. `WeekOverviewCard` conserva su
- * `@OptIn(ExperimentalLayoutApi::class)` de origen; `DayCell` no lo tiene y no lo
- * recibe porque no usa API experimental (DD-2).
+ * monolito de 1.587 líneas; `DayCell` no usa API experimental (DD-2).
  *
- * ⚠ Los tokens nombran valores, NO los cambian: `dayCellWidth` 52dp y
- * `dayCellMinHeight` 76dp (dueños A2 y T1), `dotLegacy` 7dp (T1-6 → 8), `dotTray`
- * 12dp declarado y sin conectar.
+ * A2 · `calendar-a11y-and-fit-fixes`: la fila de días es un `Row` de siete
+ * `Box(Modifier.weight(1f))`; la celda ya no fija ancho (función del viewport, luego no
+ * puede ser token) ni mínimo de alto. La banda uniforme que el mínimo daba gratis la
+ * reproduce `statusSlotHeight`: alto fijo derivado de `dotLegacy` + `collar` + el
+ * `lineHeight` del propio `labelSmall` — escala con la fuente sin API de medición
+ * (`DD-7` §7.2). `+N` vive en ella, en su propia línea y a todo ancho (D-1): a 320dp la
+ * caja es 26.286dp y tres puntos ya son 25.000dp.
+ *
+ * ⚠ Los tokens nombran valores, NO los cambian: `dotLegacy` 7dp (T1-6 → 8, intacto).
+ * `dotTray` 12dp está CONECTADO desde T4-7 como `padding` interior de esta tarjeta,
+ * 2.º término de la cadena de 56dp de la que depende toda la tabla de anchos; su KDoc
+ * en `Spacing.kt` aún describe una bandeja que el código no dibuja (`OQ-A2-3`, de
+ * T1-6/T4 — corregirlo sería una inserción y A2 solo borra ahí).
  */
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun WeekOverviewCard(
     weekStart: LocalDate,
@@ -99,22 +107,23 @@ internal fun WeekOverviewCard(
                 }
             }
 
-            FlowRow(
+            Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
-                verticalArrangement = Arrangement.spacedBy(Spacing.sm),
             ) {
                 weekDates.forEach { date ->
                     val bucketRows = dayBuckets[date]?.slots
                         ?.flatMap { it.rows }
                         .orEmpty()
-                    DayCell(
-                        date = date,
-                        rows = bucketRows,
-                        selected = date == selectedDate,
-                        resolve = resolve,
-                        onClick = { onSelectDate(date) },
-                    )
+                    Box(modifier = Modifier.weight(1f)) {
+                        DayCell(
+                            date = date,
+                            rows = bucketRows,
+                            selected = date == selectedDate,
+                            resolve = resolve,
+                            onClick = { onSelectDate(date) },
+                        )
+                    }
                 }
             }
         }
@@ -150,10 +159,15 @@ private fun DayCell(
         if (selected) append(", seleccionado")
     }
 
+    // A2 · R-A2-4 (OQ-A2-1)
+    val statusSlotHeight: Dp = with(LocalDensity.current) {
+        AgendaGeometry.dotLegacy + Spacing.collar +
+            MaterialTheme.typography.labelSmall.lineHeight.toDp()
+    }
+
     Column(
         modifier = Modifier
-            .width(AgendaGeometry.dayCellWidth)
-            .heightIn(min = AgendaGeometry.dayCellMinHeight)
+            .fillMaxWidth()
             .clip(ParentalShapes.medium)
             .background(
                 if (selected) MaterialTheme.colorScheme.primaryContainer
@@ -176,16 +190,21 @@ private fun DayCell(
             color = MaterialTheme.colorScheme.onSurface,
             fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
         )
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(Spacing.collar),
-            verticalAlignment = Alignment.CenterVertically,
+        Column(
+            modifier = Modifier.height(statusSlotHeight),
+            verticalArrangement = Arrangement.spacedBy(Spacing.collar),
         ) {
-            visibleCategories.forEach { row ->
-                TagDot(
-                    color = categoryTagTriple(resolve(row.actividad.categoryId))?.dot
-                        ?: MaterialTheme.colorScheme.outline,
-                    modifier = Modifier.size(AgendaGeometry.dotLegacy),
-                )
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(Spacing.collar),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                visibleCategories.forEach { row ->
+                    TagDot(
+                        color = categoryTagTriple(resolve(row.actividad.categoryId))?.dot
+                            ?: MaterialTheme.colorScheme.outline,
+                        modifier = Modifier.size(AgendaGeometry.dotLegacy),
+                    )
+                }
             }
             if (extraCategories > 0) {
                 Text(
