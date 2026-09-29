@@ -61,8 +61,12 @@ internal data class DayBucket(val date: LocalDate, val slots: List<AgendaSlot>)
 // ── Formateadores ─────────────────────────────────────────────────────
 internal fun weekdayLabel(date: LocalDate): String = ES_WEEKDAYS[date.dayOfWeek.ordinal]
 
+/** Mes COMPLETO + `" De "` + año — `R1-T1-1`: `"Agosto De 2026"`. El `De` en
+ *  mayúscula es la convención de `prd-v4:112` que ya usa [formatLongDate], no una
+ *  rareza: [ES_MONTHS_FULL] entra con la inicial en mayúscula y no se capitaliza.
+ *  [ES_MONTHS] sigue intacta — `prd-v4:84` adopta sus abreviaturas CLDR. */
 internal fun formatMonthYear(date: LocalDate): String =
-    "${ES_MONTHS[date.monthNumber - 1].replaceFirstChar { it.uppercase() }} ${date.year}"
+    "${ES_MONTHS_FULL[date.monthNumber - 1]} De ${date.year}"
 
 /** Día con cero a la izquierda — `"04"`, nunca `"4"`. FR-3 (`prd-v4:309`). Es la
  *  línea superior de la columna de fecha (`R1-T3-1`): su anatomía de dos líneas no

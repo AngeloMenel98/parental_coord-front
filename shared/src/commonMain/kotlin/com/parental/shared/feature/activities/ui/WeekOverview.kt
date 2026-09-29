@@ -32,7 +32,6 @@ import com.parental.shared.core.ui.components.categoryTagTriple
 import com.parental.shared.core.ui.theme.AgendaGeometry
 import com.parental.shared.core.ui.theme.ParentalShapes
 import com.parental.shared.core.ui.theme.Spacing
-import com.parental.shared.core.ui.theme.TypeTokens
 import kotlinx.datetime.LocalDate
 
 /*
@@ -93,7 +92,10 @@ internal fun WeekOverviewCard(
                 }
                 Text(
                     text = formatMonthYear(weekStart),
-                    style = TypeTokens.date,
+                    // R1-T1-1: `TypeTokens.date` (24sp serif) → `titleMedium` (16sp).
+                    // Acaba el sobreuso 24sp/16sp de la etiqueta; el peso SemiBold de
+                    // aquí es de A12, no de T1, y se conserva.
+                    style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.SemiBold,
                     textAlign = TextAlign.Center,
