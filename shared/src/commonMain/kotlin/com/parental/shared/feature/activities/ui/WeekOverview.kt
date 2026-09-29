@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -210,6 +211,14 @@ private fun DayCell(
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            // R7-T1-7: suelo de 48dp en el EJE DE ALTO, y sólo en ese eje. La
+            // IGUALDAD entre las siete celdas no la da este mínimo sino la ranura
+            // de alto fijo de arriba; un mínimo fijo sólo dejaría el borde inferior
+            // recto por casualidad. A 320dp la celda mide ~34.3dp de ancho y siete
+            // objetivos 48x48 no caben en una tarjeta topada a 640dp: la ANCHURA es
+            // exención aceptada, no un defecto. `Layout.touchMin` no existe en el
+            // árbol; el token de 48dp es `touchTargetLegacy`.
+            .heightIn(min = AgendaGeometry.touchTargetLegacy)
             .clip(ParentalShapes.medium)
             .background(
                 if (selected) MaterialTheme.colorScheme.primary
