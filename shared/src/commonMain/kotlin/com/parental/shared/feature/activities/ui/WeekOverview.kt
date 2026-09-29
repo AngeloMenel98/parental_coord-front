@@ -36,23 +36,18 @@ import kotlinx.datetime.LocalDate
 
 /*
  * Tarjeta de semana + celda de día — `calendar-design-redesign`, T4 (paso 5). `R7-T1-7`.
+ * Aislarla es lo que hace T1 revisable contra este archivo y no contra el monolito de
+ * 1.587 líneas; `DayCell` no usa API experimental (DD-2).
  *
- * Aislar la tarjeta es lo que hace T1 revisable contra este archivo y no contra el
- * monolito de 1.587 líneas; `DayCell` no usa API experimental (DD-2).
+ * A2 · `calendar-a11y-and-fit-fixes`: la fila es un `Row` de siete
+ * `Box(Modifier.weight(1f))`; la celda NO fija ancho —es función del viewport, luego no
+ * puede ser token— ni mínimo de alto. La banda uniforme la da `statusSlotHeight`
+ * (mecanismo y derivación en su sitio, más abajo). `+N` vive en ella, en su propia
+ * línea y a todo ancho (D-1): a 320dp la caja es 26.286dp.
  *
- * A2 · `calendar-a11y-and-fit-fixes`: la fila de días es un `Row` de siete
- * `Box(Modifier.weight(1f))`; la celda ya no fija ancho (función del viewport, luego no
- * puede ser token) ni mínimo de alto. La banda uniforme que el mínimo daba gratis la
- * reproduce `statusSlotHeight`: alto fijo derivado de `dotLegacy` + `collar` + el
- * `lineHeight` del propio `labelSmall` — escala con la fuente sin API de medición
- * (`DD-7` §7.2). `+N` vive en ella, en su propia línea y a todo ancho (D-1): a 320dp la
- * caja es 26.286dp y tres puntos ya son 25.000dp.
- *
- * ⚠ Los tokens nombran valores, NO los cambian: `dotLegacy` 7dp (T1-6 → 8, intacto).
- * `dotTray` 12dp está CONECTADO desde T4-7 como `padding` interior de esta tarjeta,
- * 2.º término de la cadena de 56dp de la que depende toda la tabla de anchos; su KDoc
- * en `Spacing.kt` aún describe una bandeja que el código no dibuja (`OQ-A2-3`, de
- * T1-6/T4 — corregirlo sería una inserción y A2 solo borra ahí).
+ * ⚠ `dotTray` 12dp está CONECTADO desde T4-7 como `padding` interior de esta tarjeta —
+ * 2.º término de la cadena de 56dp— y NO es la bandeja del punto. Los tokens nombran
+ * valores, NO los cambian.
  */
 
 @Composable
@@ -149,7 +144,9 @@ private fun DayCell(
         else -> "${rows.size} actividades"
     }
     val semanticLabel = buildString {
-        append(weekdayLabel(date))
+        // R2-T1-2: la etiqueta HABLA el día entero; la celda lo MUESTRA en dos
+        // letras. Mismo día, dos tablas — no un intercambio ciego.
+        append(ES_WEEKDAYS_SPOKEN[date.dayOfWeek.ordinal])
         append(", ")
         append(date.dayOfMonth)
         append(" ")
@@ -182,6 +179,7 @@ private fun DayCell(
         verticalArrangement = Arrangement.spacedBy(Spacing.collar),
     ) {
         Text(
+            // R2-T1-2: visual en dos letras; `labelSmall` ya trae `smcp`.
             text = weekdayLabel(date),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,

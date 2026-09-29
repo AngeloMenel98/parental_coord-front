@@ -11,14 +11,11 @@ import kotlinx.datetime.toLocalDateTime
 /*
  * Tablas de texto en español y formateadores puros del timeline — `calendar-design-redesign`.
  *
- * NO importa `androidx.compose.*`: sin recomposición, sin estado, sin `@OptIn`.
- * Las declaraciones son `internal` (eran `private` en el monolito): un símbolo
- * top-level `private` es invisible entre archivos (R2-T4-2).
+ * NO importa `androidx.compose.*`: sin recomposición, sin estado, sin `@OptIn`. Las
+ * declaraciones son `internal` (eran `private`): un `private` top-level no cruza archivo (R2-T4-2).
  *
- * ⚠ TECHO 170, SIN HOLGURA. Recibe adiciones de varios temas (T1-1/T1-2
- * declararon [ES_MONTHS_FULL]/[ES_WEEKDAYS_SPOKEN]; T2-2 las consume y añade
- * [formatLongDate]). Cuando hay que ganar líneas se COMPRIMEN comentarios, nunca
- * se suprime el porqué de una decisión.
+ * ⚠ TECHO 170, SIN HOLGURA. T1-1/T1-2 y T2-2 ya consumieron sus tablas. Cuando
+ * hay que ganar líneas se COMPRIMEN comentarios, nunca el porqué de una decisión.
  */
 
 // ── Constantes de copia ───────────────────────────────────────────────
@@ -27,15 +24,16 @@ internal val ES_MONTHS = listOf(
     "jul", "ago", "sep", "oct", "nov", "dic",
 )
 
-/** Los 12 nombres COMPLETOS, para fechas largas. **No** sustituyen a [ES_MONTHS]
- *  ni se derivan de ella: `prd-v4:84` adopta las abreviaturas CLDR del código y
- *  las dos listas no son intercambiables. */
+/** Los 12 nombres COMPLETOS. **No** sustituyen a [ES_MONTHS] ni se derivan: `prd-v4:84`
+ *  adopta las abreviaturas CLDR y las dos listas no son intercambiables. */
 internal val ES_MONTHS_FULL = listOf(
     "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
     "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
 )
 
-internal val ES_WEEKDAYS = listOf("Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom")
+/** Visual de la celda: DOS letras; el `Á` se conserva porque `labelSmall` no acentúa
+ *  solo. `ES_WEEKDAYS` (3 letras) RETIRADA —código muerto—; habla [ES_WEEKDAYS_SPOKEN]. `R2-T1-2`. */
+internal val ES_WEEKDAYS_CAPS = listOf("LU", "MA", "MI", "JU", "VI", "SÁ", "DO")
 
 /** Los 7 nombres completos: titular del día y etiqueta hablado. `R2-T1-2`. */
 internal val ES_WEEKDAYS_SPOKEN = listOf("Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo")
@@ -59,12 +57,14 @@ internal data class AgendaSlot(val hour: Int, val minute: Int, val rows: List<Ti
 internal data class DayBucket(val date: LocalDate, val slots: List<AgendaSlot>)
 
 // ── Formateadores ─────────────────────────────────────────────────────
-internal fun weekdayLabel(date: LocalDate): String = ES_WEEKDAYS[date.dayOfWeek.ordinal]
+/** VISUAL: dos letras. La hablada la elige el call-site (`ES_WEEKDAYS_SPOKEN[…]` en la
+ *  etiqueta combinada de F6); un intercambio ciego haría decir a TalkBack "MI, 26 ago
+ *  2026, 2 actividades". `R2-T1-2`. */
+internal fun weekdayLabel(date: LocalDate): String = ES_WEEKDAYS_CAPS[date.dayOfWeek.ordinal]
 
-/** Mes COMPLETO + `" De "` + año — `R1-T1-1`: `"Agosto De 2026"`. El `De` en
- *  mayúscula es la convención de `prd-v4:112` que ya usa [formatLongDate], no una
- *  rareza: [ES_MONTHS_FULL] entra con la inicial en mayúscula y no se capitaliza.
- *  [ES_MONTHS] sigue intacta — `prd-v4:84` adopta sus abreviaturas CLDR. */
+/** Mes COMPLETO + `" De "` + año — `R1-T1-1`: `"Agosto De 2026"`. El `De` mayúscula
+ *  es la convención de `prd-v4:112` que ya usa [formatLongDate]; [ES_MONTHS_FULL] entra
+ *  capitalizado y no se re-capitaliza. */
 internal fun formatMonthYear(date: LocalDate): String =
     "${ES_MONTHS_FULL[date.monthNumber - 1]} De ${date.year}"
 
