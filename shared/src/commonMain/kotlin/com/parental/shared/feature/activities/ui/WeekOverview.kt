@@ -160,9 +160,12 @@ private fun DayCell(
     resolve: (String) -> CategoryInfo?,
     onClick: () -> Unit,
 ) {
-    val uniqueCategories = rows.distinctBy { it.actividad.categoryId }
-    val visibleCategories = uniqueCategories.take(3)
-    val extraCategories = (uniqueCategories.size - visibleCategories.size).coerceAtLeast(0)
+    // R5-T1-5 (C3): las TRES unidades de esta celda son ACTIVIDADES — un punto
+    // por actividad con tope 3, `+N` con las que sobran, y la etiqueta combinada
+    // con todas. Antes la celda mezclaba unidades: puntos por categoría y `+N`
+    // por categoría, mientras la etiqueta contaba actividades. Se contradecía.
+    val visibleActivities = rows.take(3)
+    val extraActivities = (rows.size - visibleActivities.size).coerceAtLeast(0)
     val countLabel = when (rows.size) {
         0 -> "sin actividades"
         1 -> "1 actividad"
@@ -233,7 +236,7 @@ private fun DayCell(
                 horizontalArrangement = Arrangement.spacedBy(Spacing.collar),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                visibleCategories.forEach { row ->
+                visibleActivities.forEach { row ->
                     TagDot(
                         color = categoryTagTriple(resolve(row.actividad.categoryId))?.dot
                             ?: MaterialTheme.colorScheme.outline,
@@ -241,9 +244,9 @@ private fun DayCell(
                     )
                 }
             }
-            if (extraCategories > 0) {
+            if (extraActivities > 0) {
                 Text(
-                    text = "+$extraCategories",
+                    text = "+$extraActivities",
                     style = MaterialTheme.typography.labelSmall,
                     color = cellForeground,
                 )
