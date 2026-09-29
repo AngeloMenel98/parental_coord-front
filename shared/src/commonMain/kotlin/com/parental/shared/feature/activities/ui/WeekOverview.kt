@@ -189,12 +189,22 @@ private fun DayCell(
             MaterialTheme.typography.labelSmall.lineHeight.toDp()
     }
 
+    // R4-T1-4 — UNA regla, TRES foregrounds. `onSurfaceVariant` sobre `primary`
+    // mide 0.69:1: un solo foreground sin intercambiar es ilegible, y por eso
+    // la regla se declara una vez y no como tres ediciones que puedan olvidarse.
+    // Sin seleccionar no cambia nada: `onSurface` / `onSurfaceVariant`.
+    val onSelected = MaterialTheme.colorScheme.onPrimary
+    val cellForeground =
+        if (selected) onSelected else MaterialTheme.colorScheme.onSurfaceVariant
+    val numberForeground =
+        if (selected) onSelected else MaterialTheme.colorScheme.onSurface
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .clip(ParentalShapes.medium)
             .background(
-                if (selected) MaterialTheme.colorScheme.primaryContainer
+                if (selected) MaterialTheme.colorScheme.primary
                 else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
             )
             .clickable(onClick = onClick)
@@ -207,12 +217,12 @@ private fun DayCell(
             // R2-T1-2: visual en dos letras; `labelSmall` ya trae `smcp`.
             text = weekdayLabel(date),
             style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = cellForeground,
         )
         Text(
             text = date.dayOfMonth.toString(),
             style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurface,
+            color = numberForeground,
             fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
         )
         Column(
@@ -235,7 +245,7 @@ private fun DayCell(
                 Text(
                     text = "+$extraCategories",
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = cellForeground,
                 )
             }
         }
