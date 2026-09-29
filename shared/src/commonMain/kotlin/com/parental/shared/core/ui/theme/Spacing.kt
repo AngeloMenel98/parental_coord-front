@@ -110,16 +110,35 @@ object AgendaGeometry {
      */
     val nodeCard: Dp = 40.dp
 
-    /** Punto de categoría dentro de la celda de día. Propietario: T1-6 (7 → 8). */
-    val dotLegacy: Dp = 7.dp
+    /**
+     * Punto de categoría dentro de la celda de día. `R6-T1-6` — **7 → 8**.
+     *
+     * 8dp es el mínimo de indicador de Material y el suelo de legibilidad: por
+     * debajo degrada el contraste no textual (WCAG 1.4.11) justo en el viewport
+     * más estrecho. `R6-T1-6` prohíbe expresamente encogerlo para que quepa.
+     */
+    val dotLegacy: Dp = 8.dp
 
     /**
-     * Punto de estado. Va emparejado con [dotTray]: los dos son una sola
-     * geometría (8dp dentro de 12dp) y no deben cambiar por separado.
+     * Punto de estado. 8dp. `R6-T2-6`.
+     *
+     * ⚠ KDoc corregido en T1-6 (`OQ-A2-3`): antes decía ir emparejado con
+     * [dotTray] como "8dp dentro de 12dp". Es FALSO y nunca lo fue — [dotTray]
+     * es el `padding` de la tarjeta y este punto va en la insignia de la fila
+     * (`ActivityBody.kt:160`, `DayAgenda.kt:285,292`). No son una geometría.
      */
     val statusBadge: Dp = 8.dp
 
-    /** Bandeja de 12dp que aloja el punto de estado de 8dp. Propietario: T1-6. */
+    /**
+     * Relleno INTERIOR de la tarjeta de semana — 12dp. Conectado desde T4-7.
+     * Propietario del cambio: T1-6.
+     *
+     * ⚠ El nombre engaña; el KDoc anterior ("bandeja que aloja el punto de 8dp")
+     * describía una bandeja que NADA dibuja. Los 12dp son el `padding` de esta
+     * tarjeta y el 2.º término de la cadena de 56dp de la que depende toda la
+     * tabla de anchos (2 × 12 = 24). La bandeja real del punto de día la dibuja
+     * T1-6 con `Spacing.xs`/`collar`, NO con este token: cambiarlo rompe la cadena.
+     */
     val dotTray: Dp = 12.dp
 
     /** Columna de tiempo del agenda del día. Propietario: T2 (`R4-T2-4`). */

@@ -25,6 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -186,9 +187,13 @@ private fun DayCell(
         if (selected) append(", seleccionado")
     }
 
-    // A2 · R-A2-4 (OQ-A2-1)
+    // A2 · R-A2-4 (OQ-A2-1). T1-6 rederiva los sumandos: la fila del punto ya
+    // no es el punto, es la BANDEJA, y la bandeja son 2 × `Spacing.xs` + punto.
+    // El `Column` de la ranura tiene DOS hijos (bandeja, línea `+N`), luego hay
+    // UN `spacedBy(collar)`, no dos: la holgura es 0dp, no −2dp. `height()` recorta
+    // en silencio, así que esta igualdad es una condición viva, no una coincidencia.
     val statusSlotHeight: Dp = with(LocalDensity.current) {
-        AgendaGeometry.dotLegacy + Spacing.collar +
+        Spacing.xs + AgendaGeometry.dotLegacy + Spacing.xs + Spacing.collar +
             MaterialTheme.typography.labelSmall.lineHeight.toDp()
     }
 
@@ -232,16 +237,32 @@ private fun DayCell(
             modifier = Modifier.height(statusSlotHeight),
             verticalArrangement = Arrangement.spacedBy(Spacing.collar),
         ) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(Spacing.collar),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                visibleActivities.forEach { row ->
-                    TagDot(
-                        color = categoryTagTriple(resolve(row.actividad.categoryId))?.dot
-                            ?: MaterialTheme.colorScheme.outline,
-                        modifier = Modifier.size(AgendaGeometry.dotLegacy),
-                    )
+            // R6-T1-6 / ERR-2: el punto NO se dibuja sobre la celda teñida, sino
+            // sobre una bandeja `surface`. Sobre la celda, los seis puntos del tema
+            // oscuro caen a 1.86–2.65:1 y uno del claro a 2.69:1 — todos bajo el
+            // 3:1 de WCAG 1.4.11. Sobre la bandeja: 3.40–6.88 claro / 3.75–5.33
+            // oscuro. Su BORDE es ~1.26:1 y no se ve (`OI-6`): es fondo del punto,
+            // no un marco, y nadie debe "arreglarlo" con un borde.
+            if (visibleActivities.isNotEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .clip(ParentalShapes.small)
+                        .background(MaterialTheme.colorScheme.surface)
+                        .padding(horizontal = Spacing.collar, vertical = Spacing.xs)
+                        .clearAndSetSemantics { },
+                ) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.collar),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        visibleActivities.forEach { row ->
+                            TagDot(
+                                color = categoryTagTriple(resolve(row.actividad.categoryId))?.dot
+                                    ?: MaterialTheme.colorScheme.outline,
+                                modifier = Modifier.size(AgendaGeometry.dotLegacy),
+                            )
+                        }
+                    }
                 }
             }
             if (extraActivities > 0) {
