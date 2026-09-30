@@ -212,12 +212,6 @@ class ActividadesViewModel(
         if (current is DetailUiState.Error) selectActividad(current.id)
     }
 
-    /** Atrás desde la pantalla de detalle antigua; la rama que lo llama desaparece en T2-2. */
-    fun backToList() {
-        val opened = _uiState.value.detail.openedId ?: return
-        closeDetail(opened)
-    }
-
     /** Dispara el snackbar para un acción inerte (placeholders). */
     fun onInertAction(message: String) {
         _uiState.value = _uiState.value.copy(snackbarMessage = message)

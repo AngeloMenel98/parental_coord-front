@@ -3,6 +3,7 @@ package com.parental.shared.feature.activities.ui
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -15,6 +16,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.font.FontWeight
@@ -27,7 +29,8 @@ import com.parental.shared.core.ui.theme.ParentalShapes
 import com.parental.shared.core.ui.theme.Spacing
 import com.parental.shared.core.ui.theme.TypeTokens
 import com.parental.shared.feature.activities.domain.model.canConfirm
-import com.parental.shared.feature.activities.ui.detail.ActividadDetailScreen
+import com.parental.shared.feature.activities.ui.detail.ActividadDetailSheet
+import com.parental.shared.feature.activities.ui.openedId
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
@@ -59,6 +62,25 @@ fun ActividadesScreen(
     var weekStartIso by rememberSaveable { mutableStateOf(mondayStart(initialToday).toString()) }
     var selectedDateIso by rememberSaveable { mutableStateOf(initialToday.toString()) }
 
+    // D-B-1 · El `SheetState` lo posee el host. `show()` se vuelve a PEDIR en cada apertura, así
+    // que un fallo de estado se autocura en lugar de dejar la hoja incapaz de reabrir.
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val listFallback = remember { FocusRequester() }
+    var originId by rememberSaveable { mutableStateOf<String?>(null) }
+
+    // R4 · Guardado SIEMPRE y NUNCA antes del clear: pedido antes, `closeDetail` podría haber
+    // borrado ya la fila y la petición caería al contenedor, o fallaría sin red de seguridad.
+    LaunchedEffect(uiState.detail) {
+        if (uiState.detail is DetailUiState.Closed) {
+            val returning = originId
+            originId = null
+            if (returning != null) {
+                runCatching { focusRequesters[returning]?.requestFocus() }
+                    .recoverCatching { runCatching { listFallback.requestFocus() } }
+            }
+        }
+    }
+
     LaunchedEffect(uiState.snackbarMessage) {
         uiState.snackbarMessage?.let { message ->
             snackbarHostState.showSnackbar(message)
@@ -68,26 +90,14 @@ fun ActividadesScreen(
 
     val resolve: (String) -> CategoryInfo? = { id -> uiState.categories[id] }
 
-    if (uiState.detail is DetailUiState.Content) {
-        ActividadDetailScreen(
-            actividad = (uiState.detail as DetailUiState.Content).actividad,
-            resolve = resolve,
-            memberNames = uiState.memberNames,
-            snackbarHostState = snackbarHostState,
-            onBack = viewModel::backToList,
-            onInertAction = viewModel::onInertAction,
-            onNavigateBottom = onNavigateBottom,
-            onConfirm = viewModel::confirmAssignment,
-            isConfirming = uiState.isConfirming,
-            currentUserId = viewModel.currentUserId,
-        )
-    } else {
+    // FR-1 · Composición hermana: la lista se compone SIEMPRE y la hoja se superpone, así que
+    // sobreviven al ciclo abrir/cerrar sus `rememberSaveable`, `remember` y `Crossfade` (R4-T5-4).
+    Box(modifier = Modifier.fillMaxSize()) {
         ActividadesListScreen(
             uiState = uiState,
             onSelectTab = viewModel::selectTab,
-            onSelectActividad = viewModel::selectActividad,
+            onSelectActividad = { id -> originId = id; viewModel.selectActividad(id) },
             onRetryList = viewModel::retry,
-            onRetryDetail = viewModel::retryDetail,
             resolve = resolve,
             snackbarHostState = snackbarHostState,
             onInertAction = viewModel::onInertAction,
@@ -102,7 +112,26 @@ fun ActividadesScreen(
             selectedDateIso = selectedDateIso,
             onSelectedDateChange = { selectedDateIso = it },
             focusRequesters = focusRequesters,
+            // Hogar de foco: SIN nodo anunciable nuevo, sólo un destino al que caer si la fila
+            // que abrió la hoja ya no existe.
+            listFocusRequester = listFallback,
         )
+        if (uiState.detail !is DetailUiState.Closed) {
+            LaunchedEffect(uiState.detail) { sheetState.show() }
+            ActividadDetailSheet(
+                state = uiState.detail,
+                sheetState = sheetState,
+                resolve = resolve,
+                memberNames = uiState.memberNames,
+                snackbarHostState = snackbarHostState,
+                onDismissRequest = { uiState.detail.openedId?.let { viewModel.closeDetail(it) } },
+                onRetry = viewModel::retryDetail,
+                onInertAction = viewModel::onInertAction,
+                onConfirm = viewModel::confirmAssignment,
+                isConfirming = uiState.isConfirming,
+                currentUserId = viewModel.currentUserId,
+            )
+        }
     }
 }
 
@@ -115,7 +144,6 @@ private fun ActividadesListScreen(
     onSelectTab: (ActivityTab) -> Unit,
     onSelectActividad: (String) -> Unit,
     onRetryList: () -> Unit,
-    onRetryDetail: () -> Unit,
     resolve: (String) -> CategoryInfo?,
     snackbarHostState: SnackbarHostState,
     onInertAction: (String) -> Unit,
@@ -130,6 +158,7 @@ private fun ActividadesListScreen(
     selectedDateIso: String,
     onSelectedDateChange: (String) -> Unit,
     focusRequesters: MutableMap<String, FocusRequester>,
+    listFocusRequester: FocusRequester,
 ) {
     val zone = remember { TimeZone.currentSystemDefault() }
     val today = remember(zone) { currentDateIn(zone) }
@@ -190,7 +219,14 @@ private fun ActividadesListScreen(
         )
     }
 
-    Scaffold(
+    // R4 · Hogar de foco de la lista: `focusable()` da destino a `requestFocus()` y
+    // `clearAndSetSemantics { }` evita que ese destino sea un nodo anunciable nuevo. Sólo se usa
+    // cuando la fila que abrió la hoja se ha ido.
+    Box(
+        modifier = Modifier.fillMaxSize().focusRequester(listFocusRequester)
+            .focusable().clearAndSetSemantics { },
+    ) {
+        Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("Actividades") },
@@ -215,7 +251,10 @@ private fun ActividadesListScreen(
                 onNavigate = onNavigateBottom,
             )
         },
-        snackbarHost = { SnackbarHost(snackbarHostState) },
+        // R-8 / G-1 · Un ÚNICO `SnackbarHost` en toda la pantalla. La lista lo hospeda sólo
+        // cuando NO hay hoja; mientras hay hoja lo hospeda la hoja. Dos hosts siempre activos
+        // serían doble pintada y doble anuncio.
+        snackbarHost = { if (uiState.detail is DetailUiState.Closed) SnackbarHost(snackbarHostState) },
     ) { padding ->
         Column(
             modifier = Modifier.fillMaxSize().padding(padding),
@@ -227,42 +266,6 @@ private fun ActividadesListScreen(
                 selectedTab = uiState.selectedTab,
                 onSelectTab = onSelectTab,
             )
-
-            // Banner de error del detalle (lista permanece visible, con retry).
-            (uiState.detail as? DetailUiState.Error)?.let { error ->
-                Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = Spacing.lg, vertical = Spacing.xs)
-                        .widthIn(max = Spacing.maxContentWidth)
-                        .align(Alignment.CenterHorizontally),
-                    color = MaterialTheme.colorScheme.errorContainer,
-                    shape = ParentalShapes.small,
-                ) {
-                    Row(
-                        modifier = Modifier.padding(
-                            start = Spacing.md,
-                            top = Spacing.xs,
-                            bottom = Spacing.xs,
-                            end = Spacing.xs,
-                        ),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            text = error.message,
-                            modifier = Modifier.weight(1f),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onErrorContainer,
-                        )
-                        TextButton(
-                            onClick = onRetryDetail,
-                            modifier = Modifier.heightIn(min = AgendaGeometry.touchTargetLegacy),
-                        ) {
-                            Text("Reintentar")
-                        }
-                    }
-                }
-            }
 
             when {
                 uiState.isLoading && uiState.actividades.isEmpty() -> ListSkeleton()
@@ -316,6 +319,7 @@ private fun ActividadesListScreen(
                     )
                 }
             }
+        }
         }
     }
 }
