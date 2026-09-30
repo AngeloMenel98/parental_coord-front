@@ -17,7 +17,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -68,16 +67,28 @@ fun ActividadesScreen(
     val listFallback = remember { FocusRequester() }
     var originId by rememberSaveable { mutableStateOf<String?>(null) }
 
-    // R4 · Guardado SIEMPRE y NUNCA antes del clear: pedido antes, `closeDetail` podría haber
-    // borrado ya la fila y la petición caería al contenedor, o fallaría sin red de seguridad.
+    // R4 · Destino del foco al cerrar: la fila que abrió la hoja, o el contenedor de la lista
+    // si esa fila ya no está compuesta. ⚠ La ausencia se comprueba EXPRESAMENTE: con `?.` el
+    // acceso cortocircuitaba devolviendo `null` SIN lanzar, y `recoverCatching` —que sólo corre
+    // ante excepción— no se invocaba nunca, dejando el respaldo como código muerto. `runCatching`
+    // cubre además el caso en que la fila existe pero `requestFocus()` falla.
+    val returnFocus: (String) -> Unit = { id ->
+        val row = focusRequesters[id]
+        if (row == null) {
+            runCatching { listFallback.requestFocus() }
+        } else {
+            runCatching { row.requestFocus() }
+                .onFailure { runCatching { listFallback.requestFocus() } }
+        }
+    }
+
+    // El pedido es SIEMPRE posterior al clear y va guardado: pedido antes, `closeDetail` podría
+    // haber borrado ya la fila y la petición caería al contenedor, o fallaría sin red de seguridad.
     LaunchedEffect(uiState.detail) {
         if (uiState.detail is DetailUiState.Closed) {
             val returning = originId
             originId = null
-            if (returning != null) {
-                runCatching { focusRequesters[returning]?.requestFocus() }
-                    .recoverCatching { runCatching { listFallback.requestFocus() } }
-            }
+            if (returning != null) returnFocus(returning)
         }
     }
 
@@ -91,7 +102,9 @@ fun ActividadesScreen(
     val resolve: (String) -> CategoryInfo? = { id -> uiState.categories[id] }
 
     // FR-1 · Composición hermana: la lista se compone SIEMPRE y la hoja se superpone, así que
-    // sobreviven al ciclo abrir/cerrar sus `rememberSaveable`, `remember` y `Crossfade` (R4-T5-4).
+    // sobreviven al ciclo abrir/cerrar sus `rememberSaveable`, `remember` y `Crossfade`.
+    // ⚠ `R4-T5-4` es la regla de "condición de vacío como `targetState`" de T5-4, de OTRO
+    // cambio; NO es el R-4 (foco) de `activity-detail-modal`, que es el de arriba.
     Box(modifier = Modifier.fillMaxSize()) {
         ActividadesListScreen(
             uiState = uiState,
@@ -219,12 +232,25 @@ private fun ActividadesListScreen(
         )
     }
 
-    // R4 · Hogar de foco de la lista: `focusable()` da destino a `requestFocus()` y
-    // `clearAndSetSemantics { }` evita que ese destino sea un nodo anunciable nuevo. Sólo se usa
-    // cuando la fila que abrió la hoja se ha ido.
+    // R4 · Hogar de foco de la lista: `focusable()` da destino a `requestFocus()` cuando la
+    // fila que abrió la hoja ya no está compuesta.
+    //
+    // ⚠ SIN `clearAndSetSemantics { }` (retirado en el pase de remediación). Ese modificador
+    // no vacía sólo SU propio nodo: limpia además la semántica de TODOS sus descendientes
+    // (`SemanticsModifier.kt:156-162` en compose-ui 1.7.1), de modo que las filas, el
+    // `TopAppBar`, las pestañas, el `BottomNavBar` y el `SnackbarHost` de la lista se
+    // colapsaban en un único nodo vacío para TalkBack/VoiceOver — de forma PERMANENTE, hoja
+    // abierta o cerrada, que es justo lo que R-4 necesita para poder devolver el foco a una
+    // fila. Con la hoja CERRADA la lista debe ser plenamente legible (FR-11).
+    //
+    // El fondo NO necesita supresión propia para ser inerte (FR-4): con la hoja abierta el
+    // contenido se compone en OTRA ventana de plataforma —`ModalBottomSheetDialog` es un
+    // `Dialog` real (`AndroidDialog.android.kt:287-294`, `ComponentDialog`, sin
+    // `FLAG_NOT_TOUCH_MODAL`)— y el `Scrim` de la biblioteca la cubre entera
+    // (`ModalBottomSheet.kt:408-431`, `fillMaxSize` + `detectTapGestures`), así que ningún
+    // toque llega a la lista. Esa misma ventana modal es la que acota el árbol accesible.
     Box(
-        modifier = Modifier.fillMaxSize().focusRequester(listFocusRequester)
-            .focusable().clearAndSetSemantics { },
+        modifier = Modifier.fillMaxSize().focusRequester(listFocusRequester).focusable(),
     ) {
         Scaffold(
         topBar = {
