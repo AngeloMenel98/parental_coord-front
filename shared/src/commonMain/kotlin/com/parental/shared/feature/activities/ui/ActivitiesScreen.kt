@@ -18,11 +18,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.text.font.FontWeight
 import com.parental.shared.core.ui.components.BottomNavBar
 import com.parental.shared.core.ui.components.CategoryInfo
 import com.parental.shared.core.ui.theme.MotionTokens
-import com.parental.shared.core.ui.theme.TypeTokens
 import com.parental.shared.feature.activities.domain.model.canConfirm
 import com.parental.shared.feature.activities.ui.detail.ActividadDetailSheet
 import com.parental.shared.feature.activities.ui.openedId
@@ -64,10 +62,13 @@ fun ActividadesScreen(
     var originId by rememberSaveable { mutableStateOf<String?>(null) }
 
     // R4 · Destino del foco al cerrar: la fila que abrió la hoja, o el contenedor de la lista
-    // si esa fila ya no está compuesta. ⚠ La ausencia se comprueba EXPRESAMENTE: con `?.` el
-    // acceso cortocircuitaba devolviendo `null` SIN lanzar, y `recoverCatching` —que sólo corre
-    // ante excepción— no se invocaba nunca, dejando el respaldo como código muerto. `runCatching`
-    // cubre además el caso en que la fila existe pero `requestFocus()` falla.
+    // si esa fila ya no está. ⚠ HAY DOS CAÍDAS DISTINTAS y aquí están las dos: la fila no está en
+    // `focusRequesters` (su id salió del conjunto de datos en una recarga, o el `originId`
+    // sobrevivió a la muerte del proceso) ⇒ rama `row == null`; o la fila está registrada pero
+    // su nodo ya no está adjunto (se destruyó el ítem al salir del viewport) ⇒ `requestFocus()`
+    // LANZA y lo cubre `onFailure`. Sin esa segunda rama el respaldo es código muerto: `?.`
+    // cortocircuitaba devolviendo `null` sin lanzar, y `recoverCatching` —que sólo corre ante
+    // excepción— no se invocaba nunca (así lo halló verify en el pase 2, C-5).
     val returnFocus: (String) -> Unit = { id ->
         val row = focusRequesters[id]
         if (row == null) {
@@ -76,6 +77,15 @@ fun ActividadesScreen(
             runCatching { row.requestFocus() }
                 .onFailure { runCatching { listFallback.requestFocus() } }
         }
+    }
+
+    // R4 · Poda por CONJUNTO DE DATOS, no por descarte. Podar al cerrar borraría la entrada de
+    // una fila que sigue compuesta y que no volvería a registrarse —`SideEffect` sólo corre al
+    // recomponer el ítem—, así que el retorno caería al contenedor por un motivo inventado. Una
+    // recarga, en cambio, cambia los datos: todo ítem superviviente recompone y se reinscribe por
+    // su `SideEffect`, y un id que ya no existe no puede volver a pedir foco. Queda acotado.
+    LaunchedEffect(uiState.actividades) {
+        focusRequesters.keys.retainAll(uiState.actividades.map { it.id }.toSet())
     }
 
     // El pedido es SIEMPRE posterior al clear y va guardado: pedido antes, `closeDetail` podría
