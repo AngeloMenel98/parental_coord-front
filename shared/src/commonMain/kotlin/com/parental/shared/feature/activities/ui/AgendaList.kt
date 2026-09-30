@@ -19,8 +19,12 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -60,6 +64,7 @@ internal fun AgendaTimeline(
     onConfirm: (String) -> Unit,
     isConfirming: Boolean,
     currentUserId: String,
+    focusRequesters: MutableMap<String, FocusRequester>,
 ) {
     Box(
         modifier = Modifier.fillMaxSize(),
@@ -107,6 +112,7 @@ internal fun AgendaTimeline(
                                     onConfirm = onConfirm,
                                     isConfirming = isConfirming,
                                     currentUserId = currentUserId,
+                                    focusRequesters = focusRequesters,
                                 )
                             }
                         }
@@ -157,7 +163,13 @@ internal fun AgendaTimelineRow(
     onConfirm: (String) -> Unit,
     isConfirming: Boolean,
     currentUserId: String,
+    focusRequesters: MutableMap<String, FocusRequester>,
 ) {
+    // R4-T1-2 · `SideEffect` + no-leer-en-composición ⇒ escribir el mapa no recompone
+    // a nadie: sin bucle. `remember` sin clave porque la posición ya identifica la fila.
+    val focusRequester = remember { FocusRequester() }
+    SideEffect { focusRequesters[row.actividad.id] = focusRequester }
+
     val info = resolve(row.actividad.categoryId)
     val categoryColor = categoryTagTriple(info)?.dot ?: MaterialTheme.colorScheme.outline
     val canConfirm = row.actividad.canConfirm(currentUserId)
@@ -225,7 +237,9 @@ internal fun AgendaTimelineRow(
             showTime = true,
             canConfirm = canConfirm,
             onClick = { onSelectActividad(row.actividad.id) },
-            modifier = Modifier.weight(1f),
+            // C4: `ActivityBody` aplica su `modifier` ANTES de `.clickable`, el orden que
+            // exige `focusRequester`; por eso el fichero no cambia.
+            modifier = Modifier.weight(1f).focusRequester(focusRequester),
         )
 
         if (canConfirm) {

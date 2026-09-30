@@ -19,9 +19,13 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.style.TextAlign
@@ -153,8 +157,14 @@ internal fun DayAgendaRow(
     onSelectActividad: (String) -> Unit,
     onConfirm: (String) -> Unit,
     isConfirming: Boolean,
+    focusRequesters: MutableMap<String, FocusRequester>,
     modifier: Modifier = Modifier,
 ) {
+    // R4-T1-2 · Mismo registro que `AgendaTimelineRow`; el mapa es compartido para
+    // que T2-2 pueda devolver el foco sea cual sea la pestaña que abrió la hoja.
+    val focusRequester = remember { FocusRequester() }
+    SideEffect { focusRequesters[row.actividad.id] = focusRequester }
+
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -201,7 +211,8 @@ internal fun DayAgendaRow(
             isConfirming = isConfirming,
             modifier = Modifier
                 .weight(1f)
-                .padding(start = Spacing.md),
+                .padding(start = Spacing.md)
+                .focusRequester(focusRequester),
         )
     }
 }

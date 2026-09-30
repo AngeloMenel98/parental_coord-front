@@ -9,6 +9,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.font.FontWeight
@@ -58,6 +59,7 @@ internal fun WeekTimeline(
     onSelectDate: (LocalDate) -> Unit,
     onPreviousWeek: () -> Unit,
     onNextWeek: () -> Unit,
+    focusRequesters: MutableMap<String, FocusRequester>,
 ) {
     val selectedBucket = dayBuckets[selectedDate]
     val unscheduledRows = rows.filter { it.localStart == null }
@@ -126,6 +128,7 @@ internal fun WeekTimeline(
                                     onSelectActividad = onSelectActividad,
                                     onConfirm = onConfirm,
                                     isConfirming = isConfirming,
+                                    focusRequesters = focusRequesters,
                                 )
                             }
                         }
@@ -157,6 +160,7 @@ internal fun WeekTimeline(
                         onConfirm = onConfirm,
                         isConfirming = isConfirming,
                         currentUserId = currentUserId,
+                        focusRequesters = focusRequesters,
                     )
                 }
             }

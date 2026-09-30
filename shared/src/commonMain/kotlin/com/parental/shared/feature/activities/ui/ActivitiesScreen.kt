@@ -14,6 +14,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.font.FontWeight
@@ -50,6 +51,8 @@ fun ActividadesScreen(
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val initialToday = remember { currentDate() }
+    // R4-T1-2 · id → `FocusRequester` de la fila que la pintó; T2-2 lo lee al cerrar.
+    val focusRequesters = remember { mutableStateMapOf<String, FocusRequester>() }
 
     // Estado local de presentación; selectedTab sigue perteneciendo al ViewModel.
     var timelineMode by rememberSaveable { mutableStateOf(TimelineMode.AGENDA) }
@@ -98,6 +101,7 @@ fun ActividadesScreen(
             onWeekStartChange = { weekStartIso = it },
             selectedDateIso = selectedDateIso,
             onSelectedDateChange = { selectedDateIso = it },
+            focusRequesters = focusRequesters,
         )
     }
 }
@@ -125,6 +129,7 @@ private fun ActividadesListScreen(
     onWeekStartChange: (String) -> Unit,
     selectedDateIso: String,
     onSelectedDateChange: (String) -> Unit,
+    focusRequesters: MutableMap<String, FocusRequester>,
 ) {
     val zone = remember { TimeZone.currentSystemDefault() }
     val today = remember(zone) { currentDateIn(zone) }
@@ -307,6 +312,7 @@ private fun ActividadesListScreen(
                         onSelectDate = { date -> onSelectedDateChange(date.toString()) },
                         onPreviousWeek = { navigateWeek(-1) },
                         onNextWeek = { navigateWeek(1) },
+                        focusRequesters = focusRequesters,
                     )
                 }
             }
@@ -333,6 +339,7 @@ private fun TimelineContent(
     onSelectDate: (LocalDate) -> Unit,
     onPreviousWeek: () -> Unit,
     onNextWeek: () -> Unit,
+    focusRequesters: MutableMap<String, FocusRequester>,
 ) {
     // R4-T5-4 · SITIO 1 de 2. `Crossfade` (no `AnimatedContent`: es experimental
     // en CMP 1.7.1 y añadiría un `@OptIn`, contra la disciplina de DD-2). El
@@ -356,6 +363,7 @@ private fun TimelineContent(
                 onConfirm = onConfirm,
                 isConfirming = isConfirming,
                 currentUserId = currentUserId,
+                focusRequesters = focusRequesters,
             )
 
             TimelineMode.SEMANA -> WeekTimeline(
@@ -373,6 +381,7 @@ private fun TimelineContent(
                 onSelectDate = onSelectDate,
                 onPreviousWeek = onPreviousWeek,
                 onNextWeek = onNextWeek,
+                focusRequesters = focusRequesters,
             )
         }
     }
