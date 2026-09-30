@@ -10,6 +10,7 @@ import com.parental.shared.feature.activities.domain.model.ActividadDetalle
 import com.parental.shared.feature.bonds.data.remote.BondsApi
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
@@ -25,14 +26,46 @@ enum class ActivityTab(val label: String) {
     OBLIGACIONES("Obligaciones"),
 }
 
+/** Estado del detalle de UNA actividad — R1. El **id es la única clave**: sustituye a
+ *  `selectedActividad`/`isDetailLoading`/`detailError`/`lastSelectedId`, y clavear por
+ *  *payload* haría el estado de carga irrepresentable (mientras `Loading` no hay payload
+ *  que no sea `null`). Por eso la hoja se compone sobre `!= Closed`, no sobre "hay algo
+ *  seleccionado". [Content.id] es siempre igual a `actividad.id`. */
+sealed interface DetailUiState {
+    /** Ninguna hoja abierta. Es el estado inicial y el único tras un descarte. */
+    data object Closed : DetailUiState
+
+    /** Petición en vuelo para [id] — la hoja pinta su esqueleto (R5). */
+    data class Loading(val id: String) : DetailUiState
+
+    /** Falló `GET /activities/:id` para [id] — la hoja pinta el error inline (R6). */
+    data class Error(val id: String, val message: String) : DetailUiState
+
+    /** Detalle cargado de [id]. */
+    data class Content(val id: String, val actividad: ActividadDetalle) : DetailUiState
+}
+
+/** Id de la actividad abierta, o `null` si no hay ninguna — R1/R2. Existe porque
+ *  [DetailUiState.Closed] no lleva `id` y una interfaz sellada no admite un smart cast
+ *  "todo menos `Closed`": tras `if (current is Closed) return` el tipo sigue siendo
+ *  `DetailUiState` y `current.id` no resuelve. ⚠ La misma regla aplica en la UI: `uiState`
+ *  es una `val` delegada (`by collectAsState()`) y no admite smart cast, de modo que el `as`
+ *  explícito de la rama `Content` en `ActivitiesScreen` es necesario, no redundante. */
+internal val DetailUiState.openedId: String?
+    get() = when (this) {
+        DetailUiState.Closed -> null
+        is DetailUiState.Loading -> id
+        is DetailUiState.Error -> id
+        is DetailUiState.Content -> id
+    }
+
 data class ActivitiesUiState(
     val isLoading: Boolean = true,
     val listError: String? = null,
     val actividades: List<Actividad> = emptyList(),
     val selectedTab: ActivityTab = ActivityTab.TODOS,
-    val selectedActividad: ActividadDetalle? = null,
-    val isDetailLoading: Boolean = false,
-    val detailError: String? = null,
+    /** Detalle por id — R1. `Closed` = no hay hoja; el resto lleva el id de la actividad. */
+    val detail: DetailUiState = DetailUiState.Closed,
     /** uuid → info resuelta de GET /categories + preferencias por nombre. */
     val categories: Map<String, CategoryInfo> = emptyMap(),
     /** userId → "Nombre Apellido" (del vínculo activo). */
@@ -56,7 +89,18 @@ class ActividadesViewModel(
     private val _uiState = MutableStateFlow(ActivitiesUiState())
     val uiState: StateFlow<ActivitiesUiState> = _uiState.asStateFlow()
 
-    private var lastSelectedId: String? = null
+    /** Contador de generación del detalle — R1, y la GARANTÍA de que una respuesta obsoleta
+     *  no escriba. ⚠ `detailJob?.cancel()` NO basta: `ActivitiesApi.getActividad` envuelve su
+     *  `client.get` en `catch (e: Exception)` (`ActivitiesApi.kt:68`) y
+     *  `CancellationException` ES una `Exception` ⇒ la cancelación se convierte en un
+     *  `ApiResult.Error` normal y el `return` siguiente no tiene punto de suspensión antes
+     *  de la escritura: un job cancelado igual escribe. Por eso [gen] se lee de forma
+     *  síncrona fuera del `launch` y se comprueba justo tras la llamada; `cancel()` sólo
+     *  libera el socket. */
+    private var detailGeneration = 0
+
+    /** Petición de detalle en vuelo. Sólo se cancela para liberar el socket. */
+    private var detailJob: Job? = null
 
     init {
         loadAll()
@@ -130,36 +174,48 @@ class ActividadesViewModel(
         loadAll()
     }
 
+    /** Abre el detalle de [id] — R1. `Loading(id)` se escribe **fuera** del `launch` para
+     *  que la hoja aparezca en el mismo frame del toque; [gen] se captura antes de lanzarlo
+     *  y su comparación posterior es la que invalida la respuesta. */
     fun selectActividad(id: String) {
-        lastSelectedId = id
-        scope.launch {
-            _uiState.value = _uiState.value.copy(isDetailLoading = true, detailError = null)
-
-            when (val result = activitiesApi.getActividad(token, id)) {
-                is ApiResult.Success -> {
-                    _uiState.value = _uiState.value.copy(
-                        selectedActividad = result.data,
-                        isDetailLoading = false,
-                    )
-                }
-                is ApiResult.Error -> {
-                    // Falló el detalle → permanece en la lista con banner de error.
-                    _uiState.value = _uiState.value.copy(
-                        detailError = result.message,
-                        isDetailLoading = false,
-                    )
-                }
-            }
+        val gen = ++detailGeneration
+        _uiState.value = _uiState.value.copy(detail = DetailUiState.Loading(id))
+        detailJob?.cancel()
+        detailJob = scope.launch {
+            val result = activitiesApi.getActividad(token, id)
+            // Obsoleta (descarte, o re-tap de otra): no escribe NADA, ni un campo.
+            if (gen != detailGeneration) return@launch
+            _uiState.value = _uiState.value.copy(
+                detail = when (result) {
+                    is ApiResult.Success -> DetailUiState.Content(id, result.data)
+                    is ApiResult.Error -> DetailUiState.Error(id, result.message)
+                },
+            )
         }
     }
 
-    /** Reintentar el último detalle seleccionado (banner de error de detalle). */
-    fun retryDetail() {
-        lastSelectedId?.let { selectActividad(it) }
+    /** Cierra el detalle de [id] — R1/R2, el único reseteo. Idempotente Y con guarda de id:
+     *  un descarte de una apertura anterior (el `hide()` tardío) no toca la apertura viva, y
+     *  el `detailGeneration++` deja obsoleta cualquier respuesta en vuelo para que no reabra
+     *  la hoja ni pinte un error en la lista. */
+    fun closeDetail(id: String) {
+        if (_uiState.value.detail.openedId != id) return
+        detailGeneration++
+        detailJob?.cancel()
+        _uiState.value = _uiState.value.copy(detail = DetailUiState.Closed)
     }
 
+    /** Reintenta el detalle que falló — R6. Lee `Error.id` (ya no hay `lastSelectedId` que
+     *  pueda quedar obsoleto) y reentra en `Loading(id)` → `Content`, sin casos especiales. */
+    fun retryDetail() {
+        val current = _uiState.value.detail
+        if (current is DetailUiState.Error) selectActividad(current.id)
+    }
+
+    /** Atrás desde la pantalla de detalle antigua; la rama que lo llama desaparece en T2-2. */
     fun backToList() {
-        _uiState.value = _uiState.value.copy(selectedActividad = null, detailError = null)
+        val opened = _uiState.value.detail.openedId ?: return
+        closeDetail(opened)
     }
 
     /** Dispara el snackbar para un acción inerte (placeholders). */
@@ -180,6 +236,7 @@ class ActividadesViewModel(
             when (val result = activitiesApi.confirmAssignment(token, activityId)) {
                 is ApiResult.Success -> {
                     val r = result.data
+                    val detail = _uiState.value.detail
                     _uiState.value = _uiState.value.copy(
                         isConfirming = false,
                         actividades = _uiState.value.actividades.map {
@@ -192,13 +249,19 @@ class ActividadesViewModel(
                                 it
                             }
                         },
-                        selectedActividad = _uiState.value.selectedActividad
-                            ?.takeIf { it.id == activityId }
-                            ?.copy(
-                                assignedConfirmed = r.assignedConfirmed,
-                                confirmedAt = r.confirmedAt,
+                        // R1: el `Content` se REESCRIBE EN SITU por id; sin esta rama el chip
+                        // "Asignación confirmada" quedaría obsoleto (la hoja vive sobre él).
+                        detail = if (detail is DetailUiState.Content && detail.id == activityId) {
+                            DetailUiState.Content(
+                                id = activityId,
+                                actividad = detail.actividad.copy(
+                                    assignedConfirmed = r.assignedConfirmed,
+                                    confirmedAt = r.confirmedAt,
+                                ),
                             )
-                            ?: _uiState.value.selectedActividad,
+                        } else {
+                            detail
+                        },
                         snackbarMessage = "Asignación confirmada",
                     )
                 }

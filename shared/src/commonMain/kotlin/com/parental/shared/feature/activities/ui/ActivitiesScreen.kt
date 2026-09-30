@@ -65,9 +65,9 @@ fun ActividadesScreen(
 
     val resolve: (String) -> CategoryInfo? = { id -> uiState.categories[id] }
 
-    if (uiState.selectedActividad != null && !uiState.isDetailLoading) {
+    if (uiState.detail is DetailUiState.Content) {
         ActividadDetailScreen(
-            actividad = uiState.selectedActividad!!,
+            actividad = (uiState.detail as DetailUiState.Content).actividad,
             resolve = resolve,
             memberNames = uiState.memberNames,
             snackbarHostState = snackbarHostState,
@@ -224,7 +224,7 @@ private fun ActividadesListScreen(
             )
 
             // Banner de error del detalle (lista permanece visible, con retry).
-            uiState.detailError?.let { error ->
+            (uiState.detail as? DetailUiState.Error)?.let { error ->
                 Surface(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -244,7 +244,7 @@ private fun ActividadesListScreen(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(
-                            text = error,
+                            text = error.message,
                             modifier = Modifier.weight(1f),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onErrorContainer,
