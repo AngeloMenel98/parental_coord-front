@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 enum class ActivityTab(val label: String) {
     TODOS("Todos"),
@@ -90,13 +91,12 @@ class ActividadesViewModel(
     val uiState: StateFlow<ActivitiesUiState> = _uiState.asStateFlow()
 
     /** Contador de generación del detalle — R1, y la GARANTÍA de que una respuesta obsoleta
-     *  no escriba. ⚠ `detailJob?.cancel()` NO basta: `ActivitiesApi.getActividad` envuelve su
-     *  `client.get` en `catch (e: Exception)` (`ActivitiesApi.kt:68`) y
-     *  `CancellationException` ES una `Exception` ⇒ la cancelación se convierte en un
-     *  `ApiResult.Error` normal y el `return` siguiente no tiene punto de suspensión antes
-     *  de la escritura: un job cancelado igual escribe. Por eso [gen] se lee de forma
-     *  síncrona fuera del `launch` y se comprueba justo tras la llamada; `cancel()` sólo
-     *  libera el socket. */
+     *  no escriba. ⚠ CONFINADO al hilo principal: los `++` salen del toque y del descarte, y
+     *  la comparación de la respuesta va también en `Dispatchers.Main` ([selectActividad]);
+     *  así la lectura entre hilos desaparece por construcción y no hace falta `@Volatile`.
+     *  ⚠ `detailJob?.cancel()` NO basta: `getActividad` envuelve su `client.get` en
+     *  `catch (e: Exception)` (`ActivitiesApi.kt:68`) y `CancellationException` ES una
+     *  `Exception` ⇒ un job cancelado igual escribe. `cancel()` sólo libera el socket. */
     private var detailGeneration = 0
 
     /** Petición de detalle en vuelo. Sólo se cancela para liberar el socket. */
@@ -183,14 +183,18 @@ class ActividadesViewModel(
         detailJob?.cancel()
         detailJob = scope.launch {
             val result = activitiesApi.getActividad(token, id)
-            // Obsoleta (descarte, o re-tap de otra): no escribe NADA, ni un campo.
-            if (gen != detailGeneration) return@launch
-            _uiState.value = _uiState.value.copy(
-                detail = when (result) {
-                    is ApiResult.Success -> DetailUiState.Content(id, result.data)
-                    is ApiResult.Error -> DetailUiState.Error(id, result.message)
-                },
-            )
+            // ⚠ Comparación y escritura en el hilo principal, que es donde vive
+            // [detailGeneration]: la carrera entre hilos desaparece por construcción (R-1).
+            withContext(Dispatchers.Main) {
+                // Obsoleta (descarte, o re-tap de otra): no escribe NADA, ni un campo.
+                if (gen != detailGeneration) return@withContext
+                _uiState.value = _uiState.value.copy(
+                    detail = when (result) {
+                        is ApiResult.Success -> DetailUiState.Content(id, result.data)
+                        is ApiResult.Error -> DetailUiState.Error(id, result.message)
+                    },
+                )
+            }
         }
     }
 
