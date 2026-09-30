@@ -40,9 +40,12 @@ import kotlinx.coroutines.launch
  * biblioteca ya lo hace) ni se pasa un ancho sin especificar (eso sí rompería el diseño).
  *
  * ⚠ D-B, EL `SheetState` LO POSEe EL HOST. `onDismissRequest` es su `finishDismiss` idempotente
- * y la "X" NO llama a `hide()`: pasa por [requestDismiss], espejo exacto del `animateToDismiss`
- * de la biblioteca **con su guard de visibilidad** — su callback también corre ante cancelación,
- * y un `hide()` sin observador deja una ventana `Dialog` invisible tragando la entrada (§1.6).
+ * y la "X" NO llama a `hide()` a pelo: pasa por [requestDismiss], que replica el `animateToDismiss`
+ * de la biblioteca —con su comprobación de visibilidad al final— pero no es un espejo LITERAL: el
+ * guard va dentro del cuerpo de la corutina, no en `invokeOnCompletion` (igual o más segura: una
+ * suspensión cancelada nunca alcanza la sentencia siguiente), y la biblioteca lo antecede de
+ * `confirmValueChange(Hidden)`, que aquí es no-op con el `rememberModalBottomSheetState` por defecto.
+ * Un `hide()` sin observador deja una ventana `Dialog` invisible tragando la entrada (§1.6).
  *
  * ⚠ Sin animación explícita (la diapositiva la lleva `SheetState`) y sin `Scaffold`, `TopAppBar`,
  * `BottomNavBar`, `onNavigateBottom` ni el rótulo "Detalle": la lista conserva su chrome (R11).
@@ -89,13 +92,16 @@ internal fun ActividadDetailSheet(
         // que es donde se nota un salto si sólo se compone el contenido.
         Column(modifier = Modifier.fillMaxWidth()) {
             DetailHeader(
-                title = (state as? DetailUiState.Content)?.actividad?.title,
                 onClose = requestDismiss,
                 closeFocus = closeFocus,
             )
             when (state) {
                 DetailUiState.Closed -> Spacer(Modifier.height(Spacing.lg))
                 is DetailUiState.Loading -> DetailSkeleton(Modifier.weight(1f))
+                // ⚠ `EmptyState` aplica `fillMaxHeight()` (`CalendarChrome.kt:110`) y aquí se
+                // emite sin `weight`: la hoja de error mide a altura completa. Es INTENCIONAL
+                // (riesgo R8 del diseño, que lo declara y lo manda a medir en G-24), no un
+                // descuido — no se le pasa un alto compacto.
                 is DetailUiState.Error -> EmptyState(
                     title = "No pudimos cargar el detalle",
                     message = state.message,
@@ -128,19 +134,17 @@ internal fun ActividadDetailSheet(
     }
 }
 
-/** Fila de cierre. El título sólo aparece con `Content` cargado; si no, la celda queda vacía en
- *  vez de inventar un rótulo que luego parpadearía. */
+/** Fila de cierre: espacio flexible + la "X" al borde. ⚠ SIN rótulo de actividad aquí: el título
+ *  se pinta y se ANUNCA una sola vez, en el cuerpo (`headlineSmall`), que es donde lo lleva el
+ *  diseño. Repetirlo en la cabecera lo duplicaba en pantalla y lo hacía anunciar dos veces al
+ *  abrir la hoja. */
 @Composable
-private fun DetailHeader(title: String?, onClose: () -> Unit, closeFocus: FocusRequester) {
+private fun DetailHeader(onClose: () -> Unit, closeFocus: FocusRequester) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.lg),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            text = title.orEmpty(),
-            style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier.weight(1f),
-        )
+        Spacer(Modifier.weight(1f))
         IconButton(
             onClick = onClose,
             // 48dp heredado del token: G-3, sin literal.
@@ -195,7 +199,10 @@ private fun DetailContent(
         if (a.description.isNotBlank()) item { DetailCard(title = "Descripción", body = a.description) }
         item { DetailBlockCard(pairs) }
         item {
-            // Chip contextual inerte — sin llamada API.
+            // FR-7 **NO ENTREGADA** — bloqueada: no existe API de adjuntos (`ActAttachmentEntity`
+            // sólo está en la entidad y en `activities.module.ts`; sin servicio, ruta ni campo en
+            // el DTO). El chip pinta el rótulo y NO abre nada —ni selector, ni cámara, ni red—:
+            // sólo emite `NEXT_MSG`. Mismo caso inerte que ya traía la pantalla antigua.
             AssistChip(
                 onClick = { onInertAction(NEXT_MSG) },
                 label = { Text(if (isSalud) "Adjuntar resumen médico" else "Adjuntar archivo") },
@@ -239,6 +246,8 @@ private fun DetailFooter(
             }
             else -> {}
         }
+        // FR-8 con salvedad declarada: la acción primaria se Pinta y se Ancla al fondo, pero no
+        // abre nada — no hay flujo de subida. Tampoco es un token nuevo: `primary` del esquema.
         Surface(
             modifier = Modifier.fillMaxWidth().heightIn(min = AgendaGeometry.touchTargetLegacy),
             color = MaterialTheme.colorScheme.primary,
