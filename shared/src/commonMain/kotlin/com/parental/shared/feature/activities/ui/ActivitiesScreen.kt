@@ -19,13 +19,9 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
 import com.parental.shared.core.ui.components.BottomNavBar
 import com.parental.shared.core.ui.components.CategoryInfo
-import com.parental.shared.core.ui.theme.AgendaGeometry
 import com.parental.shared.core.ui.theme.MotionTokens
-import com.parental.shared.core.ui.theme.ParentalShapes
-import com.parental.shared.core.ui.theme.Spacing
 import com.parental.shared.core.ui.theme.TypeTokens
 import com.parental.shared.feature.activities.domain.model.canConfirm
 import com.parental.shared.feature.activities.ui.detail.ActividadDetailSheet
