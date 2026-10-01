@@ -51,6 +51,25 @@ import kotlinx.coroutines.launch
  * `BottomNavBar`, `onNavigateBottom` ni el rótulo "Detalle": la lista conserva su chrome (R11).
  */
 
+/**
+ * R-13 · Tope de altura de la hoja: como máximo esta fracción de la ventana.
+ *
+ * Relación y no `Dp` porque `ModalBottomSheet` no expone altura máxima
+ * (`ModalBottomSheet.kt:119-133`) y `Modifier.draggableAnchors` es `internal`, así que el
+ * único tope posible es de CONTENIDO y tiene que leer la ventana vigente (`maxHeight`):
+ * rotación, plegable, ventana dividida y teclado abierto. Sin unidad no nace token
+ * (`Spacing.kt` es aditivo-only y está en su techo) y G-15 sigue en 0.
+ *
+ * 🔴 NO se "arregla" poniendo `skipPartiallyExpanded = false`: da el 50 % por cero líneas
+ * (`ModalBottomSheet.kt:239-243`) y ROMPE FR-9 — `PartiallyExpanded` es una posición, no un
+ * redimensionado, así que el pie cae en `y ≈ 1.5 · ventana` y la CTA fijada de FR-8 sale por
+ * el borde inferior. Detalle en #1208 §7.1.
+ *
+ * El 60 % tampoco es un ancla: es un tope. El borde superior al 40 % es la CONSECUENCIA de
+ * `Expanded at max(0f, fullHeight − altoMedido)`, no el mecanismo.
+ */
+private const val SHEET_MAX_HEIGHT_RATIO = 0.6f
+
 /** Raíz de la hoja — `activity-detail-modal`, T2-1. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -90,45 +109,59 @@ internal fun ActividadDetailSheet(
     ) {
         // Concha SIEMPRE compuesta: la fila de cierre sobrevive a la transición entre estados,
         // que es donde se nota un salto si sólo se compone el contenido.
-        Column(modifier = Modifier.fillMaxWidth()) {
-            DetailHeader(
-                onClose = requestDismiss,
-                closeFocus = closeFocus,
-            )
-            when (state) {
-                DetailUiState.Closed -> Spacer(Modifier.height(Spacing.lg))
-                is DetailUiState.Loading -> DetailSkeleton(Modifier.weight(1f))
-                // ⚠ `EmptyState` aplica `fillMaxHeight()` (`CalendarChrome.kt:110`) y aquí se
-                // emite sin `weight`: la hoja de error mide a altura completa. Es INTENCIONAL
-                // (riesgo R8 del diseño, que lo declara y lo manda a medir en G-24), no un
-                // descuido — no se le pasa un alto compacto.
-                is DetailUiState.Error -> EmptyState(
-                    title = "No pudimos cargar el detalle",
-                    message = state.message,
-                    actionLabel = "Reintentar",
-                    onAction = onRetry,
+        //
+        // R-13 · `BoxWithConstraints` sólo aporta el `maxHeight` de la ventana VIGENTE: es lo
+        // que hace que el tope escale. El `Box` no aporta layout —`propagateMinConstraints` es
+        // `false` por defecto y su único hijo es esta columna, luego mide lo que mide—.
+        BoxWithConstraints {
+            Column(
+                modifier = Modifier.fillMaxWidth().heightIn(max = maxHeight * SHEET_MAX_HEIGHT_RATIO),
+            ) {
+                DetailHeader(
+                    onClose = requestDismiss,
+                    closeFocus = closeFocus,
                 )
-                // `weight` es extensión de `ColumnScope`: sólo resuelve dentro del lambda de
-                // `Column`, así que se pasa ya aplicado desde este sitio de llamada.
-                is DetailUiState.Content -> DetailContent(
-                    state = state,
-                    resolve = resolve,
-                    memberNames = memberNames,
-                    onInertAction = onInertAction,
-                    modifier = Modifier.weight(1f),
-                )
-            }
-            // Un único `SnackbarHost` VISIBLE a la vez (R-8): la lista lo hospeda cuando no hay
-            // hoja y la hoja mientras está abierta. Dos activos = doble pintada + doble anuncio.
-            SnackbarHost(snackbarHostState)
-            if (state is DetailUiState.Content) {
-                DetailFooter(
-                    actividad = state.actividad,
-                    onInertAction = onInertAction,
-                    onConfirm = onConfirm,
-                    isConfirming = isConfirming,
-                    currentUserId = currentUserId,
-                )
+                when (state) {
+                    DetailUiState.Closed -> Spacer(Modifier.height(Spacing.lg))
+                    // R-13 · `fill = false`: el esqueleto ENVUELVE sus ~116 dp de barras en vez
+                    // de tensar el hueco, así que `Loading` abre compacto en vez de dejar 0.6 de
+                    // ventana muerta debajo. `Content` y `Error` no cambian: el `LazyColumn` y el
+                    // `EmptyState` se llenan ellos. El peso sigue siendo 1f, luego la transición
+                    // `Loading`→`Content` no salta —el hueco existe igual—.
+                    is DetailUiState.Loading -> DetailSkeleton(Modifier.weight(1f, fill = false))
+                    // ⚠ `EmptyState` aplica `fillMaxHeight()` (`CalendarChrome.kt:112`) y aquí se
+                    // emite SIN `weight`: estira hasta el máximo de la columna, que con el tope
+                    // R-13 es 0.6·ventana y NO la ventana entera. "Reintentar" vuelve a verse —
+                    // a verificar en dispositivo (G-27), no a suponer. No se le pasa un alto
+                    // compacto: ese `fillMaxHeight()` se usa en 5 sitios y quitarlo regresa la lista.
+                    is DetailUiState.Error -> EmptyState(
+                        title = "No pudimos cargar el detalle",
+                        message = state.message,
+                        actionLabel = "Reintentar",
+                        onAction = onRetry,
+                    )
+                    // `weight` es extensión de `ColumnScope`: sólo resuelve dentro del lambda de
+                    // `Column`, así que se pasa ya aplicado desde este sitio de llamada.
+                    is DetailUiState.Content -> DetailContent(
+                        state = state,
+                        resolve = resolve,
+                        memberNames = memberNames,
+                        onInertAction = onInertAction,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                // Un único `SnackbarHost` VISIBLE a la vez (R-8): la lista lo hospeda cuando no hay
+                // hoja y la hoja mientras está abierta. Dos activos = doble pintada + doble anuncio.
+                SnackbarHost(snackbarHostState)
+                if (state is DetailUiState.Content) {
+                    DetailFooter(
+                        actividad = state.actividad,
+                        onInertAction = onInertAction,
+                        onConfirm = onConfirm,
+                        isConfirming = isConfirming,
+                        currentUserId = currentUserId,
+                    )
+                }
             }
         }
     }
