@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -148,6 +149,14 @@ internal fun DayAgendaHeader(date: LocalDate, activityCount: Int, zone: TimeZone
  * siguen decorativos (`clearAndSetSemantics { }`): el rótulo ya nombra la categoría y la
  * cronología la llevan la hora y el contador de `DayAgendaHeader`.
  *
+ * 🔴 CONSECUENCIA DE `R7-T2-8` QUE `R4-T2-4` NO REFLEJA. Ese requisito dice "exactamente DOS
+ * nodos por hueco"; con la hora rotulada **una vez por grupo** un hueco de N tiene **DOS**
+ * nodos en la PRIMERA fila (hora + rótulo fusionado) y **UNO** en cada CONTINUACIÓN, donde no
+ * hay `Text` que contar — el `Spacer` no es nodo. Mejora, no regresión: el rótulo fusionado
+ * sigue anunciando hora, título, categoría y estado en todas las filas, así que ninguna es
+ * sorda; lo que cambia es el recuento. 🔴 `R4-T2-4` **NO se ha editado para que cuadre**: su
+ * texto es el rastro de auditoría y el desacuerdo queda declarado aquí, no borrado.
+ *
  * ⚠ `height(IntrinsicSize.Min)` es el MISMO patrón que ya envía `AgendaList.kt`: sin él el
  * riel de `fillMaxHeight()` no tiene altura que llenar. Desviación registrada contra §7.2
  * de diseño, confirmada por T2-7: el riel del día es un segmento de altura de fila, y esa es
@@ -155,7 +164,7 @@ internal fun DayAgendaHeader(date: LocalDate, activityCount: Int, zone: TimeZone
  */
 @Composable
 internal fun DayAgendaRow(
-    timeLabel: String,
+    timeLabel: String?,
     row: TimelineRow,
     info: CategoryInfo?,
     zone: TimeZone,
@@ -172,24 +181,33 @@ internal fun DayAgendaRow(
             .height(IntrinsicSize.Min),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            text = timeLabel,
-            style = TypeTokens.time,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.End,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            // 🔴 `R4-T2-4` · ARRIBA, NO CENTRADA. `align(Alignment.Top)` es el
-            // `Alignment.Vertical` del `RowScope`: sube SÓLO este hijo, así que el nodo y el
-            // cuerpo siguen centrados. Con título de dos líneas + límite la fila crece, y una
-            // hora centrada deja de leerse como la hora DE ESA fila.
-            // ⚠ Y NO SE ESCONDE (ver el KDoc): sin el `clearAndSetSemantics` de antes, este
-            // `Text` es un nodo real y el hueco tiene exactamente DOS nodos.
-            modifier = Modifier
-                .align(Alignment.Top)
-                .width(AgendaGeometry.timeColumn)
-                .padding(end = Spacing.sm),
-        )
+// 🔴 `R7-T2-8` · LA HORA SE ROTULA UNA VEZ POR GRUPO. `timeLabel` es `null` en las filas
+        // de CONTINUACIÓN de un grupo de misma hora. El pie está RESERVADO igual (48dp) para
+        // que nodo, riel y cuerpo no se desplacen: el riel es lo que `RR-4` y `AgendaList.kt`
+        // tienen alineado. ⚠ Un `Spacer` y no un texto vacío porque un `Text` vacío SÍ crea
+        // nodo de semántica, y `R4-T2-4` cuenta nodos con precisión.
+        if (timeLabel != null) {
+            Text(
+                text = timeLabel,
+                style = TypeTokens.time,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.End,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                // 🔴 `R4-T2-4` · ARRIBA, NO CENTRADA. `align(Alignment.Top)` es el
+                // `Alignment.Vertical` del `RowScope`: sube SÓLO este hijo, así que el nodo y
+                // el cuerpo siguen centrados. Con título de dos líneas + límite la fila
+                // crece, y una hora centrada deja de leerse como la hora DE ESA fila.
+                // ⚠ Y NO SE ESCONDE (ver el KDoc): sin el `clearAndSetSemantics` de antes,
+                // este `Text` es un nodo real y la fila tiene su nodo de hora.
+                modifier = Modifier
+                    .align(Alignment.Top)
+                    .width(AgendaGeometry.timeColumn)
+                    .padding(end = Spacing.sm),
+            )
+        } else {
+            Spacer(modifier = Modifier.width(AgendaGeometry.timeColumn))
+        }
         // Riel = hermano de la fila, NO hijo de [AgendaNode] (RR-4).
         if (showConnector) {
             TimelineConnector()
