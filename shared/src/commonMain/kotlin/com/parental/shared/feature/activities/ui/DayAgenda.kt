@@ -107,14 +107,11 @@ internal fun DayAgendaHeader(date: LocalDate, activityCount: Int, zone: TimeZone
         // R3-T2-3 · LA COPIA SIGUE AL TRATAMIENTO DE FILA QUE SE ENVÍA. Aquí nombra la
         // ACTIVIDAD porque la fila CON título (A4 provisional) es la que se renderiza; la
         // variante que nombra el icono sólo sería cierta para un nodo sin título
-        // (`prd-v4:166` guioniza esa OTRA variante).
-        //
-        // ⚠ `S3-T2-3a` es un grep LITERAL sobre `shared/src/` y exige **0** aciertos
-        // mientras la fila con título siga en pantalla. Citar la otra variante—even
-        // entre comillas, incluso en un comentario— lo convierte en 1 y hace fallar el
-        // guard por una razón que no es un defecto del producto. Por eso aquí se
-        // DESCRIBE y no se transcribe.
-        //
+        // (`prd-v4:166` guioniza esa OTRA variante). `S3-T2-3a` es un grep LITERAL que
+        // exige **0** aciertos sobre `shared/src/`, así que aquí la otra variante se
+        // DESCRIBE y no se transcribe: citarla —incluso entre comillas, incluso en un
+        // comentario— la convertiría en 1 y haría fallar el guard por algo que no es un
+        // defecto del producto.
         // ⚠ LA COSTA DE C9 ASOMA AQUÍ: las DOS variantes están fijadas para que el futuro
         // flip sea un cambio de UNA cadena. Si C9 se confirma "sin título", cambia esta
         // línea y sólo esta. Es la costura que verifica T2-9.
@@ -143,14 +140,12 @@ internal fun DayAgendaHeader(date: LocalDate, activityCount: Int, zone: TimeZone
  * ([activitySemanticLabel]). Sólo la fila es pulsable. El [ConfirmarChip], cuando existe, es
  * un TERCER nodo hermano (T2-8), nunca anidado dentro del rótulo de la fila.
  *
- * ⚠ La hora se anuncia DOS veces — y `R4-T2-4` lo pide así a propósito. El requisito dice
- * que la hora NO se oculte a la tecnología asistiva porque es información real, y que NO
- * debe fundirse dentro del rótulo de la fila porque `activitySemanticLabel` ya la dice:
- * fundirla produciría la repetición dentro de UN nodo, mientras que tener su propio nodo la
- * produce entre DOS, que es la estructura que el requisito especifica y la que el árbol de
- * semántica puede contar. Un nodo de tiempo por su cuenta es además el que permite barrer la
- * columna de horas. `AgendaNode` y el riel SÍ siguen siendo decorativos
- * (`clearAndSetSemantics { }`): el rótulo ya nombra la categoría en palabras y la
+ * ⚠ La hora se anuncia DOS veces — y `R4-T2-4` lo pide así a propósito. No se oculta porque
+ * es información real, y no se funde en el rótulo porque `activitySemanticLabel` ya la dice:
+ * fundirla repetiría la hora DENTRO de un nodo, mientras que su propio nodo la produce ENTRE
+ * dos, que es la estructura que el requisito especifica y la que el árbol de semántica puede
+ * contar — y además es lo que permite barrer la columna de horas. `AgendaNode` y el riel SÍ
+ * siguen decorativos (`clearAndSetSemantics { }`): el rótulo ya nombra la categoría y la
  * cronología la llevan la hora y el contador de `DayAgendaHeader`.
  *
  * ⚠ `height(IntrinsicSize.Min)` es el MISMO patrón que ya envía `AgendaList.kt`: sin él el
@@ -184,14 +179,12 @@ internal fun DayAgendaRow(
             textAlign = TextAlign.End,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            // 🔴 `R4-T2-4` · LA HORA VA ARRIBA, NO CENTRADA. `align(Alignment.Top)` es el
-            // `Alignment.Vertical` del `RowScope`, así que sube SÓLO este hijo: el nodo y el
-            // cuerpo se quedan centrados y el cambio es quirúrgico. Con un título de dos
-            // líneas + línea de límite la fila crece, y una hora centrada deja de leerse
-            // como la hora DE ESA fila — se vuelve la hora de la más alta del bloque.
-            //
-            // ⚠ Y NO SE ESCONDE: sin `clearAndSetSemantics` este `Text` es un nodo de texto
-            // real (ver el KDoc de arriba) ⇒ el hueco tiene exactamente DOS nodos.
+            // 🔴 `R4-T2-4` · ARRIBA, NO CENTRADA. `align(Alignment.Top)` es el
+            // `Alignment.Vertical` del `RowScope`: sube SÓLO este hijo, así que el nodo y el
+            // cuerpo siguen centrados. Con título de dos líneas + límite la fila crece, y una
+            // hora centrada deja de leerse como la hora DE ESA fila.
+            // ⚠ Y NO SE ESCONDE (ver el KDoc): sin el `clearAndSetSemantics` de antes, este
+            // `Text` es un nodo real y el hueco tiene exactamente DOS nodos.
             modifier = Modifier
                 .align(Alignment.Top)
                 .width(AgendaGeometry.timeColumn)
@@ -302,18 +295,15 @@ internal fun AgendaNode(
                 modifier = Modifier.size(AgendaGeometry.nodeCard / 2),
             )
         }
-        // 🔴 `R6-T2-6` · EL PUNTO VA EN LA ESQUINA SUPERIOR DERECHA. El requisito dice
-        // "centred on the node's top-right corner so roughly one third overlaps the
-        // circle"; el disco de 40dp con la fila alineada ARRIBA (T2-4) deja el hombro
-        // superior derecho libre — abajo chocaba con el borde inferior del propio disco y
-        // con el `outline` de la fila siguiente. Arriba el solape lee como "este nodo
-        // lleva este estado" en vez de como un borde de la tarjeta.
+        // 🔴 `R6-T2-6` · EL PUNTO VA EN LA ESQUINA SUPERIOR DERECHA. El requisito lo pide
+        // "centred on the node's top-right corner"; abajo chocaba con el borde inferior del
+        // propio disco y con el `outline` de la fila siguiente. Arriba, con la fila ya
+        // alineada ARRIBA (T2-4), el solape lee como "este nodo lleva este estado".
         //
-        // ⚠ TAMAÑOS: collar `statusBadge` 8dp con punto 6dp. `AgendaGeometry.statusBadge`
-        // lo comparte `ActivityBody.kt:160` (el punto de estado de la fila de Agenda), así
-        // que cambiar su VALOR no es de T2 —sería un cambio en dos pantallas— y aquí se
-        // consume el token tal cual. El contraste que hace el collar es el del punto contra
-        // `surface`, no el del collar.
+        // ⚠ TAMAÑOS: collar `statusBadge` 8dp con punto 6dp, el token tal cual. Su VALOR no
+        // es de T2 — `ActivityBody.kt:160` lo comparte el punto de estado de la fila de
+        // Agenda, así que moverlo es un cambio de dos pantallas. El contraste que hace el
+        // collar es punto-contra-`surface`, no collar-contra-disco.
         Box(
             modifier = Modifier
                 .align(Alignment.TopEnd)
