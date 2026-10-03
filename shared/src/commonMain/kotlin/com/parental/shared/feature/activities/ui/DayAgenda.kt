@@ -302,10 +302,21 @@ internal fun AgendaNode(
                 modifier = Modifier.size(AgendaGeometry.nodeCard / 2),
             )
         }
-        // Collar de 2dp de `surface` entre el punto de estado y el disco de categoría.
+        // 🔴 `R6-T2-6` · EL PUNTO VA EN LA ESQUINA SUPERIOR DERECHA. El requisito dice
+        // "centred on the node's top-right corner so roughly one third overlaps the
+        // circle"; el disco de 40dp con la fila alineada ARRIBA (T2-4) deja el hombro
+        // superior derecho libre — abajo chocaba con el borde inferior del propio disco y
+        // con el `outline` de la fila siguiente. Arriba el solape lee como "este nodo
+        // lleva este estado" en vez de como un borde de la tarjeta.
+        //
+        // ⚠ TAMAÑOS: collar `statusBadge` 8dp con punto 6dp. `AgendaGeometry.statusBadge`
+        // lo comparte `ActivityBody.kt:160` (el punto de estado de la fila de Agenda), así
+        // que cambiar su VALOR no es de T2 —sería un cambio en dos pantallas— y aquí se
+        // consume el token tal cual. El contraste que hace el collar es el del punto contra
+        // `surface`, no el del collar.
         Box(
             modifier = Modifier
-                .align(Alignment.BottomEnd)
+                .align(Alignment.TopEnd)
                 .size(AgendaGeometry.statusBadge)
                 .clip(CircleShape)
                 .background(MaterialTheme.colorScheme.surface),
