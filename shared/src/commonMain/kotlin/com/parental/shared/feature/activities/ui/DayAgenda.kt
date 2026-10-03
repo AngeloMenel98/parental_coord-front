@@ -104,12 +104,20 @@ internal fun DayAgendaHeader(date: LocalDate, activityCount: Int, zone: TimeZone
                 textAlign = TextAlign.End,
             )
         }
-        // R3-T2-3 · LA COPIA SIGUE AL TRATAMIENTO DE FILA QUE SE ENVÍA. Aquí dice
-        // "actividad" porque la fila CON título (A4 provisional) es la que se renderiza;
-        // "Toca un icono" sólo sería cierto para un nodo sin título (`prd-v4:166`
-        // guioniza esa variante). ⚠ LA COSTA DE C9 ASOMA AQUÍ: las DOS literales están
-        // fijadas para que el futuro flip sea un cambio de UNA cadena. Si C9 se confirma
-        // "sin título", cambia esta línea y sólo esta. Es la costura que verifica T2-9.
+        // R3-T2-3 · LA COPIA SIGUE AL TRATAMIENTO DE FILA QUE SE ENVÍA. Aquí nombra la
+        // ACTIVIDAD porque la fila CON título (A4 provisional) es la que se renderiza; la
+        // variante que nombra el icono sólo sería cierta para un nodo sin título
+        // (`prd-v4:166` guioniza esa OTRA variante).
+        //
+        // ⚠ `S3-T2-3a` es un grep LITERAL sobre `shared/src/` y exige **0** aciertos
+        // mientras la fila con título siga en pantalla. Citar la otra variante—even
+        // entre comillas, incluso en un comentario— lo convierte en 1 y hace fallar el
+        // guard por una razón que no es un defecto del producto. Por eso aquí se
+        // DESCRIBE y no se transcribe.
+        //
+        // ⚠ LA COSTA DE C9 ASOMA AQUÍ: las DOS variantes están fijadas para que el futuro
+        // flip sea un cambio de UNA cadena. Si C9 se confirma "sin título", cambia esta
+        // línea y sólo esta. Es la costura que verifica T2-9.
         Text(
             text = "Toca una actividad para ver los detalles",
             style = MaterialTheme.typography.bodySmall,
