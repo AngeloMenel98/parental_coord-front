@@ -137,13 +137,21 @@ internal fun DayAgendaHeader(date: LocalDate, activityCount: Int, zone: TimeZone
  * 48dp que NO es un objetivo táctil — no "corregirla" a `Layout.touchMin`, igual que
  * `dateColumn` (`Spacing.kt`).
  *
- * SEMÁNTICA — como máximo DOS nodos, y nunca un tercero decorativo: (1) el nodo fusionado de
- * [ActivityBody], que ya anuncia fecha, hora, título, categoría, tipo, estado y límite
- * ([activitySemanticLabel]); y (2) el [ConfirmarChip], hermano aparte con su propio nodo
- * (T2-8). La columna de tiempo y el nodo son **decorativos para la tecnología asistiva**:
- * `activitySemanticLabel` ya dice la hora de `row.localStart` — que es exactamente la de esta
- * fila — y la categoría en palabras, así que un nodo para cualquiera de los dos sería
- * duplicación, el mismo argumento que `AgendaRowSeparator` da en `AgendaList.kt`.
+ * SEMÁNTICA — EXACTAMENTE DOS nodos por hueco, y ni uno decorativo más: (1) el **nodo de
+ * tiempo**, un `Text` real que se lee tal cual; y (2) el nodo fusionado de [ActivityBody],
+ * que anuncia fecha, hora, título, categoría, tipo, estado y límite
+ * ([activitySemanticLabel]). Sólo la fila es pulsable. El [ConfirmarChip], cuando existe, es
+ * un TERCER nodo hermano (T2-8), nunca anidado dentro del rótulo de la fila.
+ *
+ * ⚠ La hora se anuncia DOS veces — y `R4-T2-4` lo pide así a propósito. El requisito dice
+ * que la hora NO se oculte a la tecnología asistiva porque es información real, y que NO
+ * debe fundirse dentro del rótulo de la fila porque `activitySemanticLabel` ya la dice:
+ * fundirla produciría la repetición dentro de UN nodo, mientras que tener su propio nodo la
+ * produce entre DOS, que es la estructura que el requisito especifica y la que el árbol de
+ * semántica puede contar. Un nodo de tiempo por su cuenta es además el que permite barrer la
+ * columna de horas. `AgendaNode` y el riel SÍ siguen siendo decorativos
+ * (`clearAndSetSemantics { }`): el rótulo ya nombra la categoría en palabras y la
+ * cronología la llevan la hora y el contador de `DayAgendaHeader`.
  *
  * ⚠ `height(IntrinsicSize.Min)` es el MISMO patrón que ya envía `AgendaList.kt`: sin él el
  * riel de `fillMaxHeight()` no tiene altura que llenar. Desviación registrada contra §7.2
@@ -176,10 +184,18 @@ internal fun DayAgendaRow(
             textAlign = TextAlign.End,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
+            // 🔴 `R4-T2-4` · LA HORA VA ARRIBA, NO CENTRADA. `align(Alignment.Top)` es el
+            // `Alignment.Vertical` del `RowScope`, así que sube SÓLO este hijo: el nodo y el
+            // cuerpo se quedan centrados y el cambio es quirúrgico. Con un título de dos
+            // líneas + línea de límite la fila crece, y una hora centrada deja de leerse
+            // como la hora DE ESA fila — se vuelve la hora de la más alta del bloque.
+            //
+            // ⚠ Y NO SE ESCONDE: sin `clearAndSetSemantics` este `Text` es un nodo de texto
+            // real (ver el KDoc de arriba) ⇒ el hueco tiene exactamente DOS nodos.
             modifier = Modifier
+                .align(Alignment.Top)
                 .width(AgendaGeometry.timeColumn)
-                .padding(end = Spacing.sm)
-                .clearAndSetSemantics { },
+                .padding(end = Spacing.sm),
         )
         // Riel = hermano de la fila, NO hijo de [AgendaNode] (RR-4).
         if (showConnector) {
