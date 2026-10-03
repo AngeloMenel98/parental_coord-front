@@ -1,9 +1,7 @@
 package com.parental.shared.feature.activities.ui
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -35,8 +33,9 @@ import com.parental.shared.core.ui.theme.AgendaGeometry
 import com.parental.shared.core.ui.theme.Spacing
 import com.parental.shared.core.ui.theme.TagTriple
 import com.parental.shared.core.ui.theme.TypeTokens
-import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
+
+
 
 /*
  * Agenda del día — `calendar-design-redesign`, tema T2. F7. **Archivo nuevo.**
@@ -57,74 +56,16 @@ import kotlinx.datetime.TimeZone
  * la que se copió sí está anotada. T2-7 retiró el `FlowRow`; el que se reintroduzca uno aquí
  * debe añadir el marcador él mismo, y eso se comprueba con grep. Riesgo R4, ALTA.
  *
- * ⚠ Techo ≈230 al que F7 NO llega: cierra en ~296 y el exceso es TODO prosa de estos
- * comentarios. Comprimir es lo permitido; suprimir el porqué no (precedente B, desv. 5), así
- * que el techo registrado en T2-9 es el real, no el ≈230.
+ * ⚠ Techo ≈230. Antes de separar `DayAgendaHeader` a su propio fichero, F7 cerraba en
+ * 351 y NO llegaba: el exceso era TODO prosa de estos comentarios. Comprimir es lo
+ * permitido; suprimir el porqué no (precedente B, desv. 5).
+ *
+ * 🪓 2026-10-03 — `DayAgendaHeader` se movió a `DayAgendaHeader.kt`. El antetítulo y el
+ * titular son otro trabajo que la lista de actividades, y este fichero ya sostenía las
+ * cuatro piezas de `RR-4`. 🔴 `RR-4` NO SE TOCA: las cuatro siguen siendo DECLARACIONES
+ * separadas, sólo que repartidas en dos ficheros. La reversibilidad de C9 (`OD-4`) depende
+ * de la declaración, no del fichero.
  */
-
-/**
- * Antetítulo + titular del día — `R1-T2-1` (antetítulo) y `R2-T2-2` (titular). El
- * antetítulo se escribe **`Agenda del día`** y se ve en versalitas gracias al
- * `fontFeatureSettings = "smcp"` de `labelSmall` (`Type.kt:103-109`): **NO se escribe en
- * mayúsculas a mano**, la fuente de verdad es la cadena con su capitalización natural y la
- * forma versal es un efecto de tipografía. Nodo de texto real, se anuncia una sola vez, **no**
- * lleva `contentDescription` y **no** se oculta de la tecnología asistiva: duplica nada,
- * porque las filas de abajo anuncian sus propios títulos.
- */
-@Composable
-internal fun DayAgendaHeader(date: LocalDate, activityCount: Int, zone: TimeZone) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Text(
-            text = "Agenda del día",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = Spacing.md, bottom = Spacing.xs),
-        )
-        // R2-T2-2. Titular `weight(1f)` y conteo de ancho intrínseco: a 320dp el TITULAR se
-        // elide, nunca el conteo. Éste no lleva `maxLines` porque el requisito es que no se
-        // trunque a NINGÚN ancho. `TextAlign.End` + singular/plural: "1 actividad" / "N
-        // actividades". Contar es `FR-13` — hasta T2-2 el número sólo existía en el
-        // `contentDescription` fuera de pantalla de la celda de día, nunca en la UI visible.
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.Bottom,
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Text(
-                text = formatLongDate(date, currentDateIn(zone).year),
-                style = TypeTokens.date,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f).padding(end = Spacing.sm),
-            )
-            Text(
-                text = if (activityCount == 1) "1 actividad" else "$activityCount actividades",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.End,
-            )
-        }
-        // R3-T2-3 · LA COPIA SIGUE AL TRATAMIENTO DE FILA QUE SE ENVÍA. Aquí nombra la
-        // ACTIVIDAD porque la fila CON título (A4 provisional) es la que se renderiza; la
-        // variante que nombra el icono sólo sería cierta para un nodo sin título
-        // (`prd-v4:166` guioniza esa OTRA variante). `S3-T2-3a` es un grep LITERAL que
-        // exige **0** aciertos sobre `shared/src/`, así que aquí la otra variante se
-        // DESCRIBE y no se transcribe: citarla —incluso entre comillas, incluso en un
-        // comentario— la convertiría en 1 y haría fallar el guard por algo que no es un
-        // defecto del producto.
-        // ⚠ LA COSTA DE C9 ASOMA AQUÍ: las DOS variantes están fijadas para que el futuro
-        // flip sea un cambio de UNA cadena. Si C9 se confirma "sin título", cambia esta
-        // línea y sólo esta. Es la costura que verifica T2-9.
-        Text(
-            text = "Toca una actividad para ver los detalles",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-    }
-}
 
 /**
  * Fila del agenda del día — `R4-T2-4`. Cuatro columnas hermanas: **columna de tiempo +
@@ -338,3 +279,4 @@ internal fun AgendaNode(
         }
     }
 }
+
