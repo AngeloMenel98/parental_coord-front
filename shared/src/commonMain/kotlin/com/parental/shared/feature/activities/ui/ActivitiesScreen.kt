@@ -25,6 +25,9 @@ import com.parental.shared.feature.activities.domain.model.canConfirm
 import com.parental.shared.feature.activities.ui.detail.ActividadDetailSheet
 import com.parental.shared.feature.activities.ui.create.CreateActivitySheet
 import com.parental.shared.feature.activities.ui.openedId
+import com.parental.shared.feature.activities.ui.swipe.SwipeAction
+import com.parental.shared.feature.activities.ui.swipe.SwipeReasonDialog
+import com.parental.shared.feature.activities.ui.swipe.SWIPE_UNDO_LABEL
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
@@ -99,10 +102,31 @@ fun ActividadesScreen(
         }
     }
 
-    LaunchedEffect(uiState.snackbarMessage) {
-        uiState.snackbarMessage?.let { message ->
+    LaunchedEffect(uiState.snackbarMessage, uiState.undoOffer) {
+        val message = uiState.snackbarMessage ?: return@LaunchedEffect
+        val offer = uiState.undoOffer
+        val result = if (offer != null) {
+            // R2 · El snackbar de una acción reversible LLEVA "Deshacer". No es
+            // adorno: la fila ya salió de la lista de forma optimista, así que sin
+            // esta acción el usuario perdería la actividad sin haber visto nada.
+            snackbarHostState.showSnackbar(
+                message = message,
+                actionLabel = SWIPE_UNDO_LABEL,
+                duration = SnackbarDuration.Short,
+            )
+        } else {
             snackbarHostState.showSnackbar(message)
+        }
+        if (offer != null && result == SnackbarResult.ActionPerformed) {
+            // ⇦ NO se consume aquí: `undoLastSwipe()` publica su propio mensaje
+            // ("Deshecho"). Consumirlo en este punto borraría ese mensaje en el mismo
+            // frame en que se escribe.
+            viewModel.undoLastSwipe()
+        } else {
+            // El snackbar se tragó solo (o había otra oferta): la ventana se cierra
+            // para no dejar un botón que ya no serviría.
             viewModel.consumeSnackbar()
+            viewModel.consumeUndoOffer()
         }
     }
 
@@ -124,6 +148,7 @@ fun ActividadesScreen(
             onConfirm = viewModel::confirmAssignment,
             isConfirming = uiState.isConfirming,
             onOpenCreate = viewModel::openCreate,
+            onSwipeAction = viewModel::startSwipeAction,
             currentUserId = viewModel.currentUserId,
             timelineMode = timelineMode,
             onTimelineModeChange = { timelineMode = it },
@@ -156,6 +181,16 @@ fun ActividadesScreen(
         }
         // T-FE-17 · El "+" abre el modal de alta. Se compone SOBRE la lista (composición hermana,
         // igual que el detalle), así que sobrevive al ciclo abrir/cerrar sus `remember`.
+        if (uiState.swipeReason !is SwipeReasonUiState.Closed) {
+            val reason = uiState.swipeReason as SwipeReasonUiState.Content
+            SwipeReasonDialog(
+                state = reason,
+                onReasonChange = viewModel::setSwipeReason,
+                onSubmit = viewModel::submitSwipeReason,
+                onDismiss = viewModel::dismissSwipeReason,
+            )
+        }
+
         if (uiState.create !is CreateUiState.Closed) {
             CreateActivitySheet(
                 state = uiState.create,
@@ -203,6 +238,12 @@ private fun ActividadesListScreen(
      * ("Cargar comprobante" y el chip de adjuntos, ambos inertes por FR-7) por su propio canal.
      */
     onOpenCreate: () -> Unit,
+    /**
+     * R2-T2-7 · Reenvía una acción de swipe desde la agenda. Se declara aquí y NO dentro
+     * de `TimelineView`: el cable tiene que existir aunque la semana no esté visible, o
+     * la firma de `TimelineView` cambiaría cada vez que se añadiera una acción.
+     */
+    onSwipeAction: (String, SwipeAction) -> Unit,
     currentUserId: String,
     timelineMode: TimelineMode,
     onTimelineModeChange: (TimelineMode) -> Unit,
@@ -379,6 +420,7 @@ private fun ActividadesListScreen(
                         onConfirm = onConfirm,
                         isConfirming = isConfirming,
                         currentUserId = currentUserId,
+                        onSwipeAction = onSwipeAction,
                         onSelectDate = { date -> onSelectedDateChange(date.toString()) },
                         onPreviousWeek = { navigateWeek(-1) },
                         onNextWeek = { navigateWeek(1) },
@@ -407,6 +449,7 @@ private fun TimelineContent(
     onConfirm: (String) -> Unit,
     isConfirming: Boolean,
     currentUserId: String,
+    onSwipeAction: (String, SwipeAction) -> Unit,
     onSelectDate: (LocalDate) -> Unit,
     onPreviousWeek: () -> Unit,
     onNextWeek: () -> Unit,
@@ -449,6 +492,7 @@ private fun TimelineContent(
                 onConfirm = onConfirm,
                 isConfirming = isConfirming,
                 currentUserId = currentUserId,
+                onSwipeAction = onSwipeAction,
                 onSelectDate = onSelectDate,
                 onPreviousWeek = onPreviousWeek,
                 onNextWeek = onNextWeek,

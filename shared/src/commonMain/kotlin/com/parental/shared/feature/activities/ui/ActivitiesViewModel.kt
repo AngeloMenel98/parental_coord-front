@@ -7,10 +7,18 @@ import com.parental.shared.core.ui.components.CategoryResolver
 import com.parental.shared.feature.activities.data.remote.ActivitiesApi
 import com.parental.shared.feature.activities.domain.model.Actividad
 import com.parental.shared.feature.activities.domain.model.ActividadDetalle
+import com.parental.shared.feature.activities.domain.model.ActivityReasonRequest
 import com.parental.shared.feature.activities.ui.create.CreateForm
 import com.parental.shared.feature.activities.ui.create.TimeOfDay
 import com.parental.shared.feature.activities.ui.create.toRequest
 import com.parental.shared.feature.activities.ui.create.validateCreateForm
+import com.parental.shared.feature.activities.ui.swipe.REASON_MAX_LENGTH
+import com.parental.shared.feature.activities.ui.swipe.ReasonValidation
+import com.parental.shared.feature.activities.ui.swipe.SWIPE_UNDO_WINDOW_MS
+import com.parental.shared.feature.activities.ui.swipe.SwipeAction
+import com.parental.shared.feature.activities.ui.swipe.UndoOffer
+import com.parental.shared.feature.activities.ui.swipe.successMessage
+import com.parental.shared.feature.activities.ui.swipe.validateSwipeReason
 import com.parental.shared.feature.bonds.data.remote.BondsApi
 import com.parental.shared.feature.bonds.domain.model.VinculoChild
 import kotlinx.coroutines.CoroutineDispatcher
@@ -94,6 +102,15 @@ data class ActivitiesUiState(
     val memberCandidates: List<MemberCandidate> = emptyList(),
     /** True SOLO mientras `POST /:id/complete` está en vuelo (single-flight global). */
     val isCompleting: Boolean = false,
+    // ── activity-swipe-actions: mutaciones de swipe ────────────────────────
+    /** Diálogo de motivo de Cancelar / No asistir — A1. `Closed` = no hay diálogo. */
+    val swipeReason: SwipeReasonUiState = SwipeReasonUiState.Closed,
+    /**
+     * R2 · Oferta de "Deshacer" viva, o `null`. ⚠ El campo NO guarda "hay snackbar":
+     * guarda una ventana con plazo. `null` significa que no hay nada que deshacer —
+     * tanto porque no se hizo una acción reversible como porque la ventana se venció.
+     */
+    val undoOffer: UndoOffer? = null,
 )
 
 /** Estado del MODAL DE ALTA — D19. ⚠ El estado en vuelo se llama `Loading`, no `Saving`, a
@@ -115,6 +132,36 @@ sealed interface CreateUiState {
 /** Un miembro del vínculo que puede recibir la actividad — el desplegable "Asignar a". */
 data class MemberCandidate(val id: String, val name: String)
 
+// ═══════════════════════════════════════════════════════════════════════════
+// Acciones de swipe (R1–R8)
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Diálogo de motivo — A1 · obligatorio en Cancelar y No asistir, inexistente en Eliminar.
+ *
+ * Como en [DetailUiState], la clave es el **id** de la actividad y no el payload: el
+ * diálogo se compone sobre `!= Closed`, así que `Loading` no necesita llevar una
+ * actividad que aún no existe. `Content` sí lleva el título, que es lo que la pantalla
+ * pinta en el subtítulo y que evita tener que buscar la fila en la lista —que ya no
+ * está, porque se quitó de forma optimista.
+ */
+sealed interface SwipeReasonUiState {
+    data object Closed : SwipeReasonUiState
+
+    /** Diálogo abierto, esperando texto. */
+    data class Content(
+        val id: String,
+        val action: SwipeAction,
+        val title: String,
+        val reason: String = "",
+        /** @param validation error de cliente (`TooShort`, `TooLong`…); `null` = aún no se ha enviado. */
+        val validation: ReasonValidation? = null,
+        val isSubmitting: Boolean = false,
+        /** @param serverError 422 `VALIDATION_FAILED` del backend: manda sobre [validation]. */
+        val serverError: String? = null,
+    ) : SwipeReasonUiState
+}
+
 class ActividadesViewModel(
     private val activitiesApi: ActivitiesApi,
     private val categoriesApi: CategoriesApi,
@@ -131,6 +178,18 @@ class ActividadesViewModel(
      * `UnconfinedTestDispatcher` SIN `Dispatchers.setMain`.
      */
     private val dispatcher: CoroutineDispatcher = Dispatchers.Main,
+    /**
+     * Reloj de pared inyectado. Lo que R2 miden son 5000 ms REALES contra el reloj del
+     * SERVIDOR, así que este reloj no decide nada: sólo hace que el texto del contador y
+     * el cierre automático de la oferta sean comprobables.
+     *
+     * ⇦ Inyectarlo evita el `Thread.sleep` en los tests, y además hace algo más
+     * importante: con [scope] en un dispatcher virtual, `delay()` avanza el reloj virtual
+     * pero NO el de `System.currentTimeMillis()`. Un test que esperara cinco segundos por
+     * `delay()` vería expirar la oferta sin que el tiempo real hubiera pasado, y probaría
+     * un reloj que no existe en producción.
+     */
+    private val clock: () -> Long = { System.currentTimeMillis() },
 ) {
     private val scope = CoroutineScope(SupervisorJob() + dispatcher)
 
@@ -578,7 +637,299 @@ class ActividadesViewModel(
         _uiState.value = _uiState.value.copy(snackbarMessage = null)
     }
 
+    // ── activity-swipe-actions · ELIMINAR / CANCELAR / NO ASISTIR ─────────────
+
+    /**
+     * Una acción a la vez por actividad. ⇦ NO es un `isActing` global como el de
+     * `isConfirming`: dos swipe distintos sobre filas distintas son independientes y
+     * bloquearlos juntos los haría sentir lentos. La clave es el **id**, y su único
+     * contenido es el texto que se está escribiendo.
+     */
+    private var swipeJobs = mutableMapOf<String, Job>()
+
+    /** Qué acción está pendiente de UNO de los verbos reversibles, o `null`. */
+    private var pendingUndoable: Pair<String, SwipeAction>? = null
+
+    /**
+     * Ticker de la oferta de deshacer. Existe porque R2 fija una ventana REAL: si nada
+     * la cerrara, el botón "Deshacer" seguiría en pantalla para siempre y acabaría
+     * mandar una petición que el servidor rechaza con 409. Compara contra el reloj en
+     * cada tic en vez de contar downto porque el proceso puede congelarse en segundo
+     * plano, y un contador que se quedó atrás mostraría un botón ya muerto.
+     */
+    private var undoTicker: Job? = null
+
+    /**
+     * Punto de entrada desde el swipe. Para [SwipeAction.DELETE] va directo al servidor;
+     * el resto abre [SwipeReasonUiState] porque A1 exige motivo.
+     */
+    fun startSwipeAction(id: String, action: SwipeAction) {
+        // R1 · Los flags del SERVIDOR son la autoridad. Si el cliente ofrece la acción y el
+        // servidor la niega, la fila queda en un estado en el que el usuario ve una opción
+        // que nunca funcionó. Se avisa en vez de enviar la petición: el 403 igual, pero el
+        // snackbar explica por qué en vez de mostrar un error de permisos que no helpa.
+        val row = _uiState.value.actividades.firstOrNull { it.id == id } ?: return
+        val allowed = when (action) {
+            SwipeAction.DELETE -> row.canDelete
+            SwipeAction.CANCEL -> row.canCancel
+            SwipeAction.DECLINE -> row.canDecline
+        }
+        if (!allowed) {
+            _uiState.value = _uiState.value.copy(
+                snackbarMessage = "Esta actividad ya no admite ${action.label.lowercase()}",
+            )
+            return
+        }
+        if (action.requiresReason) {
+            _uiState.value = _uiState.value.copy(
+                swipeReason = SwipeReasonUiState.Content(
+                    id = id,
+                    action = action,
+                    title = row.title,
+                ),
+            )
+        } else {
+            submitSwipeAction(id, action, reason = null)
+        }
+    }
+
+    /** Escribe el motivo — A1. Corta a 200 para que el diálogo no deje construir un 422. */
+    fun setSwipeReason(value: String) {
+        val current = _uiState.value.swipeReason
+        if (current !is SwipeReasonUiState.Content) return
+        if (current.isSubmitting) return
+        _uiState.value = _uiState.value.copy(
+            swipeReason = current.copy(
+                reason = value.take(REASON_MAX_LENGTH),
+                // Escribir BORRA el error del servidor anterior: si no, un 422 viejo
+                // seguiría en pantalla con el texto ya corregido, que es la peor forma
+                // de "no se puede enviar" porque no dice qué hacer.
+                validation = null,
+                serverError = null,
+            ),
+        )
+    }
+
+    /** Cierra el diálogo. Idempotente y sin efectos si ya estaba cerrado. */
+    fun dismissSwipeReason() {
+        if (_uiState.value.swipeReason is SwipeReasonUiState.Closed) return
+        _uiState.value = _uiState.value.copy(swipeReason = SwipeReasonUiState.Closed)
+    }
+
+    /** Envía el diálogo abierto. Corta en DOS puntos, como `submitCreate()`:
+     *  · `isSubmitting` ⇒ un solo POST en vuelo (doble envío imposible);
+     *  · `validateSwipeReason(...) !is Valid` ⇒ ni siquiera sale la petición. */
+    fun submitSwipeReason() {
+        val current = _uiState.value.swipeReason
+        if (current !is SwipeReasonUiState.Content) return
+        if (current.isSubmitting) return
+        val validation = validateSwipeReason(current.reason)
+        if (validation !is ReasonValidation.Valid) {
+            _uiState.value = _uiState.value.copy(
+                swipeReason = current.copy(validation = validation, serverError = null),
+            )
+            return
+        }
+        _uiState.value = _uiState.value.copy(
+            swipeReason = current.copy(validation = null, isSubmitting = true),
+        )
+        submitSwipeAction(current.id, current.action, current.reason.trim())
+    }
+
+    /**
+     * El verbo real, común a las tres acciones.
+     *
+     * 🔴 R2 · La fila sale de la lista **de forma optimista** ANTES de la respuesta. Es
+     * lo que hace que un swipe se sienta inmediato; la contrapartida es que hay que poder
+     * volver atrás, y por eso [previous] viaja entero en [UndoOffer].
+     *
+     * El error NO es un no-op: se devuelve la fila EXACTAMENTE como estaba y, si venía un
+     * [UndoOffer] de una acción anterior, se cierra — si no, "Deshacer" apuntaría a una
+     * fila que este fallo acaba de reinsertar y cuyo estado real es el de antes.
+     */
+    private fun submitSwipeAction(id: String, action: SwipeAction, reason: String?) {
+        val row = _uiState.value.actividades.firstOrNull { it.id == id } ?: return
+        swipeJobs[id]?.cancel()
+        // Optimista: fuera de la lista ya, y fuera del detalle si es la que está abierta.
+        _uiState.value = _uiState.value.copy(
+            actividades = _uiState.value.actividades.filterNot { it.id == id },
+            detail = if (_uiState.value.detail.openedId == id) {
+                DetailUiState.Closed
+            } else {
+                _uiState.value.detail
+            },
+            swipeReason = if (
+                (_uiState.value.swipeReason as? SwipeReasonUiState.Content)?.id == id
+            ) {
+                SwipeReasonUiState.Closed
+            } else {
+                _uiState.value.swipeReason
+            },
+            undoOffer = null,
+        )
+        swipeJobs[id] = scope.launch {
+            val result = when (action) {
+                SwipeAction.DELETE -> activitiesApi.deleteActivity(token, id)
+                SwipeAction.CANCEL -> activitiesApi.cancelActivity(
+                    token, id,
+                    ActivityReasonRequest(reason!!),
+                )
+
+                SwipeAction.DECLINE -> activitiesApi.declineActivity(
+                    token, id,
+                    ActivityReasonRequest(reason!!),
+                )
+            }
+            withContext(dispatcher) {
+                swipeJobs.remove(id)
+                when (result) {
+                    is ApiResult.Success -> {
+                        // R2 · Sólo DELETE y DECLINE se deshacen. CANCEL no: no hay verbo
+                        // de reversión en la API y ofrecerlo sería un botón que miente.
+                        val reversible = action == SwipeAction.DELETE || action == SwipeAction.DECLINE
+                        if (reversible) {
+                            pendingUndoable = id to action
+                            val offer = UndoOffer(
+                                id = id,
+                                action = action,
+                                previous = row,
+                                expiresAtEpochMillis = clock() + SWIPE_UNDO_WINDOW_MS,
+                            )
+                            _uiState.value = _uiState.value.copy(
+                                undoOffer = offer,
+                                snackbarMessage = offer.successMessage(),
+                            )
+                            startUndoTicker(offer)
+                        } else {
+                            _uiState.value = _uiState.value.copy(
+                                snackbarMessage = "Actividad ${action.pastTense}",
+                            )
+                        }
+                        loadAll()
+                    }
+
+                    is ApiResult.Error -> {
+                        // Reversión del gesto optimista + por qué NO se reintenta a ciegas.
+                        _uiState.value = _uiState.value.copy(
+                            actividades = (_uiState.value.actividades + row)
+                                .sortedBy { it.scheduledStart },
+                            undoOffer = null,
+                            snackbarMessage = explainSwipeError(result),
+                        )
+                        // R2 · Un 409 de ventana vencida significa que la fila YA NO se
+                        // puede recuperar: el refetch sustituye al gesto, y sin esto la
+                        // lista mentiría mostrando una actividad que el servidor ya borró.
+                        if (result.code == 409) loadAll()
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Traduce el fallo a algo accionable usando el CÓDIGO estable (R8), no el status.
+     *
+     * Un 409 son dos cosas distintas —"ya pasó" o "se venció la ventana"— y el móvil
+     * tiene que distinguirlas: la primera se corrige esperando, la segunda no admite
+     * reintento. Por eso el backend manda `code` y aquí se lee, en vez de mirar
+     * `code == 409`, que sería el status y por tanto justo lo que R8 prohíbe.
+     */
+    private fun explainSwipeError(result: ApiResult.Error): String =
+        when (result.errorCode) {
+            "ACTIVITY_ALREADY_PAST" ->
+                "Esta actividad ya pasó y no admite cambios"
+
+            "ACTIVITY_UNDO_WINDOW_EXPIRED" ->
+                "Ya no se puede deshacer: la ventana de 5 segundos venció"
+
+            "ACTIVITY_FORBIDDEN" ->
+                "No tienes permiso para esta acción en esta actividad"
+
+            "ACTIVITY_NOT_FOUND" ->
+                "Esta actividad ya no existe"
+
+            "VALIDATION_FAILED" -> result.message
+            // Sin código: el endpoint no codifica el error, así que el mensaje del
+            // backend es lo mejor que hay. No se adivina una traducción por status.
+            else -> result.message
+        }
+
+    /**
+     * Toca "Deshacer" — R2. Sólo tiene efecto si la ventana sigue viva; un toque
+     * posterior es un no-op silencioso en vez de un 409 que el usuario no pidió.
+     */
+    fun undoLastSwipe() {
+        val offer = _uiState.value.undoOffer ?: return
+        if (!offer.isLive(clock())) {
+            clearUndoOffer()
+            return
+        }
+        val (id, action) = pendingUndoable ?: return
+        undoTicker?.cancel()
+        _uiState.value = _uiState.value.copy(
+            actividades = (_uiState.value.actividades + offer.previous)
+                .sortedBy { it.scheduledStart },
+            undoOffer = null,
+            snackbarMessage = "Deshecho",
+        )
+        pendingUndoable = null
+        swipeJobs[id] = scope.launch {
+            val result = when (action) {
+                SwipeAction.DELETE -> activitiesApi.restoreActivity(token, id)
+                SwipeAction.DECLINE -> activitiesApi.undoDeclineActivity(token, id)
+                SwipeAction.CANCEL -> return@launch
+            }
+            withContext(dispatcher) {
+                swipeJobs.remove(id)
+                when (result) {
+                    is ApiResult.Success -> {
+                        _uiState.value = _uiState.value.copy(snackbarMessage = "Deshecho")
+                        loadAll()
+                    }
+
+                    is ApiResult.Error -> {
+                        // El gesto optimista ya reinsertó la fila; si el servidor la
+                        // devuelve 404/409 la fila no existe y quedarse con ella mentiría.
+                        _uiState.value = _uiState.value.copy(
+                            actividades = _uiState.value.actividades
+                                .filterNot { it.id == id },
+                            snackbarMessage = explainSwipeError(result),
+                        )
+                        loadAll()
+                    }
+                }
+            }
+        }
+    }
+
+    /** Cierra la oferta sin deshacer — el snackbar se tragó solo. */
+    fun consumeUndoOffer() = clearUndoOffer()
+
+    private fun clearUndoOffer() {
+        undoTicker?.cancel()
+        undoTicker = null
+        pendingUndoable = null
+        _uiState.value = _uiState.value.copy(undoOffer = null)
+    }
+
+    private fun startUndoTicker(offer: UndoOffer) {
+        undoTicker?.cancel()
+        undoTicker = scope.launch {
+            // Tics de 100 ms: afinado para el texto "Deshecho (Ns)" sin gastar.
+            while (clock() <= offer.expiresAtEpochMillis) {
+                kotlinx.coroutines.delay(UNDO_TICK_MS)
+                if (!offer.isLive(clock())) break
+            }
+            clearUndoOffer()
+        }
+    }
+
     fun destroy() {
+        undoTicker?.cancel()
         scope.cancel()
+    }
+
+    private companion object {
+        const val UNDO_TICK_MS = 100L
     }
 }

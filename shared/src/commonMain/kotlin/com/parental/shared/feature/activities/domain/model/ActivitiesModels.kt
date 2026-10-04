@@ -12,7 +12,7 @@ data class Actividad(
     val id: String,
     val title: String,
     val type: String,             // "event" | "obligation"
-    val status: String,           // "created" | "assigned" | "in_progress" | "verify" | "done" | "overdue"
+    val status: String,           // "created"|"assigned"|"assisting"|"in_progress"|"verify"|"done"|"overdue"|"not_assisting"|"cancelled"
     val categoryId: String,       // UUID
     val criticality: String,      // "critical" | "high" | "medium" | "low"
     val scheduledStart: String? = null, // ISO-8601
@@ -22,6 +22,15 @@ data class Actividad(
     val assignedConfirmed: Boolean = false, // flag-only: confirmar asignación no toca status
     val confirmedAt: String? = null,   // ISO-8601, null mientras assignedConfirmed=false
     val completedAt: String? = null,   // ISO-8601 (D14)
+    // 🔴 R1 · Los TRES flags los calcula el SERVIDOR para el usuario que pregunta
+    // (`ActivityPolicyService.evaluate`). El cliente NO los recalcula — a diferencia
+    // de `canConfirm` más abajo, que sí es una regla local. Si el cliente los
+    // derivara, habría dos copias de la política y divergirían en cuanto cambiara
+    // una; con `false` por defecto, un servidor viejo degrada a "sin acciones" en
+    // vez de a "acciones que van a fallar".
+    val canDelete: Boolean = false,
+    val canCancel: Boolean = false,
+    val canDecline: Boolean = false,
 )
 
 @Serializable
@@ -42,6 +51,17 @@ data class ActividadDetalle(
     val assignedConfirmed: Boolean = false,
     val confirmedAt: String? = null,
     val completedAt: String? = null,   // ISO-8601 (D14)
+    val canDelete: Boolean = false,
+    val canCancel: Boolean = false,
+    val canDecline: Boolean = false,
+    /** `now >= coalesce(scheduledEnd, scheduledStart)` — sólo lo manda el detalle. */
+    val isPast: Boolean = false,
+    /**
+     * A3 · Motivo de "No asistir", visible para TODA la actividad del vínculo y no
+     * sólo para el creador. Que no cruce de vínculos lo garantiza el servidor (404
+     * al no miembro), no este campo: si llega aquí, ya es del vínculo del usuario.
+     */
+    val declinedReason: String? = null,
 ) {
     /** Código corto derivado del id (el backend no expone un campo short-id). */
     val code: String get() = "ACT-" + id.take(4).uppercase()
@@ -97,4 +117,51 @@ data class CompleteActivityResponse(
     val id: String,
     val status: String,
     val completedAt: String? = null,
+)
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Contratos de las acciones de swipe (R7)
+// ═══════════════════════════════════════════════════════════════════════════
+
+/** `DELETE /activities/:id` → `{id, deletedAt}`. */
+@Serializable
+data class DeleteActivityResponse(
+    val id: String,
+    val deletedAt: String,
+)
+
+/** `POST /activities/:id/restore` → `{id, deletedAt}` (null tras deshacer). */
+@Serializable
+data class RestoreActivityResponse(
+    val id: String,
+    val deletedAt: String? = null,
+)
+
+/** `POST /activities/:id/cancel` → `{id, status, cancelledAt}`. */
+@Serializable
+data class CancelActivityResponse(
+    val id: String,
+    val status: String,
+    val cancelledAt: String,
+)
+
+/** `POST /activities/:id/decline` → `{id, status, declinedAt}`. */
+@Serializable
+data class DeclineActivityResponse(
+    val id: String,
+    val status: String,
+    val declinedAt: String,
+)
+
+/** `POST /activities/:id/undo-decline` → `{id, status}`. */
+@Serializable
+data class UndoDeclineResponse(
+    val id: String,
+    val status: String,
+)
+
+/** Cuerpo de cancelar y de declinar. A1 · el motivo es OBLIGATORIO en ambos. */
+@Serializable
+data class ActivityReasonRequest(
+    val reason: String,
 )

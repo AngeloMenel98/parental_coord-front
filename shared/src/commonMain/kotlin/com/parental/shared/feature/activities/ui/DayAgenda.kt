@@ -119,6 +119,18 @@ internal fun DayAgendaRow(
     onConfirm: (String) -> Unit,
     isConfirming: Boolean,
     focusRequesters: MutableMap<String, FocusRequester>,
+    /**
+     * R2-T2-7 · Hueco de swipe. Llega como
+     * `@Composable (content: @Composable () -> Unit) -> Unit` y NO como componente
+     * concreto a propósito: si [DayAgendaRow] importara `ActivitySwipeBox`, esta fila
+     * sabría qué gestos existen y habría que cambiar su firma cada vez que se añada uno.
+     * Con el hueco, la fila sólo garantiza "esto es lo que se puede deslizar".
+     *
+     * Por defecto `{}` (pinta el contenido tal cual): [AgendaList] y cualquier otro
+     * llamante existente siguen compilando sin tocar una línea, y una fila sin swipe no
+     * añade ni superficie ni nodo de semántica.
+     */
+    swipe: @Composable (content: @Composable () -> Unit) -> Unit = { c -> c() },
     modifier: Modifier = Modifier,
 ) {
     // R4-T1-2 · Mismo registro que `AgendaTimelineRow`; el mapa es compartido para
@@ -168,28 +180,43 @@ internal fun DayAgendaRow(
             categoryName = info?.name,
             status = row.actividad.status,
         )
-        ActivityBody(
-            row = row,
-            info = info,
-            zone = zone,
-            semanticLabel = activitySemanticLabel(row, info, zone),
-            showTime = false,
-            showCategoryIcon = false,
-            showMetaChips = false,
-            showChevron = false,
-            // R2-T2-8 · La fila y el chip son DOS nodos hermanos, no uno anidado: el
-            // chip se pinta dentro de este `Row` pero FUERA del `clickable` del cuerpo,
-            // de modo que tocar cerca de "Confirmar" confirma y no abre el detalle.
-            showConfirmChip = true,
-            canConfirm = canConfirm,
-            onClick = { onSelectActividad(row.actividad.id) },
-            onConfirm = { onConfirm(row.actividad.id) },
-            isConfirming = isConfirming,
+        // R2-T2-7 · El `weight`, el `padding` y el `focusRequester` se QUITAN de
+        // `ActivityBody` y se quedan en el `Box` que lo envuelve. No es un
+        // reposicionamiento: es el mismo nodo visual de antes —el cuerpo de la fila—, así
+        // que la geometría de R2 no se mueve; lo que cambia es que el gesto de deslizar
+        // pasa a ser hijo suyo. Devolver el foco al envoltorio además es lo correcto: el
+        // destino del foco es la tarjeta completa, no su contenido.
+        //
+        // ⚠ `Box` SIN `semantics`: `R4-T2-4` cuenta nodos de semántica con precisión y
+        // un `Box` pelado no crea ninguno, así que el conteo no cambia. Un
+        // `Modifier.semantics {}` aquí sí lo movería.
+        Box(
             modifier = Modifier
                 .weight(1f)
                 .padding(start = Spacing.md)
                 .focusRequester(focusRequester),
-        )
+        ) {
+            swipe {
+                ActivityBody(
+                    row = row,
+                    info = info,
+                    zone = zone,
+                    semanticLabel = activitySemanticLabel(row, info, zone),
+                    showTime = false,
+                    showCategoryIcon = false,
+                    showMetaChips = false,
+                    showChevron = false,
+                    // R2-T2-8 · La fila y el chip son DOS nodos hermanos, no uno anidado: el
+                    // chip se pinta dentro de este `Row` pero FUERA del `clickable` del cuerpo,
+                    // de modo que tocar cerca de "Confirmar" confirma y no abre el detalle.
+                    showConfirmChip = true,
+                    canConfirm = canConfirm,
+                    onClick = { onSelectActividad(row.actividad.id) },
+                    onConfirm = { onConfirm(row.actividad.id) },
+                    isConfirming = isConfirming,
+                )
+            }
+        }
     }
 }
 

@@ -20,6 +20,8 @@ import com.parental.shared.core.ui.theme.ProgressStroke
 import com.parental.shared.core.ui.theme.Spacing
 import com.parental.shared.core.ui.theme.TypeTokens
 import com.parental.shared.feature.activities.domain.model.canConfirm
+import com.parental.shared.feature.activities.ui.swipe.ActivitySwipeBox
+import com.parental.shared.feature.activities.ui.swipe.SwipeAction
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 
@@ -56,6 +58,15 @@ internal fun WeekTimeline(
     onConfirm: (String) -> Unit,
     isConfirming: Boolean,
     currentUserId: String,
+    /**
+     * R2-T2-7 · ÚNICO punto por el que una agenda dispara una acción de swipe.
+     *
+     * Se pasa como callback y no leyendo un singleton, para que la fila siga siendo
+     * una función pura de sus datos: `WeekTimeline` no sabe qué gestos existen, sólo los
+     * reenvía. El tipo es `SwipeAction`, de modo que añadir una acción obliga a tocar
+     * aquí a propósito y no por olvido.
+     */
+    onSwipeAction: (String, SwipeAction) -> Unit = { _, _ -> },
     onSelectDate: (LocalDate) -> Unit,
     onPreviousWeek: () -> Unit,
     onNextWeek: () -> Unit,
@@ -125,6 +136,24 @@ internal fun WeekTimeline(
                                     // emite riel, para que no cuelgue una cola bajo el
                                     // último nodo.
                                     showConnector = index < slot.rows.lastIndex,
+                                    // R2-T2-7 · LAS ACCIONES DE SWIPE NO SE AÑADEN AQUÍ.
+                                    // El riel, los focus requesters y el agrupado de R2
+                                    // viven DENTRO de `DayAgendaRow`, y montarlos desde aquí
+                                    // obligaría a la agenda de semana a duplicar su geometría
+                                    // — dos copias que divergirían en cuanto R2 cambiase.
+                                    // Por eso la fila los recibe como `swipe` y los ejecuta
+                                    // internamente, y aquí sólo se PASA la lambda. Con el swipe
+                                    // fuera, ni `focusRequester`, ni el riel, ni la regla de
+                                    // "una hora por grupo" cambian.
+                                    swipe = { content ->
+                                        ActivitySwipeBox(
+                                            actividad = row.actividad,
+                                            onSwipe = { action ->
+                                                onSwipeAction(row.actividad.id, action)
+                                            },
+                                            content = content,
+                                        )
+                                    },
                                     // R2-T2-8 · `canConfirm` se EVALÚA AQUÍ, con el
                                     // `currentUserId` de la pantalla, y se PASA como dato.
                                     // F7 no lo recalcula ni lo adivina: si mañana la regla

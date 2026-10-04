@@ -152,7 +152,11 @@ internal fun statusSemanticLabel(status: String): String = when (status.uppercas
     "VERIFY", "PENDING_VERIFICATION" -> "Por verificar"
     "DONE", "COMPLETED" -> "Cumplida"
     "OVERDUE" -> "Vencida"
-    "NOT_ASSISTING", "OBJECTION" -> "No asiste"
+    // A5 · Se retira el brazo `"OBJECTION"`: el enum ya no lo tiene y el backend
+    // lo tira en `DropActivityStatusLegacyValues`. Dejarlo mapeado no rompe nada
+    // (es un `when`), pero es un estado que ya no puede llegar desde la API, así que
+    // su etiqueta es un segundo lugar donde editar si mañana se re-normaliza el copy.
+    "NOT_ASSISTING" -> "No asiste"
     "CANCELLED" -> "Cancelada"
     else -> "Estado ${status.ifBlank { "desconocido" }}"
 }
