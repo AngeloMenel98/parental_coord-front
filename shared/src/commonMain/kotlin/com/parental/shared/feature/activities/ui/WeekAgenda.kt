@@ -106,12 +106,18 @@ internal fun WeekTimeline(
                         Column(modifier = Modifier.fillMaxWidth()) {
                             // R2-T2-7 · El grupo de misma hora es una PILA vertical sobre el
                             // riel, no el `FlowRow` horizontal de tarjetas de 190dp que T4
-                            // dejó. Cada fila lleva su propia columna de tiempo, así que el
-                            // `Text` de hora que encabezaba el grupo era redundante: se fue
-                            // con el `FlowRow` (misma hora ⇒ misma etiqueta en cada fila).
+                            // dejó.
+                            //
+                            // 🔴 `R7-T2-8` · LA HORA SE ROTULA UNA SOLA VEZ POR GRUPO. Antes
+                            // cada fila repetía `formatTime(...)`: dos actividades a las 10:30
+                            // imprimían "10:30" dos veces, lo que además de ser redundante
+                            // ESCONDEBA el agrupamiento — el ojo leía filas sueltas, no un
+                            // grupo. Sólo la PRIMERA fila del hueco rotula; las de
+                            // continuación pasan `null` y F7 reserva los 48dp con un `Spacer`
+                            // para que el riel no se desalinee.
                             slot.rows.forEachIndexed { index, row ->
                                 DayAgendaRow(
-                                    timeLabel = formatTime(slot.hour, slot.minute),
+                                    timeLabel = if (index == 0) formatTime(slot.hour, slot.minute) else null,
                                     row = row,
                                     info = resolve(row.actividad.categoryId),
                                     zone = zone,

@@ -1,11 +1,10 @@
 package com.parental.shared.feature.activities.ui
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -38,8 +37,9 @@ import com.parental.shared.core.ui.theme.AgendaGeometry
 import com.parental.shared.core.ui.theme.Spacing
 import com.parental.shared.core.ui.theme.TagTriple
 import com.parental.shared.core.ui.theme.TypeTokens
-import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
+
+
 
 /*
  * Agenda del día — `calendar-design-redesign`, tema T2. F7. **Archivo nuevo.**
@@ -60,69 +60,16 @@ import kotlinx.datetime.TimeZone
  * la que se copió sí está anotada. T2-7 retiró el `FlowRow`; el que se reintroduzca uno aquí
  * debe añadir el marcador él mismo, y eso se comprueba con grep. Riesgo R4, ALTA.
  *
- * ⚠ Techo ≈230 al que F7 NO llega: cierra en ~296 y el exceso es TODO prosa de estos
- * comentarios. Comprimir es lo permitido; suprimir el porqué no (precedente B, desv. 5), así
- * que el techo registrado en T2-9 es el real, no el ≈230.
+ * ⚠ Techo ≈230. Antes de separar `DayAgendaHeader` a su propio fichero, F7 cerraba en
+ * 351 y NO llegaba: el exceso era TODO prosa de estos comentarios. Comprimir es lo
+ * permitido; suprimir el porqué no (precedente B, desv. 5).
+ *
+ * 🪓 2026-10-03 — `DayAgendaHeader` se movió a `DayAgendaHeader.kt`. El antetítulo y el
+ * titular son otro trabajo que la lista de actividades, y este fichero ya sostenía las
+ * cuatro piezas de `RR-4`. 🔴 `RR-4` NO SE TOCA: las cuatro siguen siendo DECLARACIONES
+ * separadas, sólo que repartidas en dos ficheros. La reversibilidad de C9 (`OD-4`) depende
+ * de la declaración, no del fichero.
  */
-
-/**
- * Antetítulo + titular del día — `R1-T2-1` (antetítulo) y `R2-T2-2` (titular). El
- * antetítulo se escribe **`Agenda del día`** y se ve en versalitas gracias al
- * `fontFeatureSettings = "smcp"` de `labelSmall` (`Type.kt:103-109`): **NO se escribe en
- * mayúsculas a mano**, la fuente de verdad es la cadena con su capitalización natural y la
- * forma versal es un efecto de tipografía. Nodo de texto real, se anuncia una sola vez, **no**
- * lleva `contentDescription` y **no** se oculta de la tecnología asistiva: duplica nada,
- * porque las filas de abajo anuncian sus propios títulos.
- */
-@Composable
-internal fun DayAgendaHeader(date: LocalDate, activityCount: Int, zone: TimeZone) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Text(
-            text = "Agenda del día",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = Spacing.md, bottom = Spacing.xs),
-        )
-        // R2-T2-2. Titular `weight(1f)` y conteo de ancho intrínseco: a 320dp el TITULAR se
-        // elide, nunca el conteo. Éste no lleva `maxLines` porque el requisito es que no se
-        // trunque a NINGÚN ancho. `TextAlign.End` + singular/plural: "1 actividad" / "N
-        // actividades". Contar es `FR-13` — hasta T2-2 el número sólo existía en el
-        // `contentDescription` fuera de pantalla de la celda de día, nunca en la UI visible.
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.Bottom,
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Text(
-                text = formatLongDate(date, currentDateIn(zone).year),
-                style = TypeTokens.date,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f).padding(end = Spacing.sm),
-            )
-            Text(
-                text = if (activityCount == 1) "1 actividad" else "$activityCount actividades",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.End,
-            )
-        }
-        // R3-T2-3 · LA COPIA SIGUE AL TRATAMIENTO DE FILA QUE SE ENVÍA. Aquí dice
-        // "actividad" porque la fila CON título (A4 provisional) es la que se renderiza;
-        // "Toca un icono" sólo sería cierto para un nodo sin título (`prd-v4:166`
-        // guioniza esa variante). ⚠ LA COSTA DE C9 ASOMA AQUÍ: las DOS literales están
-        // fijadas para que el futuro flip sea un cambio de UNA cadena. Si C9 se confirma
-        // "sin título", cambia esta línea y sólo esta. Es la costura que verifica T2-9.
-        Text(
-            text = "Toca una actividad para ver los detalles",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-    }
-}
 
 /**
  * Fila del agenda del día — `R4-T2-4`. Cuatro columnas hermanas: **columna de tiempo +
@@ -133,13 +80,27 @@ internal fun DayAgendaHeader(date: LocalDate, activityCount: Int, zone: TimeZone
  * 48dp que NO es un objetivo táctil — no "corregirla" a `Layout.touchMin`, igual que
  * `dateColumn` (`Spacing.kt`).
  *
- * SEMÁNTICA — como máximo DOS nodos, y nunca un tercero decorativo: (1) el nodo fusionado de
- * [ActivityBody], que ya anuncia fecha, hora, título, categoría, tipo, estado y límite
- * ([activitySemanticLabel]); y (2) el [ConfirmarChip], hermano aparte con su propio nodo
- * (T2-8). La columna de tiempo y el nodo son **decorativos para la tecnología asistiva**:
- * `activitySemanticLabel` ya dice la hora de `row.localStart` — que es exactamente la de esta
- * fila — y la categoría en palabras, así que un nodo para cualquiera de los dos sería
- * duplicación, el mismo argumento que `AgendaRowSeparator` da en `AgendaList.kt`.
+ * SEMÁNTICA — EXACTAMENTE DOS nodos por hueco, y ni uno decorativo más: (1) el **nodo de
+ * tiempo**, un `Text` real que se lee tal cual; y (2) el nodo fusionado de [ActivityBody],
+ * que anuncia fecha, hora, título, categoría, tipo, estado y límite
+ * ([activitySemanticLabel]). Sólo la fila es pulsable. El [ConfirmarChip], cuando existe, es
+ * un TERCER nodo hermano (T2-8), nunca anidado dentro del rótulo de la fila.
+ *
+ * ⚠ La hora se anuncia DOS veces — y `R4-T2-4` lo pide así a propósito. No se oculta porque
+ * es información real, y no se funde en el rótulo porque `activitySemanticLabel` ya la dice:
+ * fundirla repetiría la hora DENTRO de un nodo, mientras que su propio nodo la produce ENTRE
+ * dos, que es la estructura que el requisito especifica y la que el árbol de semántica puede
+ * contar — y además es lo que permite barrer la columna de horas. `AgendaNode` y el riel SÍ
+ * siguen decorativos (`clearAndSetSemantics { }`): el rótulo ya nombra la categoría y la
+ * cronología la llevan la hora y el contador de `DayAgendaHeader`.
+ *
+ * 🔴 CONSECUENCIA DE `R7-T2-8` QUE `R4-T2-4` NO REFLEJA. Ese requisito dice "exactamente DOS
+ * nodos por hueco"; con la hora rotulada **una vez por grupo** un hueco de N tiene **DOS**
+ * nodos en la PRIMERA fila (hora + rótulo fusionado) y **UNO** en cada CONTINUACIÓN, donde no
+ * hay `Text` que contar — el `Spacer` no es nodo. Mejora, no regresión: el rótulo fusionado
+ * sigue anunciando hora, título, categoría y estado en todas las filas, así que ninguna es
+ * sorda; lo que cambia es el recuento. 🔴 `R4-T2-4` **NO se ha editado para que cuadre**: su
+ * texto es el rastro de auditoría y el desacuerdo queda declarado aquí, no borrado.
  *
  * ⚠ `height(IntrinsicSize.Min)` es el MISMO patrón que ya envía `AgendaList.kt`: sin él el
  * riel de `fillMaxHeight()` no tiene altura que llenar. Desviación registrada contra §7.2
@@ -148,7 +109,7 @@ internal fun DayAgendaHeader(date: LocalDate, activityCount: Int, zone: TimeZone
  */
 @Composable
 internal fun DayAgendaRow(
-    timeLabel: String,
+    timeLabel: String?,
     row: TimelineRow,
     info: CategoryInfo?,
     zone: TimeZone,
@@ -171,18 +132,33 @@ internal fun DayAgendaRow(
             .height(IntrinsicSize.Min),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            text = timeLabel,
-            style = TypeTokens.time,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.End,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier
-                .width(AgendaGeometry.timeColumn)
-                .padding(end = Spacing.sm)
-                .clearAndSetSemantics { },
-        )
+// 🔴 `R7-T2-8` · LA HORA SE ROTULA UNA VEZ POR GRUPO. `timeLabel` es `null` en las filas
+        // de CONTINUACIÓN de un grupo de misma hora. El pie está RESERVADO igual (48dp) para
+        // que nodo, riel y cuerpo no se desplacen: el riel es lo que `RR-4` y `AgendaList.kt`
+        // tienen alineado. ⚠ Un `Spacer` y no un texto vacío porque un `Text` vacío SÍ crea
+        // nodo de semántica, y `R4-T2-4` cuenta nodos con precisión.
+        if (timeLabel != null) {
+            Text(
+                text = timeLabel,
+                style = TypeTokens.time,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.End,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                // 🔴 `R4-T2-4` · ARRIBA, NO CENTRADA. `align(Alignment.Top)` es el
+                // `Alignment.Vertical` del `RowScope`: sube SÓLO este hijo, así que el nodo y
+                // el cuerpo siguen centrados. Con título de dos líneas + límite la fila
+                // crece, y una hora centrada deja de leerse como la hora DE ESA fila.
+                // ⚠ Y NO SE ESCONDE (ver el KDoc): sin el `clearAndSetSemantics` de antes,
+                // este `Text` es un nodo real y la fila tiene su nodo de hora.
+                modifier = Modifier
+                    .align(Alignment.Top)
+                    .width(AgendaGeometry.timeColumn)
+                    .padding(end = Spacing.sm),
+            )
+        } else {
+            Spacer(modifier = Modifier.width(AgendaGeometry.timeColumn))
+        }
         // Riel = hermano de la fila, NO hijo de [AgendaNode] (RR-4).
         if (showConnector) {
             TimelineConnector()
@@ -289,10 +265,18 @@ internal fun AgendaNode(
                 modifier = Modifier.size(AgendaGeometry.nodeCard / 2),
             )
         }
-        // Collar de 2dp de `surface` entre el punto de estado y el disco de categoría.
+        // 🔴 `R6-T2-6` · EL PUNTO VA EN LA ESQUINA SUPERIOR DERECHA. El requisito lo pide
+        // "centred on the node's top-right corner"; abajo chocaba con el borde inferior del
+        // propio disco y con el `outline` de la fila siguiente. Arriba, con la fila ya
+        // alineada ARRIBA (T2-4), el solape lee como "este nodo lleva este estado".
+        //
+        // ⚠ TAMAÑOS: collar `statusBadge` 8dp con punto 6dp, el token tal cual. Su VALOR no
+        // es de T2 — `ActivityBody.kt:160` lo comparte el punto de estado de la fila de
+        // Agenda, así que moverlo es un cambio de dos pantallas. El contraste que hace el
+        // collar es punto-contra-`surface`, no collar-contra-disco.
         Box(
             modifier = Modifier
-                .align(Alignment.BottomEnd)
+                .align(Alignment.TopEnd)
                 .size(AgendaGeometry.statusBadge)
                 .clip(CircleShape)
                 .background(MaterialTheme.colorScheme.surface),
@@ -306,3 +290,4 @@ internal fun AgendaNode(
         }
     }
 }
+
