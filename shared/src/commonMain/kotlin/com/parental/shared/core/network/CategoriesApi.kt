@@ -13,9 +13,11 @@ data class CategoryDto(
     val name: String,
     val color: String? = null,
     val icon: String? = null,
+    val criticality: String? = null,
+    val isActive: Boolean = true,
 )
 
-class CategoriesApi(
+open class CategoriesApi(
     private val client: HttpClient,
     private val baseUrl: String,
 ) {
@@ -23,7 +25,7 @@ class CategoriesApi(
      * GET /categories — público (sin auth). Lista de categorías del sistema,
      * usada para resolver categoryId → (nombre, color, icono).
      */
-    suspend fun getCategories(): ApiResult<List<CategoryDto>> {
+    open suspend fun getCategories(): ApiResult<List<CategoryDto>> {
         return try {
             val response = client.get("$baseUrl/categories")
             if (response.status.isSuccess()) {

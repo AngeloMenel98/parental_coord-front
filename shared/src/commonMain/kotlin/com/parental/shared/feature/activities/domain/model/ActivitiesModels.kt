@@ -16,10 +16,12 @@ data class Actividad(
     val categoryId: String,       // UUID
     val criticality: String,      // "critical" | "high" | "medium" | "low"
     val scheduledStart: String? = null, // ISO-8601
+    val scheduledEnd: String? = null,   // ISO-8601 (D14)
     val deadline: String? = null,      // ISO-8601
     val assignedTo: String? = null,    // user UUID
     val assignedConfirmed: Boolean = false, // flag-only: confirmar asignación no toca status
     val confirmedAt: String? = null,   // ISO-8601, null mientras assignedConfirmed=false
+    val completedAt: String? = null,   // ISO-8601 (D14)
 )
 
 @Serializable
@@ -32,12 +34,14 @@ data class ActividadDetalle(
     val criticality: String,
     val description: String = "",
     val scheduledStart: String? = null,
+    val scheduledEnd: String? = null,   // ISO-8601 (D14)
     val deadline: String? = null,
     val assignedTo: String? = null,
     val createdBy: String,
     val createdAt: String,
     val assignedConfirmed: Boolean = false,
     val confirmedAt: String? = null,
+    val completedAt: String? = null,   // ISO-8601 (D14)
 ) {
     /** Código corto derivado del id (el backend no expone un campo short-id). */
     val code: String get() = "ACT-" + id.take(4).uppercase()
@@ -67,3 +71,30 @@ fun Actividad.canConfirm(currentUserId: String?) =
 
 fun ActividadDetalle.canConfirm(currentUserId: String?) =
     canConfirmAssignment(assignedTo, assignedConfirmed, currentUserId)
+
+@Serializable
+data class CreateActividadRequest(
+    val title: String,
+    val description: String? = null,
+    val type: String = "event",
+    val categoryId: String,
+    val assignedTo: String? = null,
+    val scheduledStart: String,
+    val scheduledEnd: String? = null,
+    val childrenIds: List<String>,
+)
+
+/** DTO mínimo: `ignoreUnknownKeys = true` en plataformas lo hace seguro. */
+@Serializable
+data class CreatedActividad(
+    val id: String,
+    val title: String,
+    val status: String,
+)
+
+@Serializable
+data class CompleteActivityResponse(
+    val id: String,
+    val status: String,
+    val completedAt: String? = null,
+)

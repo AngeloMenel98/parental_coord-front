@@ -194,3 +194,22 @@ object DetailGeometry {
     /** Diámetro del spinner de confirmación. `R2-T2-2` — permanente. */
     val progressSize: Dp = 18.dp
 }
+
+/**
+ * Tope de altura de las HOJAS MODALES, como fracción de la ventana.
+ *
+ * Propietarios: `activity-detail-modal` (`ActividadDetailSheet.kt`) y `activity-create-modal`
+ * (`CreateActivitySheet.kt`). Antes vivía como constante privada en el primer fichero: dos
+ * hojas con el mismo tope en dos sitios es una deriva esperando a ocurrir.
+ *
+ * 🔴 NO se "arregla" con `skipPartiallyExpanded = false`: da el 50 % por cero líneas y rompe
+ * el pie fijo (la anclura `PartiallyExpanded` es una POSICIÓN, no un redimensionado). El
+ * `ModalBottomSheet` tampoco expone altura máxima y `Modifier.draggableAnchors` es `internal`,
+ * así que el único tope posible es de CONTENIDO y tiene que leer la ventana vigente
+ * (`BoxWithConstraints.maxHeight`) — rotación, plegable, ventana dividida y teclado abierto.
+ *
+ * Propietario del cambio: `create-activity` T-FE-15.
+ */
+object SheetGeometry {
+    val maxHeightRatio: Float = 0.85f
+}

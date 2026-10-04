@@ -61,6 +61,31 @@ kotlin {
             }
         }
 
+        // ⚠ Infra de tests (D16): SIN `gradle/libs.versions.toml` — decisión deliberada, no
+        //   un olvido. Este proyecto tiene ~20 versiones hardcodeadas; un catálogo creado sólo
+        //   para estas dos dependencias de test sería un SEGUNDO origen de verdad. La versión de
+        //   `kotlin("test")` la aporta el plugin KMP; `kotlinx-coroutines-test` se fija a la
+        //   1.8.0 que Compose 1.7.1 ya arrastra.
+        //
+        // ⚠ `commonTest` existe por defecto en el template KMP y `androidUnitTest` es su
+        //   consumidor en el target Android ⇒ aquí sólo se AÑADEN dependencias, no se crea
+        //   ningún source set. `iosX64Test`/`iosSimulatorArm64Test` NO se declaran: no hay
+        //   runner de XCTest en este repo (R8) y `kotlin("test")` no habría funcionado ahí.
+        // ⚠ NO hace falta `unitTests.isReturnDefaultValues`: los tests son Kotlin puro.
+        val commonTest by getting {
+            dependencies {
+                implementation(kotlin("test"))
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.0")
+            }
+        }
+
+        val androidUnitTest by getting {
+            dependencies {
+                implementation(kotlin("test-junit"))
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.0")
+            }
+        }
+
         val iosX64Main by getting
         val iosArm64Main by getting
         val iosSimulatorArm64Main by getting

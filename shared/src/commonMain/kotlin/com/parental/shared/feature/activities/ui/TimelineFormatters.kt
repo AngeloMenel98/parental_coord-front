@@ -147,10 +147,12 @@ internal fun typeLabel(type: String): String =
 internal fun statusSemanticLabel(status: String): String = when (status.uppercase()) {
     "CREATED" -> "Creada"
     "ASSIGNED" -> "Asignada"
+    "ASSISTING" -> "Asistiendo"
     "IN_PROGRESS" -> "En progreso"
     "VERIFY", "PENDING_VERIFICATION" -> "Por verificar"
     "DONE", "COMPLETED" -> "Cumplida"
     "OVERDUE" -> "Vencida"
+    "NOT_ASSISTING", "OBJECTION" -> "No asiste"
     "CANCELLED" -> "Cancelada"
     else -> "Estado ${status.ifBlank { "desconocido" }}"
 }
@@ -162,7 +164,7 @@ internal fun formatDetailDate(raw: String?): String? {
 }
 
 internal fun criticalityLabel(criticality: String): String = when (criticality) {
-    "critical" -> "Urgente"
+    "critical" -> "Alta"
     "high" -> "Alta"
     "medium" -> "Media"
     "low" -> "Baja"

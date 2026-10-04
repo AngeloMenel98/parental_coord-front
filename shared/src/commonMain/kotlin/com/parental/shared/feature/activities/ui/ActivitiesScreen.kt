@@ -23,6 +23,7 @@ import com.parental.shared.core.ui.components.CategoryInfo
 import com.parental.shared.core.ui.theme.MotionTokens
 import com.parental.shared.feature.activities.domain.model.canConfirm
 import com.parental.shared.feature.activities.ui.detail.ActividadDetailSheet
+import com.parental.shared.feature.activities.ui.create.CreateActivitySheet
 import com.parental.shared.feature.activities.ui.openedId
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.LocalDate
@@ -119,10 +120,10 @@ fun ActividadesScreen(
             onRetryList = viewModel::retry,
             resolve = resolve,
             snackbarHostState = snackbarHostState,
-            onInertAction = viewModel::onInertAction,
             onNavigateBottom = onNavigateBottom,
             onConfirm = viewModel::confirmAssignment,
             isConfirming = uiState.isConfirming,
+            onOpenCreate = viewModel::openCreate,
             currentUserId = viewModel.currentUserId,
             timelineMode = timelineMode,
             onTimelineModeChange = { timelineMode = it },
@@ -148,7 +149,34 @@ fun ActividadesScreen(
                 onInertAction = viewModel::onInertAction,
                 onConfirm = viewModel::confirmAssignment,
                 isConfirming = uiState.isConfirming,
+                onComplete = viewModel::completeActivity,
+                isCompleting = uiState.isCompleting,
                 currentUserId = viewModel.currentUserId,
+            )
+        }
+        // T-FE-17 · El "+" abre el modal de alta. Se compone SOBRE la lista (composición hermana,
+        // igual que el detalle), así que sobrevive al ciclo abrir/cerrar sus `remember`.
+        if (uiState.create !is CreateUiState.Closed) {
+            CreateActivitySheet(
+                state = uiState.create,
+                form = uiState.createForm,
+                isDirty = uiState.createDirty,
+                categories = uiState.categories,
+                children = uiState.children,
+                memberCandidates = uiState.memberCandidates,
+                snackbarHostState = snackbarHostState,
+                onTitleChange = viewModel::setCreateTitle,
+                onDescriptionChange = viewModel::setCreateDescription,
+                onCategoryChange = viewModel::setCreateCategory,
+                onToggleChild = viewModel::toggleCreateChild,
+                onAssigneeChange = viewModel::setCreateAssignee,
+                onDateChange = viewModel::setCreateDate,
+                onTimeChange = viewModel::setCreateTime,
+                onSubmit = viewModel::submitCreate,
+                // ⚠ Reintentar = `submitCreate` tal cual: reutiliza el MISMO `createForm` intacto
+                //   (D19), así que el reintento no pierde ni un carácter de lo escrito.
+                onRetry = viewModel::submitCreate,
+                onDismissRequest = viewModel::closeCreate,
             )
         }
     }
@@ -165,10 +193,16 @@ private fun ActividadesListScreen(
     onRetryList: () -> Unit,
     resolve: (String) -> CategoryInfo?,
     snackbarHostState: SnackbarHostState,
-    onInertAction: (String) -> Unit,
     onNavigateBottom: (String) -> Unit,
     onConfirm: (String) -> Unit,
     isConfirming: Boolean,
+    /**
+     * T-FE-17 · Abre el modal de alta. Sustituye a `onInertAction` en esta firma: el "+" era su
+     * ÚNICO consumidor aquí y era un placeholder inerte, así que al dejar de serlo, mantener el
+     * parámetro sería dejar un cable muerto. La hoja de detalle sigue usando `onInertAction`
+     * ("Cargar comprobante" y el chip de adjuntos, ambos inertes por FR-7) por su propio canal.
+     */
+    onOpenCreate: () -> Unit,
     currentUserId: String,
     timelineMode: TimelineMode,
     onTimelineModeChange: (TimelineMode) -> Unit,
@@ -267,8 +301,9 @@ private fun ActividadesListScreen(
                     titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
                 ),
                 actions = {
-                    // "+ Nuevo" placeholder — sin llamada API (PRD §8).
-                    IconButton(onClick = { onInertAction(NEXT_MSG) }) {
+                    // T-FE-17 · El "+" abre el modal de alta (`openCreate`). Antes era un
+                    // placeholder inerte (PRD §8); ya no lo es: el backend de `create` existe.
+                    IconButton(onClick = onOpenCreate) {
                         Icon(
                             imageVector = Icons.Default.Add,
                             contentDescription = "Nueva actividad",

@@ -25,6 +25,7 @@ import com.parental.shared.core.ui.theme.AgendaGeometry
 import com.parental.shared.core.ui.theme.DetailGeometry
 import com.parental.shared.core.ui.theme.ParentalShapes
 import com.parental.shared.core.ui.theme.ProgressStroke
+import com.parental.shared.core.ui.theme.SheetGeometry
 import com.parental.shared.core.ui.theme.Spacing
 import com.parental.shared.feature.activities.domain.model.ActividadDetalle
 import com.parental.shared.feature.activities.domain.model.canConfirm
@@ -52,25 +53,12 @@ import kotlinx.coroutines.launch
  */
 
 /**
- * R-13 · Tope de altura de la hoja: como máximo esta fracción de la ventana.
+ * Raíz de la hoja — `activity-detail-modal`, T2-1.
  *
- * Relación y no `Dp` porque `ModalBottomSheet` no expone altura máxima
- * (`ModalBottomSheet.kt:119-133`) y `Modifier.draggableAnchors` es `internal`, así que el
- * único tope posible es de CONTENIDO y tiene que leer la ventana vigente (`maxHeight`):
- * rotación, plegable, ventana dividida y teclado abierto. Sin unidad no nace token
- * (`Spacing.kt` es aditivo-only y está en su techo) y G-15 sigue en 0.
- *
- * 🔴 NO se "arregla" poniendo `skipPartiallyExpanded = false`: da el 50 % por cero líneas
- * (`ModalBottomSheet.kt:239-243`) y ROMPE FR-9 — `PartiallyExpanded` es una posición, no un
- * redimensionado, así que el pie cae en `y ≈ 1.5 · ventana` y la CTA fijada de FR-8 sale por
- * el borde inferior. Detalle en #1208 §7.1.
- *
- * El 60 % tampoco es un ancla: es un tope. El borde superior al 40 % es la CONSECUENCIA de
- * `Expanded at max(0f, fullHeight − altoMedido)`, no el mecanismo.
+ * ⚠ R-13 (tope de altura): el `0.6f` vive AHORA en el token [SheetGeometry] (`create-activity`
+ * T-FE-15), compartido con la hoja de alta. La explicación completa —por qué es una relación y
+ * no `Dp`, y por qué NO se arregla con `skipPartiallyExpanded = false`— está junto al token.
  */
-private const val SHEET_MAX_HEIGHT_RATIO = 0.6f
-
-/** Raíz de la hoja — `activity-detail-modal`, T2-1. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun ActividadDetailSheet(
@@ -84,6 +72,8 @@ internal fun ActividadDetailSheet(
     onInertAction: (String) -> Unit,
     onConfirm: (String) -> Unit,
     isConfirming: Boolean,
+    onComplete: (String) -> Unit,
+    isCompleting: Boolean,
     currentUserId: String,
 ) {
     val scope = rememberCoroutineScope()
@@ -115,7 +105,7 @@ internal fun ActividadDetailSheet(
         // `false` por defecto y su único hijo es esta columna, luego mide lo que mide—.
         BoxWithConstraints {
             Column(
-                modifier = Modifier.fillMaxWidth().heightIn(max = maxHeight * SHEET_MAX_HEIGHT_RATIO),
+                modifier = Modifier.fillMaxWidth().heightIn(max = maxHeight * SheetGeometry.maxHeightRatio),
             ) {
                 DetailHeader(
                     onClose = requestDismiss,
@@ -159,6 +149,8 @@ internal fun ActividadDetailSheet(
                         onInertAction = onInertAction,
                         onConfirm = onConfirm,
                         isConfirming = isConfirming,
+                        onComplete = onComplete,
+                        isCompleting = isCompleting,
                         currentUserId = currentUserId,
                     )
                 }
@@ -251,9 +243,33 @@ private fun DetailFooter(
     onInertAction: (String) -> Unit,
     onConfirm: (String) -> Unit,
     isConfirming: Boolean,
+    onComplete: (String) -> Unit,
+    isCompleting: Boolean,
     currentUserId: String,
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
+        // AL-4 · "Finalizar" POR ENCIMA del bloque de acciones: es la transición que cierra el
+        // ciclo de vida (spec `activity-lifecycle`) y desaparece en cuanto `status == "done"`.
+        // ⚠ `isCompleting` es un FLAG PROPIO del ViewModel, no un estado de la hoja: la hoja NO
+        //   se desmonta al finalizar, así que un `Loading(id)` la vaciaría y el usuario perdería
+        //   el contexto justo tras completar.
+        if (actividad.status != "done") {
+            OutlinedButton(
+                onClick = { onComplete(actividad.id) },
+                enabled = !isCompleting,
+                modifier = Modifier.fillMaxWidth()
+                    .padding(start = Spacing.lg, end = Spacing.lg, bottom = Spacing.sm),
+            ) {
+                if (isCompleting) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(DetailGeometry.progressSize),
+                        strokeWidth = ProgressStroke.thin,
+                    )
+                } else {
+                    Text("Finalizar")
+                }
+            }
+        }
         // Estados 2/1/0: confirmado → chip inerte; asignable → botón; no asignado → nada.
         when {
             actividad.assignedConfirmed -> AssistChip(

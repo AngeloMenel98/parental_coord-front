@@ -9,6 +9,8 @@ data class CategoryInfo(
     val name: String,
     val colorHex: String?,
     val emoji: String?,
+    val criticality: String? = null,
+    val isActive: Boolean = true,
 )
 
 /**
@@ -42,6 +44,8 @@ object CategoryResolver {
                 name = cat.name,
                 colorHex = cat.color,
                 emoji = pref?.emoji,
+                criticality = cat.criticality,
+                isActive = cat.isActive,
             )
         }
 }

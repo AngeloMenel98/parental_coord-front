@@ -7,11 +7,11 @@ import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.http.*
 
-class BondsApi(
+open class BondsApi(
     private val client: HttpClient,
     private val baseUrl: String,
 ) {
-    suspend fun getMyBonds(token: String): ApiResult<List<Vinculo>> {
+    open suspend fun getMyBonds(token: String): ApiResult<List<Vinculo>> {
         return try {
             val response = client.get("$baseUrl/bonds") {
                 header("Authorization", "Bearer $token")
