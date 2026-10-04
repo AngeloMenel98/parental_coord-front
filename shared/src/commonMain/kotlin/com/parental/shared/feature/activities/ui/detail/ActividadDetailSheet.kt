@@ -29,6 +29,7 @@ import com.parental.shared.core.ui.theme.SheetGeometry
 import com.parental.shared.core.ui.theme.Spacing
 import com.parental.shared.feature.activities.domain.model.ActividadDetalle
 import com.parental.shared.feature.activities.domain.model.canConfirm
+import com.parental.shared.feature.activities.domain.model.visibleDeclinedReason
 import com.parental.shared.feature.activities.ui.*
 import kotlinx.coroutines.launch
 
@@ -222,6 +223,22 @@ private fun DetailContent(
             }
         }
         if (a.description.isNotBlank()) item { DetailCard(title = "Descripción", body = a.description) }
+        // A3 · EL MOTIVO DE "NO ASISTIR". Es la mitad de A3 que faltaba: el backend ya lo
+        // exponía a toda la actividad del vínculo y el cliente no lo pintaba en ninguna parte.
+        //
+        // 🔴 NO SE FILTRA POR AUTOR. Se lee con [visibleDeclinedReason], que no admite
+        // parámetro de visor — la firma ES la aplicación de A3 (ver el KDoc). Volver a
+        // gatear esto por `createdBy` para "no molestar" reintroduce el defecto anterior.
+        //
+        // ⚠ Sin `remember` ni caché: se relee de la actividad cargada en cada composición.
+        // El `DetailUiState.Content` que la envuelve es el único sitio donde vive, y al
+        // cerrar la hoja vuelve a `Closed` — el motivo no sobrevive a la actividad.
+        // A4: `deletedAt` es la ÚNICA marca de borrado; aquí no hay nada que purgar ni que
+        // preguntar, y esta tarjeta desaparece sola cuando el servidor deja de mandar el
+        // motivo.
+        a.visibleDeclinedReason()?.let { motivo ->
+            item { DetailCard(title = "Motivo de no asistencia", body = motivo) }
+        }
         item { DetailBlockCard(pairs) }
         item {
             // FR-7 **NO ENTREGADA** — bloqueada: no existe API de adjuntos (`ActAttachmentEntity`

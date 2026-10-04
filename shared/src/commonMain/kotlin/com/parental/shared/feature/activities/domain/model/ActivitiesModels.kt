@@ -67,6 +67,28 @@ data class ActividadDetalle(
     val code: String get() = "ACT-" + id.take(4).uppercase()
 }
 
+/**
+ * A3 · El motivo de "No asistir" que la hoja de detalle pinta, o `null` si no pinta nada.
+ *
+ * 🔴 **SIN PARÁMETRO DE VISOR, Y ESO ES LA APLICACIÓN DE A3.** El motivo lo ve HOY CUALQUIER
+ * MIEMBRO DEL VÍNCULO, no sólo quien lo escribió. La forma de hacer esa regla imposible de
+ * romper por descuido es no ofrecer por dónde meterla: aquí no hay `createdBy`, ni
+ * `currentUserId`, ni `isViewer` que comparar. Añadirlos "por si acaso" es exactamente el
+ * cambio que devolvería el motivo a verse sólo para quien lo escribió, así que la firma es
+ * también la prueba.
+ *
+ * ⚠ NO filtra por vínculos ni memoriza nada. La garantía es del servidor (404 al no
+ * miembro) y de la vida del `DetailUiState.Content` que la envuelve: cuando la hoja se
+ * cierra, `detail` vuelve a `Closed` y el motivo se va con él. Aquí sólo se lee el valor
+ * que ya está en la actividad cargada — ni `remember`, ni caché, ni `DataStore`.
+ *
+ * ⚠ Un motivo en blanco NO se pinta. El backend lo recorta y mide antes de guardar
+ * (3–200), así que sólo un servidor viejo o un dato importado podrían dejarlo vacío; pintar
+ * una tarjeta con el rótulo y el cuerpo en blanco es peor que no pintar la tarjeta.
+ */
+fun ActividadDetalle.visibleDeclinedReason(): String? =
+    declinedReason?.trim()?.takeIf { it.isNotEmpty() }
+
 /** Respuesta exacta de POST /activities/:id/confirm (R4: exactamente 3 claves). */
 @Serializable
 data class ConfirmAssignmentResponse(
