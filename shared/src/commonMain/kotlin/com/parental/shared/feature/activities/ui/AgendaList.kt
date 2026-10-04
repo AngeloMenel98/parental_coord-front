@@ -3,49 +3,41 @@ package com.parental.shared.feature.activities.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.SideEffect
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import com.parental.shared.core.ui.components.CategoryInfo
-import com.parental.shared.core.ui.components.TagDot
-import com.parental.shared.core.ui.components.categoryTagTriple
 import com.parental.shared.core.ui.theme.AgendaGeometry
 import com.parental.shared.core.ui.theme.Spacing
-import com.parental.shared.feature.activities.domain.model.canConfirm
-import kotlinx.datetime.LocalDate
+import com.parental.shared.feature.activities.ui.swipe.ActivitySwipeBox
+import com.parental.shared.feature.activities.ui.swipe.SwipeAction
 import kotlinx.datetime.TimeZone
 
 /*
  * Pestaña Agenda — `calendar-design-redesign`, T4 (paso 6). F4.
  *
- * `AgendaTimeline` + `AgendaTimelineRow`. `ActivityBody` NO vive aquí: al medir
+ * `AgendaTimeline` + el separador. `ActivityBody` NO vive aquí: al medir
  * el archivo con su bloque de imports, F4 pasaba de 250, así que se disparó la
  * válvula de escape que el propio registro autoriza — `ActivityBody` a su propio
  * `ui/ActivityBody.kt` (archivo 10). Sin replanificar nada.
+ *
+ * 🪓 2026-10-04 — `AgendaTimelineRow` también se va a su propio fichero
+ * (`ui/AgendaTimelineRow.kt`), por la misma válvula: el hueco `swipe` de R2-T2-7
+ * lo empujaba otra vez sobre 250. Segunda extracción de la MISMA clase,
+ * autorizada por el mismo registro de F4. Este fichero queda en la lista y el
+ * separador; lo que la fila necesita para el gesto se le pasa desde aquí.
  *
  * `ConfirmarChip` tampoco vive aquí: se queda en F5 (`WeekAgenda.kt`), que es su
  * casa final, y la fila ya lo llamaba a través de ese límite. Hoy se llama al
@@ -64,6 +56,14 @@ internal fun AgendaTimeline(
     onConfirm: (String) -> Unit,
     isConfirming: Boolean,
     currentUserId: String,
+    /**
+     * R2-T2-7 · ÚNICO punto por el que la lista Agenda dispara una acción de swipe.
+     *
+     * Mismo contrato que el de `WeekTimeline`: un callback, no un singleton, para que la
+     * fila siga siendo una función pura de sus datos. El tipo es `SwipeAction`, de modo
+     * que añadir una acción obliga a tocar aquí a propósito y no por olvido.
+     */
+    onSwipeAction: (String, SwipeAction) -> Unit,
     focusRequesters: MutableMap<String, FocusRequester>,
 ) {
     Box(
@@ -112,6 +112,21 @@ internal fun AgendaTimeline(
                                     onConfirm = onConfirm,
                                     isConfirming = isConfirming,
                                     currentUserId = currentUserId,
+                                    // R2-T2-7 · El gesto se monta AQUÍ, en el punto de
+                                    // render de la fila, y no dentro de ella: es lo que
+                                    // hace que la lista Agenda tenga swipe. Sin este
+                                    // argumento la fila NI COMPILA (el hueco no tiene
+                                    // valor por defecto), que es la garantía mecánica de
+                                    // que la superficie no se vuelva a quedar sin gesto.
+                                    swipe = { content ->
+                                        ActivitySwipeBox(
+                                            actividad = row.actividad,
+                                            onSwipe = { action ->
+                                                onSwipeAction(row.actividad.id, action)
+                                            },
+                                            content = content,
+                                        )
+                                    },
                                     focusRequesters = focusRequesters,
                                 )
                             }
@@ -150,105 +165,4 @@ private fun AgendaRowSeparator() {
             .background(MaterialTheme.colorScheme.outlineVariant)
             .clearAndSetSemantics { },
     )
-}
-
-@Composable
-internal fun AgendaTimelineRow(
-    row: TimelineRow,
-    date: LocalDate?,
-    showDate: Boolean,
-    zone: TimeZone,
-    resolve: (String) -> CategoryInfo?,
-    onSelectActividad: (String) -> Unit,
-    onConfirm: (String) -> Unit,
-    isConfirming: Boolean,
-    currentUserId: String,
-    focusRequesters: MutableMap<String, FocusRequester>,
-) {
-    // R4-T1-2 · `SideEffect` + no-leer-en-composición ⇒ escribir el mapa no recompone
-    // a nadie: sin bucle. `remember` sin clave porque la posición ya identifica la fila.
-    val focusRequester = remember { FocusRequester() }
-    SideEffect { focusRequesters[row.actividad.id] = focusRequester }
-
-    val info = resolve(row.actividad.categoryId)
-    val categoryColor = categoryTagTriple(info)?.dot ?: MaterialTheme.colorScheme.outline
-    val canConfirm = row.actividad.canConfirm(currentUserId)
-    val semanticLabel = activitySemanticLabel(row, info, zone)
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(IntrinsicSize.Min),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(
-            modifier = Modifier
-                .width(AgendaGeometry.dateColumn)
-                .padding(end = Spacing.sm),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            if (showDate && date != null) {
-                // R1-T3-1: dos líneas centradas, día arriba / mes abreviado abajo.
-                // Sin `maxLines` esto medía 3 líneas (24sp serif en 70dp) y la
-                // columna crecía; `maxLines = 1` lo vuelve inalcanzable ante
-                // cualquier cambio de fuente futuro.
-                Text(
-                    text = formatAgendaDay(date),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontWeight = FontWeight.SemiBold,
-                    textAlign = TextAlign.Center,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    text = formatAgendaMonth(date),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-        }
-
-        // R5-T3-5 / T5-6: la GEOMETRÍA y el color no se tocan — `width(1dp)
-        // .fillMaxHeight()` dentro del `Row(height(IntrinsicSize.Min))` y
-        // `clearAndSetSemantics { }` viven ahora en `AgendaTimelineLine.kt`, que
-        // el esqueleto reutiliza para que `outline` (4.37:1 / 5.83:1) no degrade
-        // a `outlineVariant` (1.67:1) justo cuando llega el contenido.
-        //
-        // NO registrado: la CONTINUIDAD — el `Arrangement.spacedBy(Spacing.xs)` de
-        // `WeekAgenda.kt` perfora huecos de 4dp en esta línea reutilizada; eso es
-        // FR-22 / A5 / H4, no este cambio.
-        AgendaTimelineLine()
-
-        TagDot(
-            color = categoryColor,
-            modifier = Modifier.padding(horizontal = Spacing.md),
-            size = AgendaGeometry.lineNode,
-        )
-
-        ActivityBody(
-            row = row,
-            info = info,
-            zone = zone,
-            semanticLabel = semanticLabel,
-            showTime = true,
-            canConfirm = canConfirm,
-            onClick = { onSelectActividad(row.actividad.id) },
-            // C4: `ActivityBody` aplica su `modifier` ANTES de `.clickable`, el orden que
-            // exige `focusRequester`; por eso el fichero no cambia.
-            modifier = Modifier.weight(1f).focusRequester(focusRequester),
-        )
-
-        if (canConfirm) {
-            Spacer(modifier = Modifier.width(Spacing.xxs))
-            ConfirmarChip(
-                onClick = { onConfirm(row.actividad.id) },
-                enabled = !isConfirming,
-                isConfirming = isConfirming,
-            )
-        }
-    }
 }

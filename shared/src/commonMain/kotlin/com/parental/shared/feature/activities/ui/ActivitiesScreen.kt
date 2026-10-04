@@ -477,6 +477,10 @@ private fun TimelineContent(
                 onConfirm = onConfirm,
                 isConfirming = isConfirming,
                 currentUserId = currentUserId,
+                // R2-T2-7 · La LISTA es la superficie principal de la acción y hasta ahora
+                // no tenía gesto: sólo lo tenía la agenda de día. Sin este argumento
+                // `AgendaTimeline` ni siquiera compila.
+                onSwipeAction = onSwipeAction,
                 focusRequesters = focusRequesters,
             )
 

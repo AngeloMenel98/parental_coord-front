@@ -65,6 +65,11 @@ internal fun WeekTimeline(
      * una función pura de sus datos: `WeekTimeline` no sabe qué gestos existen, sólo los
      * reenvía. El tipo es `SwipeAction`, de modo que añadir una acción obliga a tocar
      * aquí a propósito y no por olvido.
+     *
+     * ⚠ Éste SÍ lleva valor por defecto, y es deliberado: `WeekTimeline` no es una
+     * superficie de datos sino una pantalla, y su único llamante (`ActivitiesScreen.kt`)
+     * sí lo pasa. El hueco SIN default es el de `AgendaTimelineRow` — la FILA —, que es
+     * donde la omisión significaba una superficie entera sin gesto.
      */
     onSwipeAction: (String, SwipeAction) -> Unit = { _, _ -> },
     onSelectDate: (LocalDate) -> Unit,
@@ -127,44 +132,48 @@ internal fun WeekTimeline(
                             // continuación pasan `null` y F7 reserva los 48dp con un `Spacer`
                             // para que el riel no se desalinee.
                             slot.rows.forEachIndexed { index, row ->
-                                DayAgendaRow(
-                                    timeLabel = if (index == 0) formatTime(slot.hour, slot.minute) else null,
-                                    row = row,
-                                    info = resolve(row.actividad.categoryId),
-                                    zone = zone,
-                                    // N filas → N−1 segmentos: la última fila del grupo no
-                                    // emite riel, para que no cuelgue una cola bajo el
-                                    // último nodo.
-                                    showConnector = index < slot.rows.lastIndex,
-                                    // R2-T2-7 · LAS ACCIONES DE SWIPE NO SE AÑADEN AQUÍ.
-                                    // El riel, los focus requesters y el agrupado de R2
-                                    // viven DENTRO de `DayAgendaRow`, y montarlos desde aquí
-                                    // obligaría a la agenda de semana a duplicar su geometría
-                                    // — dos copias que divergirían en cuanto R2 cambiase.
-                                    // Por eso la fila los recibe como `swipe` y los ejecuta
-                                    // internamente, y aquí sólo se PASA la lambda. Con el swipe
-                                    // fuera, ni `focusRequester`, ni el riel, ni la regla de
-                                    // "una hora por grupo" cambian.
-                                    swipe = { content ->
-                                        ActivitySwipeBox(
-                                            actividad = row.actividad,
-                                            onSwipe = { action ->
-                                                onSwipeAction(row.actividad.id, action)
-                                            },
-                                            content = content,
-                                        )
+                                // R2-T2-7 · EL GESTO SE MONTA AQUÍ, ENVOLVIENDO LA LLAMADA.
+                                // Antes colgaba de un parámetro `swipe` de `DayAgendaRow`, y
+                                // eso estaba mal por dos razones que ya costaron un ciclo: la
+                                // fila se enteraba de qué gestos existen (por eso su firma
+                                // tenía que cambiar cada vez que se añadía uno), y —peor— el
+                                // hueco llevaba VALOR POR DEFECTO, así que las superficies que
+                                // no lo montaban compilaban igual y se quedaban sin gesto.
+                                // `DayAgendaRow` vuelve a su forma de `67a11a7`; el envoltorio
+                                // se queda en el punto de render, que es la casa de R2-T2-7.
+                                //
+                                // ⚠ MONTARLO AQUÍ NO DUPLICA LA GEOMETRÍA DE R2: el riel, los
+                                // `focusRequester` y la regla de "una hora por grupo" siguen
+                                // DENTRO de `DayAgendaRow`, y el envoltorio sólo desplaza la
+                                // fila entera en horizontal. La columna de 48dp se desplaza
+                                // con la tarjeta, que es lo correcto.
+                                ActivitySwipeBox(
+                                    actividad = row.actividad,
+                                    onSwipe = { action ->
+                                        onSwipeAction(row.actividad.id, action)
                                     },
-                                    // R2-T2-8 · `canConfirm` se EVALÚA AQUÍ, con el
-                                    // `currentUserId` de la pantalla, y se PASA como dato.
-                                    // F7 no lo recalcula ni lo adivina: si mañana la regla
-                                    // de asignación cambia, este es el único sitio que
-                                    // hay que tocar, y la fila no puede discrepar de él.
-                                    canConfirm = row.actividad.canConfirm(currentUserId),
-                                    onSelectActividad = onSelectActividad,
-                                    onConfirm = onConfirm,
-                                    isConfirming = isConfirming,
-                                    focusRequesters = focusRequesters,
-                                )
+                                ) {
+                                    DayAgendaRow(
+                                        timeLabel = if (index == 0) formatTime(slot.hour, slot.minute) else null,
+                                        row = row,
+                                        info = resolve(row.actividad.categoryId),
+                                        zone = zone,
+                                        // N filas → N−1 segmentos: la última fila del grupo no
+                                        // emite riel, para que no cuelgue una cola bajo el
+                                        // último nodo.
+                                        showConnector = index < slot.rows.lastIndex,
+                                        // R2-T2-8 · `canConfirm` se EVALÚA AQUÍ, con el
+                                        // `currentUserId` de la pantalla, y se PASA como dato.
+                                        // F7 no lo recalcula ni lo adivina: si mañana la regla
+                                        // de asignación cambia, este es el único sitio que
+                                        // hay que tocar, y la fila no puede discrepar de él.
+                                        canConfirm = row.actividad.canConfirm(currentUserId),
+                                        onSelectActividad = onSelectActividad,
+                                        onConfirm = onConfirm,
+                                        isConfirming = isConfirming,
+                                        focusRequesters = focusRequesters,
+                                    )
+                                }
                             }
                         }
                     }
@@ -195,6 +204,19 @@ internal fun WeekTimeline(
                         onConfirm = onConfirm,
                         isConfirming = isConfirming,
                         currentUserId = currentUserId,
+                        // R2-T2-7 · Misma regla que en `AgendaList`: el hueco no tiene
+                        // valor por defecto, así que esta llamada NO COMPILARÍA sin él. Una
+                        // fila sin fecha dentro de un mismo día deslizable era exactamente
+                        // el agujero que dejó el montaje equivocado.
+                        swipe = { content ->
+                            ActivitySwipeBox(
+                                actividad = row.actividad,
+                                onSwipe = { action ->
+                                    onSwipeAction(row.actividad.id, action)
+                                },
+                                content = content,
+                            )
+                        },
                         focusRequesters = focusRequesters,
                     )
                 }

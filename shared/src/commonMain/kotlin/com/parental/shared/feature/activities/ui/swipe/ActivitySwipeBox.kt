@@ -31,6 +31,7 @@ import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.isSpecified
 import androidx.compose.ui.unit.dp
 import com.parental.shared.feature.activities.domain.model.Actividad
 import kotlinx.coroutines.launch
@@ -52,14 +53,24 @@ private val SettleSpec = tween<Float>(durationMillis = 200)
 /**
  * R2-T2-7 · Capa de swipe de UNA actividad.
  *
- * Se monta desde `WeekAgenda` a través del hueco `swipe` de `DayAgendaRow`, y RECIBE el
- * contenido en vez de dibujarlo: es un envoltorio de slot, como `SwipeToDismissBox`. Si
- * pintara la tarjeta por su cuenta habría dos copias de la misma fila —una dentro del
- * gesto y otra sin él— y la de dentro nunca recibiría los datos de la agenda.
+ * Se monta en el PUNTO DE RENDER de cada fila y RECIBE el contenido en vez de dibujarlo:
+ * es un envoltorio de slot, como `SwipeToDismissBox`. Si pintara la tarjeta por su cuenta
+ * habría dos copias de la misma fila —una dentro del gesto y otra sin él— y la de dentro
+ * nunca recibiría los datos de la agenda.
  *
- * Vivir en `ui/swipe` y no dentro de la agenda es la razón de que el cambio sea
- * delta-cero: ni el riel, ni los focus requesters, ni el agrupado de R2 se mueven, y
- * `AgendaList` compila sin tocar una línea.
+ * 🔴 TRES MONTajes, y este es el único sitio donde se eligen. `WeekAgenda.kt` lo envuelve
+ * sobre la llamada a `DayAgendaRow` (filas con hora) y sobre la de `AgendaTimelineRow`
+ * (filas sin fecha); `AgendaList.kt` lo pasa a `AgendaTimelineRow` (modo lista). Antes sólo
+ * existía el primero, y montarlo sobre una fila equivocada fue el defecto que encontró
+ * `sdd-verify`: una superficie sin gesto no se ve, se compila.
+ *
+ * ⚠ POR QUÉ EL EJE CRUZADO SE DECIDE AQUÍ Y NO SIEMPRE ES `fillMaxSize`. `fillMaxSize`
+ * necesita que el alto de ENTRADA esté acotado. Dentro del hueco de una fila
+ * (`Box(weight(1f))` en un `Row(height(IntrinsicSize.Min))`) lo hay, y ahí `fillMaxSize` es
+ * lo correcto. Envolviendo la fila ENTERA desde un `Column` de un `LazyColumn` el alto llega
+ * infinito, y `fillMaxSize` acabaría midiendo con `Constraints.fixed(0, 0)`: la fila se
+ * cerraría a cero píxeles. Por eso se pregunta a `maxHeight` y se llena el alto sólo cuando
+ * está acotado.
  *
  * 🔴 EL GESTO **REVELA** el menú de acciones; no las ejecuta. Un desliz horizontal que
  * borrara en el mismo gesto haría indistinguibles "Cancelar" de "Eliminar" y dejaría sin
@@ -108,9 +119,17 @@ fun ActivitySwipeBox(
         // estrecho y el texto se parte. Fracción ⇒ siempre cabe, siempre legible.
         val barWidthPx = fullWidthPx * BAR_WIDTH_FRACTION
 
+        // 🔴 `fillMaxSize` SÓLO si el alto de entrada está acotado — ver el KDoc. Con alto
+        // infinito o sin especificar se mide el ancho y el alto lo decide el contenido.
+        // `Dp.isSpecified` es justamente `value.isFinite()`, así que cubre los dos casos.
+        val fill = if (maxHeight.isSpecified) {
+            Modifier.fillMaxSize()
+        } else {
+            Modifier.fillMaxWidth()
+        }
+
         Box(
-            modifier = Modifier
-                .fillMaxSize()
+            modifier = fill
                 .clip(MaterialTheme.shapes.medium)
                 // R4-T2-4 · Cada acción se declara como `customActions` para que TalkBack
                 // la ofrezca SIN gesto. Sin esto, swipe sería exclusivamente táctil y
@@ -166,8 +185,7 @@ fun ActivitySwipeBox(
 
             // ── La tarjeta, DESPLAZADA encima ────────────────────────────────
             Box(
-                modifier = Modifier
-                    .fillMaxSize()
+                modifier = fill
                     .offset { IntOffset(offsetX.value.roundToInt(), 0) }
                     // El fondo sólo se pinta si la tarjeta está desplazada. Siempre, sin
                     // condición, el `surfaceVariant` se transparentaría en reposo y
