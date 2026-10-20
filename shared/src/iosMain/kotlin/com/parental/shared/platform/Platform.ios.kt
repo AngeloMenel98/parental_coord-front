@@ -21,8 +21,10 @@ actual object Platform {
     // - Real device: use your machine's IP (e.g., http://192.168.1.x:3000/api)
     // - Production: https://api.yourdomain.com/api
     actual val baseUrl: String = "http://127.0.0.1:3000/api"
+    actual val wsUrl: String = "ws://127.0.0.1:3000/realtime"
 
     actual fun createHttpClient(): HttpClient = HttpClient(Darwin) {
+        install(io.ktor.client.plugins.websocket.WebSockets)
         install(ContentNegotiation) {
             json(Json {
                 ignoreUnknownKeys = true

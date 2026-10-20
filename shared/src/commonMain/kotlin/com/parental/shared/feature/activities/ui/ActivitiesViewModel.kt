@@ -21,6 +21,7 @@ import com.parental.shared.feature.activities.ui.swipe.successMessage
 import com.parental.shared.feature.activities.ui.swipe.validateSwipeReason
 import com.parental.shared.feature.bonds.data.remote.BondsApi
 import com.parental.shared.feature.bonds.domain.model.VinculoChild
+import com.parental.shared.core.network.realtime.RealtimeConnectionManager
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -189,7 +190,8 @@ class ActividadesViewModel(
      * `delay()` vería expirar la oferta sin que el tiempo real hubiera pasado, y probaría
      * un reloj que no existe en producción.
      */
-    private val clock: () -> Long = { System.currentTimeMillis() },
+    private val clock: () -> Long = { kotlinx.datetime.Clock.System.now().toEpochMilliseconds() },
+    private val realtime: RealtimeConnectionManager? = null,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + dispatcher)
 
@@ -233,80 +235,114 @@ class ActividadesViewModel(
     /** `POST /:id/complete` en vuelo. */
     private var completeJob: Job? = null
 
+    private var loadJob: Job? = null
+
     init {
         loadAll()
+        // REQ-5/REQ-6: UNA única ruta de refetch. El RealtimeConnectionManager ya
+        // alimenta su coalescer TANTO con cada frame recibido (REQ-2) como con cada
+        // reconexión exitosa (REQ-5); aquí sólo se consume la señal coalescida →
+        // loadAll() single-flight. (El collector de `changes` que había aquí era un
+        // no-op: los frames no llegaban nunca al coalescer — C1 del verify.)
+        scope.launch {
+            realtime?.resyncSignals?.collect {
+                loadAll()
+            }
+        }
     }
 
-    /** Carga lista + categorías + nombres de miembros en paralelo. */
+    /**
+     * Señal de recarga recibida mientras otra carga está en vuelo (W3 — trailing-edge).
+     * `loadAll()` en lugar de descartarla, la REARMA: al terminar la carga en curso se
+     * ejecuta UNA (y sólo una, el flag coalescea varias señales) recarga pendiente.
+     * ⚠ Escrito y leído en el hilo de [dispatcher] (Main / test), como el resto de
+     * estado de esta clase — no hay carreras intra-hilo entre la condición y el bucle.
+     */
+    private var pendingReload = false
+
+    /** Carga lista + categorías + nombres de miembros en paralelo.
+     *  Nunca dos recargas concurrentes (REQ-6); una señal durante la carga en vuelo
+     *  deja ANOTADA exactamente una recarga pendiente que se ejecuta al terminar. */
     fun loadAll() {
-        scope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true, listError = null)
+        if (loadJob?.isActive == true) {
+            pendingReload = true
+            return
+        }
+        loadJob = scope.launch {
+            do {
+                pendingReload = false
+                performLoad()
+            } while (pendingReload)
+        }
+    }
 
-            coroutineScope {
-                val listDeferred = async { activitiesApi.listActividades(token, bondId) }
-                val categoriesDeferred = async { categoriesApi.getCategories() }
-                val bondsDeferred = async { bondsApi.getMyBonds(token) }
+    private suspend fun performLoad() {
+        _uiState.value = _uiState.value.copy(isLoading = true, listError = null)
 
-                val listResult = listDeferred.await()
-                val categoriesResult = categoriesDeferred.await()
-                val bondsResult = bondsDeferred.await()
+        coroutineScope {
+            val listDeferred = async { activitiesApi.listActividades(token, bondId) }
+            val categoriesDeferred = async { categoriesApi.getCategories() }
+            val bondsDeferred = async { bondsApi.getMyBonds(token) }
 
-                // Fallas de categorías/miembros no bloquean la lista:
-                // categorías desconocidas → chip neutral; asignatario → "Sin asignar".
-                val categories = when (categoriesResult) {
-                    is ApiResult.Success -> CategoryResolver.build(categoriesResult.data)
-                    is ApiResult.Error -> emptyMap()
+            val listResult = listDeferred.await()
+            val categoriesResult = categoriesDeferred.await()
+            val bondsResult = bondsDeferred.await()
+
+            // Fallas de categorías/miembros no bloquean la lista:
+            // categorías desconocidas → chip neutral; asignatario → "Sin asignar".
+            val categories = when (categoriesResult) {
+                is ApiResult.Success -> CategoryResolver.build(categoriesResult.data)
+                is ApiResult.Error -> emptyMap()
+            }
+            // ⚠ `children` y `memberCandidates` se derivan AQUÍ MISMO, del `Vinculo` que ya
+            // venía en `GET /bonds`: el modal de alta no hace NINGUNA petición nueva (D: §4.4).
+            val bond = (bondsResult as? ApiResult.Success)?.data?.firstOrNull { it.id == bondId }
+            val memberNames = bond
+                ?.members
+                ?.mapNotNull { member ->
+                    val user = member.user ?: return@mapNotNull null
+                    val name = listOfNotNull(user.firstName, user.lastName)
+                        .joinToString(" ")
+                        .trim()
+                    if (name.isBlank()) null else user.id to name
                 }
-                // ⚠ `children` y `memberCandidates` se derivan AQUÍ MISMO, del `Vinculo` que ya
-                // venía en `GET /bonds`: el modal de alta no hace NINGUNA petición nueva (D: §4.4).
-                val bond = (bondsResult as? ApiResult.Success)?.data?.firstOrNull { it.id == bondId }
-                val memberNames = bond
-                    ?.members
-                    ?.mapNotNull { member ->
-                        val user = member.user ?: return@mapNotNull null
-                        val name = listOfNotNull(user.firstName, user.lastName)
-                            .joinToString(" ")
-                            .trim()
-                        if (name.isBlank()) null else user.id to name
-                    }
-                    ?.toMap()
-                    ?: emptyMap()
-                // ⚠ AS-9 con precisión: `bonds.repository.ts:27-30` YA filtra en el servidor los
-                // miembros que se fueron (`leftAt IS NULL`). Lo que NO se puede filtrar es
-                // "inactivo/pending" (`VinculoMember` no trae `leftAt` ni `user.isActive`), así que
-                // el desplegable ofrece TODOS los miembros, incluido el propio, SIN inventar un
-                // estado `pending`. Es la degradación declarada, no un olvido.
-                val candidates = bond
-                    ?.members
-                    ?.mapNotNull { member ->
-                        val user = member.user ?: return@mapNotNull null
-                        val name = listOfNotNull(user.firstName, user.lastName)
-                            .joinToString(" ")
-                            .trim()
-                        if (name.isBlank()) null else MemberCandidate(user.id, name)
-                    }
-                    .orEmpty()
+                ?.toMap()
+                ?: emptyMap()
+            // ⚠ AS-9 con precisión: `bonds.repository.ts:27-30` YA filtra en el servidor los
+            // miembros que se fueron (`leftAt IS NULL`). Lo que NO se puede filtrar es
+            // "inactivo/pending" (`VinculoMember` no trae `leftAt` ni `user.isActive`), así que
+            // el desplegable ofrece TODOS los miembros, incluido el propio, SIN inventar un
+            // estado `pending`. Es la degradación declarada, no un olvido.
+            val candidates = bond
+                ?.members
+                ?.mapNotNull { member ->
+                    val user = member.user ?: return@mapNotNull null
+                    val name = listOfNotNull(user.firstName, user.lastName)
+                        .joinToString(" ")
+                        .trim()
+                    if (name.isBlank()) null else MemberCandidate(user.id, name)
+                }
+                .orEmpty()
 
-                val derived = derivedFromBond(
-                    categories = categories,
-                    memberNames = memberNames,
-                    children = bond?.children.orEmpty(),
-                    memberCandidates = candidates,
-                )
+            val derived = derivedFromBond(
+                categories = categories,
+                memberNames = memberNames,
+                children = bond?.children.orEmpty(),
+                memberCandidates = candidates,
+            )
 
-                when (listResult) {
-                    is ApiResult.Success -> {
-                        _uiState.value = _uiState.value.copy(
-                            actividades = listResult.data,
-                            isLoading = false,
-                        ).withDerived(derived)
-                    }
-                    is ApiResult.Error -> {
-                        _uiState.value = _uiState.value.copy(
-                            listError = listResult.message,
-                            isLoading = false,
-                        ).withDerived(derived)
-                    }
+            when (listResult) {
+                is ApiResult.Success -> {
+                    _uiState.value = _uiState.value.copy(
+                        actividades = listResult.data,
+                        isLoading = false,
+                    ).withDerived(derived)
+                }
+                is ApiResult.Error -> {
+                    _uiState.value = _uiState.value.copy(
+                        listError = listResult.message,
+                        isLoading = false,
+                    ).withDerived(derived)
                 }
             }
         }
@@ -926,6 +962,10 @@ class ActividadesViewModel(
 
     fun destroy() {
         undoTicker?.cancel()
+        loadJob?.cancel()
+        // El RealtimeConnectionManager es una dependencia INYECTADA: su ciclo de vida lo
+        // posee quien lo crea (App.kt lo construye y lo detiene en su DisposableEffect).
+        // stop() aquí era una segunda invocación idempotente redundante (N4 del verify).
         scope.cancel()
     }
 

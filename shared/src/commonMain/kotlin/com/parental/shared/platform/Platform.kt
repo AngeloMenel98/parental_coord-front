@@ -10,6 +10,9 @@ expect object Platform {
     /** Base URL for the API, configured per platform/environment. */
     val baseUrl: String
 
+    /** WebSocket URL for realtime updates */
+    val wsUrl: String
+
     /** Create a platform-appropriate HTTP client. */
     fun createHttpClient(): HttpClient
 

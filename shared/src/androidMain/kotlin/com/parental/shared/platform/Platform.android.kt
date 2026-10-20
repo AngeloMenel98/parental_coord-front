@@ -18,6 +18,7 @@ actual object Platform {
 
     // Base URL for Android: emulator uses 10.0.2.2, real device should use production URL
     actual val baseUrl: String = "http://10.0.2.2:3000/api"
+    actual val wsUrl: String = "ws://10.0.2.2:3000/realtime"
 
     private var prefs: SharedPreferences? = null
 
@@ -29,6 +30,7 @@ actual object Platform {
     }
 
     actual fun createHttpClient(): HttpClient = HttpClient(OkHttp) {
+        install(io.ktor.client.plugins.websocket.WebSockets)
         install(ContentNegotiation) {
             json(Json {
                 ignoreUnknownKeys = true

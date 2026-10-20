@@ -30,6 +30,8 @@ import com.parental.shared.feature.admin.ui.AdminViewModel
 import com.parental.shared.feature.home.ui.HomeScreen
 import com.parental.shared.feature.home.ui.HomeViewModel
 import com.parental.shared.feature.session.data.SessionManager
+import com.parental.shared.core.network.realtime.RealtimeConnectionManager
+import com.parental.shared.platform.Platform
 
 private sealed class Screen(val route: String) {
     data object Login : Screen("login")
@@ -183,6 +185,13 @@ private fun AppContent(
                         // userId: login lo provee; sesiones legacy → backfill vía /auth/me.
                         // keyed on userId para que el VM se reconstruya si el backfill llega tarde.
                         val currentUserId = sessionManager.userId
+                        val realtimeManager = remember(currentUserId) {
+                            RealtimeConnectionManager(
+                                http = ApiClient.httpClient,
+                                url = Platform.wsUrl,
+                                tokenProvider = { sessionManager.token },
+                            )
+                        }
                         val activitiesViewModel = remember(currentUserId) {
                             ActividadesViewModel(
                                 activitiesApi = ApiClient.activitiesApi(),
@@ -191,10 +200,26 @@ private fun AppContent(
                                 token = token,
                                 bondId = bondId,
                                 currentUserId = currentUserId ?: "",
+                                realtime = realtimeManager,
                             )
                         }
-                        DisposableEffect(Unit) {
-                            onDispose { activitiesViewModel.destroy() }
+                        // W2: el efecto va ANTES del LaunchedEffect de start() y va keyed en
+                        // currentUserId — al cambiar el userId (backfill tardío) o salir de la
+                        // pantalla, el dispose corre contra el manager/VM DE ESA composición:
+                        // cada manager creado recibe exactamente UN stop() y cada VM un destroy().
+                        // (Con DisposableEffect(Unit) el dispose guardaba los capturados del
+                        // primer composition: el manager viejo quedaba con el loop de
+                        // reconexión huérfano.) S1: un único efecto (antes eran dos ⇒ destroy()
+                        // se invocaba dos veces). N4: App es el ÚNICO dueño del ciclo de vida
+                        // del manager — destroy() del VM ya no lo detiene (antes había 2 stops).
+                        DisposableEffect(currentUserId) {
+                            onDispose {
+                                realtimeManager.stop()
+                                activitiesViewModel.destroy()
+                            }
+                        }
+                        LaunchedEffect(currentUserId) {
+                            realtimeManager.start()
                         }
                         ActividadesScreen(
                             viewModel = activitiesViewModel,
