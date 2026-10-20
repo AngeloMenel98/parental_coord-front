@@ -6,9 +6,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -19,19 +17,21 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.unit.isSpecified
 import androidx.compose.ui.unit.dp
 import com.parental.shared.feature.activities.domain.model.Actividad
 import kotlinx.coroutines.launch
@@ -91,6 +91,27 @@ private val SettleSpec = tween<Float>(durationMillis = 200)
 fun ActivitySwipeBox(
     actividad: Actividad,
     modifier: Modifier = Modifier,
+    /**
+     * 🔴 `fillMaxSize` sólo si el alto de ENTRADA está acotado (por defecto `true`).
+     *
+     * En los TRES montajes reales lo está: `AgendaList.kt` envuelve la fila entera
+     * dentro de un `LazyColumn` (alto acotado) y `WeekAgenda.kt` envuelve
+     * `DayAgendaRow`/`AgendaTimelineRow`, filas cuyo `Row` mide
+     * `height(IntrinsicSize.Min)` — que también acota. Un montaje futuro de alto
+     * INFINITO (p.ej. dentro de un `Column` con scroll) debe pasar `false` para que
+     * el eje cruzado lo decida el contenido en vez de medir `Constraints.fixed(0, 0)`
+     * (la fila se cerraría a cero píxeles).
+     *
+     * ⚠ POR QUÉ NO SE PREGUNTA EN RUNTIME. Antes esto se resolvía con un
+     * `BoxWithConstraints` y `maxHeight.isSpecified`. Pero `BoxWithConstraints` es un
+     * `SubcomposeLayout`, y pedirle intrínsecos REVIENTA con
+     * `IllegalStateException: Asking for intrinsic measurements of SubcomposeLayout
+     * layouts is not supported` — exactamente lo que ocurría al montarlo sobre
+     * `AgendaTimelineRow` (su `Row(height(IntrinsicSize.Min))` propaga la medición
+     * intrínseca hacia abajo). Con este parámetro el envoltorio deja de ser un
+     * `SubcomposeLayout` y el crash desaparece.
+     */
+    fillCrossAxis: Boolean = true,
     onSwipe: (SwipeAction) -> Unit,
     content: @Composable () -> Unit,
 ) {
@@ -110,24 +131,19 @@ fun ActivitySwipeBox(
 
     val offsetX = remember { Animatable(0f) }
     val scope = rememberCoroutineScope()
-    val density = LocalDensity.current
 
-    BoxWithConstraints(modifier = modifier) {
-        val fullWidthPx = with(density) { maxWidth.toPx() }
-        // La barra se mide como una fracción del ancho y NO como un ancho fijo: con tres
-        // etiquetas ("Eliminar", "Cancelar", "No asistir") un ancho fijo no cabe en móvil
-        // estrecho y el texto se parte. Fracción ⇒ siempre cabe, siempre legible.
-        val barWidthPx = fullWidthPx * BAR_WIDTH_FRACTION
+    val fill = if (fillCrossAxis) Modifier.fillMaxSize() else Modifier.fillMaxWidth()
 
-        // 🔴 `fillMaxSize` SÓLO si el alto de entrada está acotado — ver el KDoc. Con alto
-        // infinito o sin especificar se mide el ancho y el alto lo decide el contenido.
-        // `Dp.isSpecified` es justamente `value.isFinite()`, así que cubre los dos casos.
-        val fill = if (maxHeight.isSpecified) {
-            Modifier.fillMaxSize()
-        } else {
-            Modifier.fillMaxWidth()
-        }
+    // 🔴 NO volver a meter un `BoxWithConstraints` aquí: pedirle intrínsecos desde un
+    // `Row(height(IntrinsicSize.Min))` es el crash documentado arriba. El ancho se
+    // observa con `onSizeChanged` (0dp/0px hasta el primer layout), que no es un
+    // `SubcomposeLayout` y por tanto no rompe la medición intrínseca.
+    var fullWidthPx by remember { mutableStateOf(0f) }
+    val barWidthPx = fullWidthPx * BAR_WIDTH_FRACTION
 
+    Box(
+        modifier = modifier.onSizeChanged { fullWidthPx = it.width.toFloat() },
+    ) {
         Box(
             modifier = fill
                 .clip(MaterialTheme.shapes.medium)

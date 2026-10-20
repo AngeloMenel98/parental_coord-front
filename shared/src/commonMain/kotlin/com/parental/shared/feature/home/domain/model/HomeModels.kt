@@ -27,14 +27,12 @@ data class ComplianceResponse(
     @SerialName("bondId") val bondId: String,
     @SerialName("period") val period: String,
     @SerialName("members") val members: List<ComplianceMember>,
-    @SerialName("bondActive") val bondActive: Boolean,
+    @SerialName("bondActive") val bondActive: Boolean = true,
 )
 
 @Serializable
 data class HomeSummary(
     @SerialName("children") val children: List<ChildProfile>,
-    @SerialName("bondTitle") val bondTitle: String? = null,
-    @SerialName("bondType") val bondType: String? = null,
     @SerialName("memberCount") val memberCount: Int = 0,
     @SerialName("bondId") val bondId: String? = null,
     @SerialName("compliance") val compliance: ComplianceResponse? = null,

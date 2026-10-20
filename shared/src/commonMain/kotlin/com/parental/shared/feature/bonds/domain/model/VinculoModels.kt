@@ -6,8 +6,10 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class Vinculo(
     @SerialName("id") val id: String,
-    @SerialName("title") val title: String,
-    @SerialName("agreementType") val agreementType: String,
+    // El backend NO emite `title`/`agreementType` en GET /bonds (claves ausentes, no null):
+    // nullable + default para que la deserialización no truene; se muestra fallback en UI.
+    @SerialName("title") val title: String? = null,
+    @SerialName("agreementType") val agreementType: String? = null,
     @SerialName("courtCaseRef") val courtCaseRef: String? = null,
     @SerialName("startDate") val startDate: String? = null,
     @SerialName("endDate") val endDate: String? = null,

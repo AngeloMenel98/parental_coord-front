@@ -310,9 +310,6 @@ private fun HomeContent(
                 }
             } else {
                 item {
-                    BondInfoCard(summary = summary)
-                }
-                item {
                     when {
                         complianceLoading -> ComplianceCardLoading()
                         complianceError != null -> ComplianceCardError(
@@ -419,51 +416,6 @@ private fun NoBondState(modifier: Modifier = Modifier) {
             )
             Spacer(modifier = Modifier.height(8.dp))
             BondStatusPill(label = "Vínculo inactivo", active = false)
-        }
-    }
-}
-
-@Composable
-private fun BondInfoCard(
-    summary: HomeSummary,
-    modifier: Modifier = Modifier,
-) {
-    val isActive = summary.compliance?.bondActive != false
-    val statusLabel = if (isActive) "Vínculo activo" else "Vínculo inactivo"
-
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.large,
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.secondaryContainer,
-            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-        ),
-    ) {
-        Column(modifier = Modifier.padding(20.dp)) {
-            summary.bondTitle
-                ?.trim()
-                ?.takeIf { it.isNotBlank() }
-                ?.let { title ->
-                    Text(
-                        text = title,
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                }
-
-            summary.bondType
-                ?.trim()
-                ?.takeIf { it.isNotBlank() }
-                ?.let { type ->
-                    Text(
-                        text = type.replaceFirstChar { character -> character.uppercase() },
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                }
-
-            Spacer(modifier = Modifier.height(12.dp))
-            BondStatusPill(label = statusLabel, active = isActive)
         }
     }
 }

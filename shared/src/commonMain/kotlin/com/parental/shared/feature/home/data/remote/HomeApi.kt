@@ -47,8 +47,6 @@ class HomeApi(
                     ApiResult.Success(
                         HomeSummary(
                             children = children,
-                            bondTitle = firstBond?.title,
-                            bondType = firstBond?.agreementType,
                             memberCount = firstBond?.members?.size ?: 0,
                             bondId = firstBond?.id,
                         )
