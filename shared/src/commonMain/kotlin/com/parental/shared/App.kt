@@ -29,6 +29,10 @@ import com.parental.shared.feature.admin.ui.AdminScreen
 import com.parental.shared.feature.admin.ui.AdminViewModel
 import com.parental.shared.feature.home.ui.HomeScreen
 import com.parental.shared.feature.home.ui.HomeViewModel
+import com.parental.shared.feature.notifications.ui.NotificationsScreen
+import com.parental.shared.feature.notifications.ui.NotificationsViewModel
+import com.parental.shared.feature.notifications.ui.UnreadBadge
+import com.parental.shared.feature.notifications.ui.UnreadCountPoller
 import com.parental.shared.feature.session.data.SessionManager
 import com.parental.shared.core.network.realtime.RealtimeConnectionManager
 import com.parental.shared.platform.Platform
@@ -161,6 +165,7 @@ private fun AppContent(
 
         Screen.Home -> {
             var bottomRoute by remember { mutableStateOf("home") }
+            var showNotifications by remember { mutableStateOf(false) }
             val token = sessionManager.token
             val userName = sessionManager.userName.orEmpty()
 
@@ -177,7 +182,52 @@ private fun AppContent(
                 }
             }
 
-            if (bottomRoute == "activities") {
+            // Notificaciones (slice 4): el contador vive acá porque lo leen DOS
+            // superficies (la campana de Home y la lista) y lo escriben TRES
+            // (el poller, markRead, markAllRead). Una sola fuente de verdad.
+            val notificationsApi = remember { ApiClient.notificationsApi() }
+            val unreadBadge = remember(token) { UnreadBadge() }
+            val unreadPoller = remember(token) {
+                UnreadCountPoller(
+                    api = notificationsApi,
+                    token = token,
+                    badge = unreadBadge,
+                )
+            }
+            val unreadCount by unreadBadge.count.collectAsState()
+
+            DisposableEffect(unreadPoller) {
+                onDispose { unreadPoller.destroy() }
+            }
+            // Poll-only (S8): el bucle corre SOLO con Home visible. En la lista el VM
+            // ya sincroniza el badge; en Actividades no hay campana que actualizar.
+            // Al volver de la lista este efecto rearranca y fetcha de inmediato.
+            LaunchedEffect(unreadPoller, bottomRoute, showNotifications) {
+                if (bottomRoute == "home" && !showNotifications) {
+                    unreadPoller.start()
+                } else {
+                    unreadPoller.stop()
+                }
+            }
+
+            if (showNotifications) {
+                // El VM se reconstruye en cada apertura ⇒ la lista siempre se carga
+                // al abrirse, sin caché vieja entre visitas.
+                val notificationsViewModel = remember(token) {
+                    NotificationsViewModel(
+                        api = notificationsApi,
+                        token = token,
+                        badge = unreadBadge,
+                    )
+                }
+                DisposableEffect(notificationsViewModel) {
+                    onDispose { notificationsViewModel.destroy() }
+                }
+                NotificationsScreen(
+                    viewModel = notificationsViewModel,
+                    onBack = { showNotifications = false },
+                )
+            } else if (bottomRoute == "activities") {
                 val bondId = sessionManager.bondId
                 when {
                     bondId == null -> SinVinculoScreen(onGoHome = { bottomRoute = "home" })
@@ -246,6 +296,8 @@ private fun AppContent(
                         sessionManager.clear()
                     },
                     onNavigateBottom = onNavigateBottom,
+                    unreadCount = unreadCount,
+                    onOpenNotifications = { showNotifications = true },
                 )
             }
         }

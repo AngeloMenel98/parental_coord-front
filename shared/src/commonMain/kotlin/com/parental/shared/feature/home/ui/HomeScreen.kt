@@ -53,6 +53,7 @@ import com.parental.shared.feature.home.domain.model.ChildProfile
 import com.parental.shared.feature.home.domain.model.ComplianceMember
 import com.parental.shared.feature.home.domain.model.ComplianceResponse
 import com.parental.shared.feature.home.domain.model.HomeSummary
+import com.parental.shared.feature.notifications.ui.NotificationsBell
 import kotlinx.datetime.Clock
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
@@ -63,6 +64,8 @@ fun HomeScreen(
     viewModel: HomeViewModel,
     onLogout: () -> Unit = {},
     onNavigateBottom: (String) -> Unit = {},
+    unreadCount: Int = 0,
+    onOpenNotifications: () -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val error = uiState.error
@@ -83,6 +86,10 @@ fun HomeScreen(
                     actionIconContentColor = MaterialTheme.colorScheme.onPrimary,
                 ),
                 actions = {
+                    NotificationsBell(
+                        unreadCount = unreadCount,
+                        onClick = onOpenNotifications,
+                    )
                     TextButton(
                         onClick = onLogout,
                         modifier = Modifier.heightIn(min = 48.dp),

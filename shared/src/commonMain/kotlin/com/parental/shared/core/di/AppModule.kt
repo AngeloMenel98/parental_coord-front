@@ -5,6 +5,7 @@ import com.parental.shared.feature.auth.di.authModule
 import com.parental.shared.feature.admin.di.adminModule
 import com.parental.shared.feature.home.di.homeModule
 import com.parental.shared.feature.bonds.di.bondsModule
+import com.parental.shared.feature.notifications.di.notificationsModule
 import com.parental.shared.feature.session.di.sessionModule
 import org.koin.dsl.module
 
@@ -15,6 +16,7 @@ val appModule = module {
         adminModule,
         homeModule,
         bondsModule,
+        notificationsModule,
         sessionModule,
     )
 }
