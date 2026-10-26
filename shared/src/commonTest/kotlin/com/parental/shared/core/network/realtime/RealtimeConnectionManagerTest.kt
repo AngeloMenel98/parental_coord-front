@@ -1,6 +1,7 @@
 package com.parental.shared.core.network.realtime
 
 import io.ktor.client.HttpClient
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
@@ -40,7 +41,7 @@ class RealtimeConnectionManagerTest {
             override suspend fun connectSession(
                 token: String,
                 onConnected: () -> Unit,
-                onMessage: suspend (ActivityChangedMessage) -> Unit,
+                onMessage: suspend (RealtimeMessage) -> Unit,
                 onClosed: (Throwable?) -> Unit,
             ) {
                 if (token == "tok-9") {
@@ -109,7 +110,7 @@ class RealtimeConnectionManagerTest {
             override suspend fun connectSession(
                 token: String,
                 onConnected: () -> Unit,
-                onMessage: suspend (ActivityChangedMessage) -> Unit,
+                onMessage: suspend (RealtimeMessage) -> Unit,
                 onClosed: (Throwable?) -> Unit,
             ) {
                 onClosed(IllegalStateException("connection refused"))
@@ -155,7 +156,7 @@ class RealtimeConnectionManagerTest {
             override suspend fun connectSession(
                 token: String,
                 onConnected: () -> Unit,
-                onMessage: suspend (ActivityChangedMessage) -> Unit,
+                onMessage: suspend (RealtimeMessage) -> Unit,
                 onClosed: (Throwable?) -> Unit,
             ) {
                 onConnected() // handshake OK → estado CONNECTED, sesión "viva"
@@ -194,5 +195,83 @@ class RealtimeConnectionManagerTest {
         manager.stop()
         manager.stop()
         assertEquals(RealtimeState.DISCONNECTED, manager.state.value)
+    }
+
+    /**
+     * S6: cada tipo de frame alimenta SÓLO la señal de su dominio. Una
+     * notificación nueva no debe recargar actividades (el bug que esta slice
+     * cierra), y un cambio de actividad no debe refrescar notificaciones.
+     */
+    @Test
+    fun `frames feed only the signal of their own domain`() = runTest {
+        var sink: (suspend (RealtimeMessage) -> Unit)? = null
+        val manager = object : RealtimeConnectionManager(
+            http = HttpClient { },
+            url = "ws://localhost:3000/realtime",
+            tokenProvider = { "tok" },
+            dispatcher = StandardTestDispatcher(testScheduler),
+            random = Random(1),
+        ) {
+            override suspend fun connectSession(
+                token: String,
+                onConnected: () -> Unit,
+                onMessage: suspend (RealtimeMessage) -> Unit,
+                onClosed: (Throwable?) -> Unit,
+            ) {
+                sink = onMessage
+                onConnected()
+                kotlinx.coroutines.delay(Long.MAX_VALUE)
+            }
+        }
+
+        val activitySignals = mutableListOf<Unit>()
+        val notificationSignals = mutableListOf<Unit>()
+        backgroundScope.launch {
+            manager.resyncSignals.collect { activitySignals += Unit }
+        }
+        backgroundScope.launch {
+            manager.notificationSignals.collect { notificationSignals += Unit }
+        }
+
+        manager.start()
+        runCurrent()
+        // Drena el resync post-connect: no es parte de lo que este test mide.
+        advanceTimeBy(1_000)
+        runCurrent()
+        activitySignals.clear()
+        notificationSignals.clear()
+
+        sink!!.invoke(
+            NotificationCreatedMessage(
+                v = 1,
+                type = "notification.created",
+                notificationId = "n1",
+                notificationType = "activity_assigned",
+                refEntityType = "activity",
+                refEntityId = "a1",
+            ),
+        )
+        advanceTimeBy(1_000)
+        runCurrent()
+
+        assertEquals(0, activitySignals.size, "una notificación no debe recargar actividades")
+        assertEquals(1, notificationSignals.size)
+
+        sink!!.invoke(
+            ActivityChangedMessage(
+                v = 1,
+                type = "activity.changed",
+                eventId = "ev-1",
+                activityId = "a1",
+                bondId = "b1",
+            ),
+        )
+        advanceTimeBy(1_000)
+        runCurrent()
+
+        assertEquals(1, activitySignals.size)
+        assertEquals(1, notificationSignals.size, "un cambio de actividad no refresca notificaciones")
+
+        manager.stop()
     }
 }

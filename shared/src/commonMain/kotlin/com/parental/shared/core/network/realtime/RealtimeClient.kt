@@ -8,21 +8,15 @@ import io.ktor.websocket.Frame
 import io.ktor.websocket.close
 import io.ktor.websocket.readText
 import kotlinx.coroutines.CancellationException
-import kotlinx.serialization.json.Json
 
 class RealtimeClient(
     private val http: HttpClient,
     private val url: String,
 ) {
-    private val json = Json {
-        ignoreUnknownKeys = true
-        isLenient = true
-    }
-
     suspend fun connect(
         token: String,
         onConnected: () -> Unit = {},
-        onMessage: suspend (ActivityChangedMessage) -> Unit,
+        onMessage: suspend (RealtimeMessage) -> Unit,
         onClosed: (Throwable?) -> Unit,
     ) {
         try {
@@ -33,15 +27,9 @@ class RealtimeClient(
                 for (frame in incoming) {
                     when (frame) {
                         is Frame.Text -> {
-                            val text = frame.readText()
-                            val msg = try {
-                                json.decodeFromString<ActivityChangedMessage>(text)
-                            } catch (_: Exception) {
-                                null
-                            }
-                            if (msg != null) {
-                                onMessage(msg)
-                            }
+                            // El tipo lo decide el sobre; un frame desconocido o
+                            // malformado se descarta sin cortar la conexión.
+                            parseRealtimeMessage(frame.readText())?.let { onMessage(it) }
                         }
                         is Frame.Close -> {
                             close()

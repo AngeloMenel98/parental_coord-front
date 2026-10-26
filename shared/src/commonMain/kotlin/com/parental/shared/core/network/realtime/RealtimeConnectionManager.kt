@@ -36,7 +36,8 @@ open class RealtimeConnectionManager(
 ) {
     private val scope = CoroutineScope(SupervisorJob() + dispatcher)
     private val client = RealtimeClient(http, url)
-    private val coalescer = RealtimeCoalescer(windowMs = 500L)
+    private val activityCoalescer = RealtimeCoalescer(windowMs = 500L)
+    private val notificationCoalescer = RealtimeCoalescer(windowMs = 500L)
 
     private val _state = MutableStateFlow(RealtimeState.DISCONNECTED)
     val state: StateFlow<RealtimeState> = _state.asStateFlow()
@@ -71,16 +72,21 @@ open class RealtimeConnectionManager(
                             onConnected = {
                                 attempt = 0
                                 _state.value = RealtimeState.CONNECTED
-                                // REQ-5: cada conexión exitosa dispara un resync (vía coalescer).
-                                coalescer.offer()
+                                // REQ-5: cada conexión exitosa dispara un resync de
+                                // actividades (vía coalescer). Un reconnect NO dispara el
+                                // refresco de notificaciones: el badge tiene su propio poll
+                                // y la lista se recarga al abrirse.
+                                activityCoalescer.offer()
                             },
-                            onMessage = {
-                                // REQ-2/REQ-6: cada frame es señal genérica de refetch. Se
-                                // alimenta el MISMO coalescer que usa el resync post-connect,
-                                // de modo que mensajes entrantes y reconexiones convergen en
-                                // una sola ventana de coalescing → single-flight loadAll() en
-                                // el ViewModel (vía resyncSignals).
-                                coalescer.offer()
+                            onMessage = { message ->
+                                // Un canal, varios tipos: cada frame alimenta SÓLO la
+                                // señal de su dominio. Antes todo frame movía el
+                                // coalescer de actividades, así que una notificación
+                                // nueva terminaba en un loadAll() innecesario.
+                                when (message) {
+                                    is ActivityChangedMessage -> activityCoalescer.offer()
+                                    is NotificationCreatedMessage -> notificationCoalescer.offer()
+                                }
                             },
                             onClosed = { _ ->
                                 sessionEnded.complete(Unit)
@@ -130,7 +136,7 @@ open class RealtimeConnectionManager(
     protected open suspend fun connectSession(
         token: String,
         onConnected: () -> Unit,
-        onMessage: suspend (ActivityChangedMessage) -> Unit,
+        onMessage: suspend (RealtimeMessage) -> Unit,
         onClosed: (Throwable?) -> Unit,
     ) {
         client.connect(
@@ -152,5 +158,13 @@ open class RealtimeConnectionManager(
         return base + jitter
     }
 
-    open val resyncSignals: Flow<Unit> = coalescer.signals
+    open val resyncSignals: Flow<Unit> = activityCoalescer.signals
+
+    /**
+     * Señal coalescida de "hay una notificación nueva" (`notification.created`).
+     *
+     * Separada de [resyncSignals] a propósito: refrescar el badge no debe
+     * recargar la lista de actividades, ni al revés.
+     */
+    open val notificationSignals: Flow<Unit> = notificationCoalescer.signals
 }

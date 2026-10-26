@@ -4,6 +4,7 @@ import com.parental.shared.core.error.ApiResult
 import com.parental.shared.core.network.CategoriesApi
 import com.parental.shared.core.network.CategoryDto
 import com.parental.shared.core.network.realtime.ActivityChangedMessage
+import com.parental.shared.core.network.realtime.RealtimeMessage
 import com.parental.shared.core.network.realtime.RealtimeConnectionManager
 import com.parental.shared.feature.activities.data.remote.ActivitiesApi
 import com.parental.shared.feature.activities.domain.model.Actividad
@@ -83,12 +84,12 @@ class ActivitiesViewModelRealtimeTest {
         tokenProvider = { "tok" },
         dispatcher = dispatcher,
     ) {
-        private var frameSink: (suspend (ActivityChangedMessage) -> Unit)? = null
+        private var frameSink: (suspend (RealtimeMessage) -> Unit)? = null
 
         override suspend fun connectSession(
             token: String,
             onConnected: () -> Unit,
-            onMessage: suspend (ActivityChangedMessage) -> Unit,
+            onMessage: suspend (RealtimeMessage) -> Unit,
             onClosed: (Throwable?) -> Unit,
         ) {
             frameSink = onMessage
@@ -96,7 +97,7 @@ class ActivitiesViewModelRealtimeTest {
             awaitCancellation()
         }
 
-        suspend fun emitFrame(msg: ActivityChangedMessage) {
+        suspend fun emitFrame(msg: RealtimeMessage) {
             val sink = frameSink ?: error("el manager no está conectado: llama a start() antes")
             sink(msg)
         }
