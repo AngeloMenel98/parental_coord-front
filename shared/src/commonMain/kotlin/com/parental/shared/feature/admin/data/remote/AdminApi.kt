@@ -7,6 +7,23 @@ import com.parental.shared.feature.admin.domain.model.AdminUser
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.http.*
+import kotlinx.serialization.Serializable
+
+/**
+ * Request body for `POST /admin/bonds`.
+ *
+ * A `mapOf("title" to …, "agreementType" to …, "userIds" to listOf(…))` infers
+ * `Map<String, Any>`, which has no serializer: Ktor falls back to the
+ * polymorphic path and throws
+ * `serializing collection of different types is not yet supported`.
+ * A concrete DTO keeps every field typed.
+ */
+@Serializable
+internal data class CreateBondRequest(
+    val title: String,
+    val agreementType: String,
+    val userIds: List<String>,
+)
 
 class AdminApi(
     private val client: io.ktor.client.HttpClient,
@@ -87,10 +104,10 @@ class AdminApi(
                 header("Authorization", "Bearer $token")
                 contentType(ContentType.Application.Json)
                 setBody(
-                    mapOf(
-                        "title" to title,
-                        "agreementType" to agreementType,
-                        "userIds" to userIds,
+                    CreateBondRequest(
+                        title = title,
+                        agreementType = agreementType,
+                        userIds = userIds,
                     )
                 )
             }

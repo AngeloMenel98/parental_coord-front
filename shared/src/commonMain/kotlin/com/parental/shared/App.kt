@@ -182,6 +182,28 @@ private fun AppContent(
                 }
             }
 
+            // Realtime (slice 5): UN manager por composición de Home, ya no dentro de la
+            // pestaña Activities. El badge de Inicio necesita la señal
+            // `notification.created` mientras el usuario está en Home, y la pestaña se
+            // desmonta al navegar. Sin vínculo no hay frames posibles (el handshake
+            // cerraría 4403 en bucle de reconexión), así que sólo corre con bondId.
+            val bondId = sessionManager.bondId
+            val currentUserId = sessionManager.userId
+            val realtimeManager = remember(token) {
+                RealtimeConnectionManager(
+                    http = ApiClient.httpClient,
+                    url = Platform.wsUrl,
+                    tokenProvider = { sessionManager.token },
+                )
+            }
+            // Único dueño del ciclo de vida (antes lo era la rama Activities). start() y
+            // stop() son idempotentes ⇒ exactamente UN stop() por manager, y un bondId que
+            // aparece tarde (backfill) arranca el loop sin recrear el manager.
+            DisposableEffect(realtimeManager, bondId) {
+                if (bondId != null) realtimeManager.start() else realtimeManager.stop()
+                onDispose { realtimeManager.stop() }
+            }
+
             // Notificaciones (slice 4): el contador vive acá porque lo leen DOS
             // superficies (la campana de Home y la lista) y lo escriben TRES
             // (el poller, markRead, markAllRead). Una sola fuente de verdad.
@@ -210,6 +232,17 @@ private fun AppContent(
                 }
             }
 
+            // Puente frame → badge (slice 5): un `notification.created` refresca el
+            // contador sin esperar los 30 s del poll. El coalescer del manager ya acota
+            // la ráfaga a ≤1 señal por ventana, así que esto son pocos GET extra, y
+            // `refreshNow` funciona con el bucle parado (usuario en la lista o en
+            // Actividades) ⇒ el badge no queda viejo mientras el poller duerme.
+            LaunchedEffect(realtimeManager, unreadPoller) {
+                realtimeManager.notificationSignals.collect {
+                    unreadPoller.refreshNow()
+                }
+            }
+
             if (showNotifications) {
                 // El VM se reconstruye en cada apertura ⇒ la lista siempre se carga
                 // al abrirse, sin caché vieja entre visitas.
@@ -228,20 +261,11 @@ private fun AppContent(
                     onBack = { showNotifications = false },
                 )
             } else if (bottomRoute == "activities") {
-                val bondId = sessionManager.bondId
                 when {
                     bondId == null -> SinVinculoScreen(onGoHome = { bottomRoute = "home" })
                     else -> {
                         // userId: login lo provee; sesiones legacy → backfill vía /auth/me.
                         // keyed on userId para que el VM se reconstruya si el backfill llega tarde.
-                        val currentUserId = sessionManager.userId
-                        val realtimeManager = remember(currentUserId) {
-                            RealtimeConnectionManager(
-                                http = ApiClient.httpClient,
-                                url = Platform.wsUrl,
-                                tokenProvider = { sessionManager.token },
-                            )
-                        }
                         val activitiesViewModel = remember(currentUserId) {
                             ActividadesViewModel(
                                 activitiesApi = ApiClient.activitiesApi(),
@@ -253,23 +277,14 @@ private fun AppContent(
                                 realtime = realtimeManager,
                             )
                         }
-                        // W2: el efecto va ANTES del LaunchedEffect de start() y va keyed en
-                        // currentUserId — al cambiar el userId (backfill tardío) o salir de la
-                        // pantalla, el dispose corre contra el manager/VM DE ESA composición:
-                        // cada manager creado recibe exactamente UN stop() y cada VM un destroy().
-                        // (Con DisposableEffect(Unit) el dispose guardaba los capturados del
-                        // primer composition: el manager viejo quedaba con el loop de
-                        // reconexión huérfano.) S1: un único efecto (antes eran dos ⇒ destroy()
-                        // se invocaba dos veces). N4: App es el ÚNICO dueño del ciclo de vida
-                        // del manager — destroy() del VM ya no lo detiene (antes había 2 stops).
+                        // W2: keyed en currentUserId — al cambiar el userId (backfill tardío)
+                        // o salir de la pantalla, el dispose corre contra el VM DE ESA
+                        // composición ⇒ cada VM recibe exactamente UN destroy().
+                        // S1: un único efecto (antes eran dos ⇒ destroy() dos veces).
+                        // N4 (slice 5): el manager ya NO se detiene acá — su dueño es la
+                        // pantalla Home, que sigue viva mientras el usuario navega.
                         DisposableEffect(currentUserId) {
-                            onDispose {
-                                realtimeManager.stop()
-                                activitiesViewModel.destroy()
-                            }
-                        }
-                        LaunchedEffect(currentUserId) {
-                            realtimeManager.start()
+                            onDispose { activitiesViewModel.destroy() }
                         }
                         ActividadesScreen(
                             viewModel = activitiesViewModel,

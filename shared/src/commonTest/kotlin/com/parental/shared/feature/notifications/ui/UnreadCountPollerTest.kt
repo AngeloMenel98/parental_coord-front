@@ -135,6 +135,43 @@ class UnreadCountPollerTest {
         poller.destroy()
     }
 
+    // ── Slice 5 · nudge por frame realtime ─────────────────────────────────
+
+    /**
+     * `refreshNow()` es el punto de entrada que usa el puente
+     * `notification.created → badge` (App.kt). Antes de la slice 5 no lo llamaba
+     * nadie; ahora el nudge depende de que funcione con el bucle PARADO.
+     */
+    @Test
+    fun `refreshNow fetcha con el bucle parado y no lo arranca`() = runTest {
+        val api = FakeNotificationsApi().apply { result = ApiResult.Success(5) }
+        val badge = UnreadBadge()
+        val poller = UnreadCountPoller(
+            api = api,
+            token = "t-1",
+            badge = badge,
+            intervalMs = 30_000,
+            dispatcher = UnconfinedTestDispatcher(testScheduler),
+        )
+
+        // Usuario en la lista o en Actividades: el poller está detenido.
+        poller.refreshNow()
+        assertEquals(5, badge.count.value)
+        assertEquals(1, api.unreadCalls)
+
+        // refreshNow NO enciende el bucle: sin start() el intervalo no dispara.
+        advanceTimeBy(60_001)
+        assertEquals(1, api.unreadCalls)
+
+        // Dos frames ⇒ dos fetches puntuales, y el badge queda con el último valor.
+        api.result = ApiResult.Success(2)
+        poller.refreshNow()
+        assertEquals(2, badge.count.value)
+        assertEquals(2, api.unreadCalls)
+
+        poller.destroy()
+    }
+
     private companion object {
         val UNUSED_CLIENT = HttpClient { }
     }
