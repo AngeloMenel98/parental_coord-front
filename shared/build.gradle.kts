@@ -59,6 +59,10 @@ kotlin {
         val androidMain by getting {
             dependencies {
                 implementation("io.ktor:ktor-client-okhttp:2.3.12")
+                // `rememberLauncherForActivityResult`: la única forma soportada de
+                // abrir el selector de archivos sin pasar por `startActivityForResult`
+                // deprecado. Misma versión que `androidApp`, que ya la declara.
+                implementation("androidx.activity:activity-compose:1.9.3")
             }
         }
 

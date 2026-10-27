@@ -242,7 +242,7 @@ private fun ActividadesListScreen(
      * T-FE-17 · Abre el modal de alta. Sustituye a `onInertAction` en esta firma: el "+" era su
      * ÚNICO consumidor aquí y era un placeholder inerte, así que al dejar de serlo, mantener el
      * parámetro sería dejar un cable muerto. La hoja de detalle sigue usando `onInertAction`
-     * ("Cargar comprobante" y el chip de adjuntos, ambos inertes por FR-7) por su propio canal.
+     * por su propio canal.
      */
     onOpenCreate: () -> Unit,
     /**

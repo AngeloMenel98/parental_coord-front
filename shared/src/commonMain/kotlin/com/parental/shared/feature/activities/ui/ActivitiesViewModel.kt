@@ -1,6 +1,8 @@
 package com.parental.shared.feature.activities.ui
 
 import com.parental.shared.core.error.ApiResult
+import com.parental.shared.core.files.CompressedImage
+import com.parental.shared.core.files.ImageCompressor
 import com.parental.shared.core.network.CategoriesApi
 import com.parental.shared.core.ui.components.CategoryInfo
 import com.parental.shared.core.ui.components.CategoryResolver
@@ -26,6 +28,7 @@ import com.parental.shared.feature.activities.domain.model.attachments.*
 import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.http.content.ByteArrayContent
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -434,6 +437,16 @@ class ActividadesViewModel(
     /** Dispara el snackbar para un acción inerte (placeholders). */
     fun onInertAction(message: String) {
         _uiState.value = _uiState.value.copy(snackbarMessage = message)
+    }
+
+    /**
+     * Las mutaciones de adjuntos fallaban en SILENCIO: cada rama de error hacía
+     * `return@launch` sin tocar estado. El usuario elegía el archivo, no veía nada
+     * y concluía —con razón— que el botón no funcionaba. Este es el mismo canal que
+     * ya usa `confirmAssignment`, así que el aviso sale por donde el usuario mira.
+     */
+    private fun reportAttachmentFailure(text: String) {
+        _uiState.value = _uiState.value.copy(snackbarMessage = text)
     }
 
     /**
@@ -983,78 +996,111 @@ class ActividadesViewModel(
         }
     }
 
-    fun addAttachment(activityId: String, fileName: String, mimeType: String, bytes: ByteArray) {
+    /**
+     * Envoltura común de las mutaciones de adjuntos. No es ceremonia: sin el `catch`,
+     * una excepción de red (timeout, DNS, conexión rechazada) escapaba del `launch` y
+     * volvía a dejar el botón mudo —exactamente el síntoma reportado—. `CancellationException`
+     * se re-lanza para no disfrazar una cancelación normal de un fallo.
+     */
+    private fun launchAttachmentOp(failurePrefix: String, block: suspend () -> Unit) {
         scope.launch {
-            val compressed = com.parental.shared.core.files.ImageCompressor().compress(bytes, mimeType)
-            val presign = activitiesApi.presignAttachment(
+            try {
+                block()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                reportAttachmentFailure("$failurePrefix: ${e.message ?: e::class.simpleName}")
+            }
+        }
+    }
+
+    /**
+     * Presign + PUT los comparten `addAttachment` y `replaceAttachment`, y ninguno
+     * de los dos podía fallar en silencio: el usuario acaba de elegir un archivo y
+     * necesita saber por qué no entró. Ambas devuelven la señal de "ya avisé".
+     */
+    private suspend fun presignForUpload(
+        activityId: String,
+        fileName: String,
+        compressed: CompressedImage,
+    ): PresignAttachmentRes? =
+        when (
+            val res = activitiesApi.presignAttachment(
                 token,
                 activityId,
                 PresignAttachmentReq(fileName, compressed.mimeType, compressed.bytes.size.toLong()),
             )
-            if (presign !is ApiResult.Success) return@launch
-            val upload = presign.data
-            val client = httpClient
-            val putRes = client.put(upload.uploadUrl) {
-                contentType(ContentType.parse(compressed.mimeType))
-                setBody(ByteArrayContent(compressed.bytes))
-            }
-            if (!putRes.status.isSuccess()) return@launch
-            val confirm = activitiesApi.confirmAttachment(
-                token,
-                activityId,
-                ConfirmAttachmentReq(upload.path, fileName, compressed.mimeType, compressed.bytes.size.toLong()),
-            )
-            if (confirm is ApiResult.Success) {
-                _attachments.value = _attachments.value + confirm.data
+        ) {
+            is ApiResult.Success -> res.data
+            is ApiResult.Error -> {
+                reportAttachmentFailure(res.message)
+                null
             }
         }
+
+    private suspend fun uploadOrReport(upload: PresignAttachmentRes, compressed: CompressedImage): Boolean {
+        val res = httpClient.put(upload.uploadUrl) {
+            contentType(ContentType.parse(compressed.mimeType))
+            setBody(ByteArrayContent(compressed.bytes))
+        }
+        if (res.status.isSuccess()) return true
+        reportAttachmentFailure("No se pudo subir el archivo (${res.status.value})")
+        return false
     }
 
-    fun renameAttachment(activityId: String, attachmentId: String, fileName: String) {
-        scope.launch {
-            val res = activitiesApi.renameAttachment(token, activityId, attachmentId, RenameAttachmentReq(fileName))
-            if (res is ApiResult.Success) {
-                _attachments.value = _attachments.value.map { if (it.id == attachmentId) res.data else it }
+    fun addAttachment(activityId: String, fileName: String, mimeType: String, bytes: ByteArray) =
+        launchAttachmentOp("No se pudo adjuntar el archivo") {
+            val compressed = ImageCompressor().compress(bytes, mimeType)
+            val upload = presignForUpload(activityId, fileName, compressed) ?: return@launchAttachmentOp
+            if (!uploadOrReport(upload, compressed)) return@launchAttachmentOp
+            when (
+                val confirm = activitiesApi.confirmAttachment(
+                    token,
+                    activityId,
+                    ConfirmAttachmentReq(upload.path, fileName, compressed.mimeType, compressed.bytes.size.toLong()),
+                )
+            ) {
+                is ApiResult.Success -> _attachments.value = _attachments.value + confirm.data
+                is ApiResult.Error -> reportAttachmentFailure(confirm.message)
             }
         }
-    }
 
-    fun replaceAttachment(activityId: String, attachmentId: String, fileName: String, mimeType: String, bytes: ByteArray) {
-        scope.launch {
-            val compressed = com.parental.shared.core.files.ImageCompressor().compress(bytes, mimeType)
-            val presign = activitiesApi.presignAttachment(
-                token,
-                activityId,
-                PresignAttachmentReq(fileName, compressed.mimeType, compressed.bytes.size.toLong()),
-            )
-            if (presign !is ApiResult.Success) return@launch
-            val upload = presign.data
-            val client = httpClient
-            val putRes = client.put(upload.uploadUrl) {
-                contentType(ContentType.parse(compressed.mimeType))
-                setBody(ByteArrayContent(compressed.bytes))
-            }
-            if (!putRes.status.isSuccess()) return@launch
-            val replace = activitiesApi.replaceAttachment(
-                token,
-                activityId,
-                attachmentId,
-                ReplaceAttachmentReq(upload.path, fileName, compressed.mimeType, compressed.bytes.size.toLong()),
-            )
-            if (replace is ApiResult.Success) {
-                _attachments.value = _attachments.value.map { if (it.id == attachmentId) replace.data else it }
+    fun renameAttachment(activityId: String, attachmentId: String, fileName: String) =
+        launchAttachmentOp("No se pudo renombrar el archivo") {
+            when (val res = activitiesApi.renameAttachment(token, activityId, attachmentId, RenameAttachmentReq(fileName))) {
+                is ApiResult.Success ->
+                    _attachments.value = _attachments.value.map { if (it.id == attachmentId) res.data else it }
+                is ApiResult.Error -> reportAttachmentFailure(res.message)
             }
         }
-    }
 
-    fun deleteAttachment(activityId: String, attachmentId: String) {
-        scope.launch {
-            val res = activitiesApi.deleteAttachment(token, activityId, attachmentId)
-            if (res is ApiResult.Success) {
-                _attachments.value = _attachments.value.filter { it.id != attachmentId }
+    fun replaceAttachment(activityId: String, attachmentId: String, fileName: String, mimeType: String, bytes: ByteArray) =
+        launchAttachmentOp("No se pudo reemplazar el archivo") {
+            val compressed = ImageCompressor().compress(bytes, mimeType)
+            val upload = presignForUpload(activityId, fileName, compressed) ?: return@launchAttachmentOp
+            if (!uploadOrReport(upload, compressed)) return@launchAttachmentOp
+            when (
+                val replace = activitiesApi.replaceAttachment(
+                    token,
+                    activityId,
+                    attachmentId,
+                    ReplaceAttachmentReq(upload.path, fileName, compressed.mimeType, compressed.bytes.size.toLong()),
+                )
+            ) {
+                is ApiResult.Success ->
+                    _attachments.value = _attachments.value.map { if (it.id == attachmentId) replace.data else it }
+                is ApiResult.Error -> reportAttachmentFailure(replace.message)
             }
         }
-    }
+
+    fun deleteAttachment(activityId: String, attachmentId: String) =
+        launchAttachmentOp("No se pudo eliminar el archivo") {
+            when (val res = activitiesApi.deleteAttachment(token, activityId, attachmentId)) {
+                is ApiResult.Success ->
+                    _attachments.value = _attachments.value.filter { it.id != attachmentId }
+                is ApiResult.Error -> reportAttachmentFailure(res.message)
+            }
+        }
 
     fun destroy() {
         undoTicker?.cancel()

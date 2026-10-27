@@ -20,6 +20,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import com.parental.shared.core.files.FileData
 import com.parental.shared.core.files.FilePicker
+import com.parental.shared.core.files.rememberFilePicker
 import com.parental.shared.core.ui.components.CategoryBadge
 import com.parental.shared.core.ui.components.CategoryInfo
 import com.parental.shared.core.ui.components.StatusTag
@@ -91,6 +92,11 @@ internal fun ActividadDetailSheet(
 ) {
     val scope = rememberCoroutineScope()
     val closeFocus = remember { FocusRequester() }
+    // El selector de archivos se crea ACÁ, en la raíz de la hoja, y no dentro de
+    // `DetailContent`/`DetailFooter`: allí vivía dentro de un `item {}` del
+    // `LazyColumn`, y si ese item salía de composición el launcher se
+    // desregistraba con la selección en curso. Un solo picker para las dos CTAs.
+    val picker = rememberFilePicker()
     // El `onDismissRequest` del host se recrea en cada recomposición (captura el `id` vivo):
     // sin esto el lambda de la "X" podría invocar un descarte ya obsoleto.
     val currentDismiss by rememberUpdatedState(onDismissRequest)
@@ -157,6 +163,7 @@ internal fun ActividadDetailSheet(
                             onRenameAttachment = onRenameAttachment,
                             onReplaceAttachment = onReplaceAttachment,
                             onDeleteAttachment = onDeleteAttachment,
+                            picker = picker,
                             modifier = Modifier.weight(1f),
                         )
                     }
@@ -173,6 +180,11 @@ internal fun ActividadDetailSheet(
                         onComplete = onComplete,
                         isCompleting = isCompleting,
                         currentUserId = currentUserId,
+                        // Sin este cable el CTA caía en el lambda por defecto
+                        // (no-op) y el botón no hacía NADA aunque el picker
+                        // devolviera un archivo.
+                        onAddAttachment = onAddAttachment,
+                        picker = picker,
                     )
                 }
             }
@@ -213,6 +225,7 @@ private fun DetailContent(
     onRenameAttachment: (String, String, String) -> Unit = { _, _, _ -> },
     onReplaceAttachment: (String, String, String, String, ByteArray) -> Unit = { _, _, _, _, _ -> },
     onDeleteAttachment: (String, String) -> Unit = { _, _ -> },
+    picker: FilePicker,
     modifier: Modifier = Modifier,
 ) {
     val a = state.actividad
@@ -266,7 +279,6 @@ private fun DetailContent(
         }
         item { DetailBlockCard(pairs) }
         item {
-            val picker = com.parental.shared.core.files.rememberFilePicker()
             var renameTarget by remember { mutableStateOf<ActivityAttachmentDto?>(null) }
             var renameText by remember { mutableStateOf("") }
             var replaceTarget by remember { mutableStateOf<ActivityAttachmentDto?>(null) }
@@ -348,8 +360,8 @@ private fun DetailFooter(
     onComplete: (String) -> Unit,
     isCompleting: Boolean,
     currentUserId: String,
-    attachments: List<ActivityAttachmentDto> = emptyList(),
-    onAddAttachment: (String, String, String, ByteArray) -> Unit = { _, _, _, _ -> },
+    onAddAttachment: (String, String, String, ByteArray) -> Unit,
+    picker: FilePicker,
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         // AL-4 · "Finalizar" POR ENCIMA del bloque de acciones: es la transición que cierra el
@@ -399,7 +411,6 @@ private fun DetailFooter(
             }
             else -> {}
         }
-        val picker = com.parental.shared.core.files.rememberFilePicker()
         val editable = isAttachmentsEditable(actividad.status, actividad.assignedTo)
         if (editable) {
             Surface(
