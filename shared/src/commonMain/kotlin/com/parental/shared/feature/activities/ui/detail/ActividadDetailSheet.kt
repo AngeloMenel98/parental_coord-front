@@ -356,7 +356,7 @@ private fun DetailBlockCard(pairs: List<Pair<String, String>>) {
 
 /** Tarjeta con título y/o cuerpo opcionales. */
 @Composable
-private fun DetailCard(title: String? = null, body: String? = null, content: @Composable () -> Unit = {}) {
+internal fun DetailCard(title: String? = null, body: String? = null, content: @Composable () -> Unit = {}) {
     Card(modifier = Modifier.fillMaxWidth(), shape = ParentalShapes.medium) {
         Column(modifier = Modifier.padding(Spacing.lg)) {
             if (title != null) {

@@ -187,3 +187,10 @@ data class UndoDeclineResponse(
 data class ActivityReasonRequest(
     val reason: String,
 )
+
+fun isAttachmentsEditable(status: String, assignedTo: String?): Boolean {
+    val s = status.lowercase()
+    if (s == "done" || s == "cancelled" || s == "overdue") return false
+    if (s == "created" && assignedTo.isNullOrBlank()) return false
+    return true
+}
