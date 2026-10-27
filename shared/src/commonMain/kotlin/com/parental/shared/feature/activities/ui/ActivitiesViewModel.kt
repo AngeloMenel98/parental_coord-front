@@ -22,6 +22,10 @@ import com.parental.shared.feature.activities.ui.swipe.validateSwipeReason
 import com.parental.shared.feature.bonds.data.remote.BondsApi
 import com.parental.shared.feature.bonds.domain.model.VinculoChild
 import com.parental.shared.core.network.realtime.RealtimeConnectionManager
+import com.parental.shared.feature.activities.domain.model.attachments.*
+import io.ktor.client.request.*
+import io.ktor.http.*
+import io.ktor.http.content.ByteArrayContent
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -193,6 +197,11 @@ class ActividadesViewModel(
     private val clock: () -> Long = { kotlinx.datetime.Clock.System.now().toEpochMilliseconds() },
     private val realtime: RealtimeConnectionManager? = null,
 ) {
+    private val _attachments = MutableStateFlow<List<ActivityAttachmentDto>>(emptyList())
+    val attachments: StateFlow<List<ActivityAttachmentDto>> = _attachments.asStateFlow()
+    private val _attachmentsLoading = MutableStateFlow(false)
+    val attachmentsLoading: StateFlow<Boolean> = _attachmentsLoading.asStateFlow()
+    private val httpClient = com.parental.shared.core.network.ApiClient.httpClient
     private val scope = CoroutineScope(SupervisorJob() + dispatcher)
 
     private val _uiState = MutableStateFlow(ActivitiesUiState())
@@ -957,6 +966,93 @@ class ActividadesViewModel(
                 if (!offer.isLive(clock())) break
             }
             clearUndoOffer()
+        }
+    }
+
+    fun loadAttachments(activityId: String) {
+        _attachmentsLoading.value = true
+        scope.launch {
+            val res = activitiesApi.listAttachments(token, activityId)
+            withContext(dispatcher) {
+                _attachmentsLoading.value = false
+                _attachments.value = when (res) {
+                    is ApiResult.Success -> res.data
+                    else -> emptyList()
+                }
+            }
+        }
+    }
+
+    fun addAttachment(activityId: String, fileName: String, mimeType: String, bytes: ByteArray) {
+        scope.launch {
+            val compressed = com.parental.shared.core.files.ImageCompressor().compress(bytes, mimeType)
+            val presign = activitiesApi.presignAttachment(
+                token,
+                activityId,
+                PresignAttachmentReq(fileName, compressed.mimeType, compressed.bytes.size.toLong()),
+            )
+            if (presign !is ApiResult.Success) return@launch
+            val upload = presign.data
+            val client = httpClient
+            val putRes = client.put(upload.uploadUrl) {
+                contentType(ContentType.parse(compressed.mimeType))
+                setBody(ByteArrayContent(compressed.bytes))
+            }
+            if (!putRes.status.isSuccess()) return@launch
+            val confirm = activitiesApi.confirmAttachment(
+                token,
+                activityId,
+                ConfirmAttachmentReq(upload.path, fileName, compressed.mimeType, compressed.bytes.size.toLong()),
+            )
+            if (confirm is ApiResult.Success) {
+                _attachments.value = _attachments.value + confirm.data
+            }
+        }
+    }
+
+    fun renameAttachment(activityId: String, attachmentId: String, fileName: String) {
+        scope.launch {
+            val res = activitiesApi.renameAttachment(token, activityId, attachmentId, RenameAttachmentReq(fileName))
+            if (res is ApiResult.Success) {
+                _attachments.value = _attachments.value.map { if (it.id == attachmentId) res.data else it }
+            }
+        }
+    }
+
+    fun replaceAttachment(activityId: String, attachmentId: String, fileName: String, mimeType: String, bytes: ByteArray) {
+        scope.launch {
+            val compressed = com.parental.shared.core.files.ImageCompressor().compress(bytes, mimeType)
+            val presign = activitiesApi.presignAttachment(
+                token,
+                activityId,
+                PresignAttachmentReq(fileName, compressed.mimeType, compressed.bytes.size.toLong()),
+            )
+            if (presign !is ApiResult.Success) return@launch
+            val upload = presign.data
+            val client = httpClient
+            val putRes = client.put(upload.uploadUrl) {
+                contentType(ContentType.parse(compressed.mimeType))
+                setBody(ByteArrayContent(compressed.bytes))
+            }
+            if (!putRes.status.isSuccess()) return@launch
+            val replace = activitiesApi.replaceAttachment(
+                token,
+                activityId,
+                attachmentId,
+                ReplaceAttachmentReq(upload.path, fileName, compressed.mimeType, compressed.bytes.size.toLong()),
+            )
+            if (replace is ApiResult.Success) {
+                _attachments.value = _attachments.value.map { if (it.id == attachmentId) replace.data else it }
+            }
+        }
+    }
+
+    fun deleteAttachment(activityId: String, attachmentId: String) {
+        scope.launch {
+            val res = activitiesApi.deleteAttachment(token, activityId, attachmentId)
+            if (res is ApiResult.Success) {
+                _attachments.value = _attachments.value.filter { it.id != attachmentId }
+            }
         }
     }
 

@@ -177,6 +177,13 @@ fun ActividadesScreen(
                 onComplete = viewModel::completeActivity,
                 isCompleting = uiState.isCompleting,
                 currentUserId = viewModel.currentUserId,
+                attachments = viewModel.attachments.collectAsState().value,
+                attachmentsLoading = viewModel.attachmentsLoading.collectAsState().value,
+                onLoadAttachments = viewModel::loadAttachments,
+                onAddAttachment = viewModel::addAttachment,
+                onRenameAttachment = viewModel::renameAttachment,
+                onReplaceAttachment = viewModel::replaceAttachment,
+                onDeleteAttachment = viewModel::deleteAttachment,
             )
         }
         // T-FE-17 · El "+" abre el modal de alta. Se compone SOBRE la lista (composición hermana,

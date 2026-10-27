@@ -18,12 +18,17 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
+import com.parental.shared.core.files.FileData
+import com.parental.shared.core.files.FilePicker
 import com.parental.shared.core.ui.components.CategoryBadge
 import com.parental.shared.core.ui.components.CategoryInfo
 import com.parental.shared.core.ui.components.StatusTag
 import com.parental.shared.core.ui.theme.AgendaGeometry
 import com.parental.shared.core.ui.theme.DetailGeometry
 import com.parental.shared.core.ui.theme.ParentalShapes
+import com.parental.shared.feature.activities.domain.model.attachments.ActivityAttachmentDto
+import com.parental.shared.feature.activities.domain.model.isAttachmentsEditable
+import com.parental.shared.feature.activities.ui.attachments.AttachmentsSection
 import com.parental.shared.core.ui.theme.ProgressStroke
 import com.parental.shared.core.ui.theme.SheetGeometry
 import com.parental.shared.core.ui.theme.Spacing
@@ -76,6 +81,13 @@ internal fun ActividadDetailSheet(
     onComplete: (String) -> Unit,
     isCompleting: Boolean,
     currentUserId: String,
+    attachments: List<ActivityAttachmentDto> = emptyList(),
+    attachmentsLoading: Boolean = false,
+    onLoadAttachments: (String) -> Unit = {},
+    onAddAttachment: (String, String, String, ByteArray) -> Unit = { _, _, _, _ -> },
+    onRenameAttachment: (String, String, String) -> Unit = { _, _, _ -> },
+    onReplaceAttachment: (String, String, String, String, ByteArray) -> Unit = { _, _, _, _, _ -> },
+    onDeleteAttachment: (String, String) -> Unit = { _, _ -> },
 ) {
     val scope = rememberCoroutineScope()
     val closeFocus = remember { FocusRequester() }
@@ -133,13 +145,21 @@ internal fun ActividadDetailSheet(
                     )
                     // `weight` es extensión de `ColumnScope`: sólo resuelve dentro del lambda de
                     // `Column`, así que se pasa ya aplicado desde este sitio de llamada.
-                    is DetailUiState.Content -> DetailContent(
-                        state = state,
-                        resolve = resolve,
-                        memberNames = memberNames,
-                        onInertAction = onInertAction,
-                        modifier = Modifier.weight(1f),
-                    )
+                    is DetailUiState.Content -> {
+                        LaunchedEffect(state.id) { onLoadAttachments(state.id) }
+                        DetailContent(
+                            state = state,
+                            resolve = resolve,
+                            memberNames = memberNames,
+                            onInertAction = onInertAction,
+                            attachments = attachments,
+                            onAddAttachment = onAddAttachment,
+                            onRenameAttachment = onRenameAttachment,
+                            onReplaceAttachment = onReplaceAttachment,
+                            onDeleteAttachment = onDeleteAttachment,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
                 }
                 // Un único `SnackbarHost` VISIBLE a la vez (R-8): la lista lo hospeda cuando no hay
                 // hoja y la hoja mientras está abierta. Dos activos = doble pintada + doble anuncio.
@@ -188,6 +208,11 @@ private fun DetailContent(
     resolve: (String) -> CategoryInfo?,
     memberNames: Map<String, String>,
     onInertAction: (String) -> Unit,
+    attachments: List<ActivityAttachmentDto> = emptyList(),
+    onAddAttachment: (String, String, String, ByteArray) -> Unit = { _, _, _, _ -> },
+    onRenameAttachment: (String, String, String) -> Unit = { _, _, _ -> },
+    onReplaceAttachment: (String, String, String, String, ByteArray) -> Unit = { _, _, _, _, _ -> },
+    onDeleteAttachment: (String, String) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier,
 ) {
     val a = state.actividad
@@ -241,14 +266,74 @@ private fun DetailContent(
         }
         item { DetailBlockCard(pairs) }
         item {
-            // FR-7 **NO ENTREGADA** — bloqueada: no existe API de adjuntos (`ActAttachmentEntity`
-            // sólo está en la entidad y en `activities.module.ts`; sin servicio, ruta ni campo en
-            // el DTO). El chip pinta el rótulo y NO abre nada —ni selector, ni cámara, ni red—:
-            // sólo emite `NEXT_MSG`. Mismo caso inerte que ya traía la pantalla antigua.
-            AssistChip(
-                onClick = { onInertAction(NEXT_MSG) },
-                label = { Text(if (isSalud) "Adjuntar resumen médico" else "Adjuntar archivo") },
+            val picker = com.parental.shared.core.files.rememberFilePicker()
+            var renameTarget by remember { mutableStateOf<ActivityAttachmentDto?>(null) }
+            var renameText by remember { mutableStateOf("") }
+            var replaceTarget by remember { mutableStateOf<ActivityAttachmentDto?>(null) }
+            var deleteTarget by remember { mutableStateOf<ActivityAttachmentDto?>(null) }
+            val editable = isAttachmentsEditable(a.status, a.assignedTo)
+            val activityId = a.id
+            AttachmentsSection(
+                attachments = attachments,
+                editable = editable,
+                onAdd = {
+                    picker.launch { f ->
+                        if (f != null) {
+                            onAddAttachment(activityId, f.name, f.mimeType, f.bytes)
+                        }
+                    }
+                },
+                onRename = { att ->
+                    renameTarget = att
+                    renameText = att.fileName
+                },
+                onReplace = { att ->
+                    replaceTarget = att
+                    picker.launch { f ->
+                        if (f != null) {
+                            onReplaceAttachment(activityId, att.id, f.name, f.mimeType, f.bytes)
+                        }
+                        replaceTarget = null
+                    }
+                },
+                onDelete = { att ->
+                    deleteTarget = att
+                },
             )
+            if (renameTarget != null) {
+                AlertDialog(
+                    onDismissRequest = { renameTarget = null },
+                    title = { Text("Renombrar comprobante") },
+                    text = {
+                        OutlinedTextField(value = renameText, onValueChange = { renameText = it }, singleLine = true)
+                    },
+                    confirmButton = {
+                        TextButton(onClick = {
+                            renameTarget?.let { onRenameAttachment(a.id, it.id, renameText) }
+                            renameTarget = null
+                        }) { Text("Guardar") }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { renameTarget = null }) { Text("Cancelar") }
+                    },
+                )
+            }
+            if (deleteTarget != null) {
+                AlertDialog(
+                    onDismissRequest = { deleteTarget = null },
+                    title = { Text("Eliminar comprobante") },
+                    text = { Text("¿Seguro que querés eliminar este comprobante?") },
+                    confirmButton = {
+                        TextButton(onClick = {
+                            deleteTarget?.let { onDeleteAttachment(a.id, it.id) }
+                            deleteTarget = null
+                        }) { Text("Eliminar") }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { deleteTarget = null }) { Text("Cancelar") }
+                    },
+                )
+            }
         }
     }
 }
@@ -263,6 +348,8 @@ private fun DetailFooter(
     onComplete: (String) -> Unit,
     isCompleting: Boolean,
     currentUserId: String,
+    attachments: List<ActivityAttachmentDto> = emptyList(),
+    onAddAttachment: (String, String, String, ByteArray) -> Unit = { _, _, _, _ -> },
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         // AL-4 · "Finalizar" POR ENCIMA del bloque de acciones: es la transición que cierra el
@@ -312,21 +399,27 @@ private fun DetailFooter(
             }
             else -> {}
         }
-        // FR-8 con salvedad declarada: la acción primaria se Pinta y se Ancla al fondo, pero no
-        // abre nada — no hay flujo de subida. Tampoco es un token nuevo: `primary` del esquema.
-        Surface(
-            modifier = Modifier.fillMaxWidth().heightIn(min = AgendaGeometry.touchTargetLegacy),
-            color = MaterialTheme.colorScheme.primary,
-        ) {
-            Text(
-                text = "Cargar comprobante",
-                modifier = Modifier.fillMaxWidth().clickable { onInertAction(NEXT_MSG) }
-                    .padding(Spacing.lg),
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onPrimary,
-                textAlign = TextAlign.Center,
-            )
+        val picker = com.parental.shared.core.files.rememberFilePicker()
+        val editable = isAttachmentsEditable(actividad.status, actividad.assignedTo)
+        if (editable) {
+            Surface(
+                modifier = Modifier.fillMaxWidth().heightIn(min = AgendaGeometry.touchTargetLegacy),
+                color = MaterialTheme.colorScheme.primary,
+            ) {
+                Text(
+                    text = "Cargar comprobante",
+                    modifier = Modifier.fillMaxWidth().clickable {
+                        picker.launch { fd ->
+                            if (fd != null) onAddAttachment(actividad.id, fd.name, fd.mimeType, fd.bytes)
+                        }
+                    }
+                        .padding(Spacing.lg),
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onPrimary,
+                    textAlign = TextAlign.Center,
+                )
+            }
         }
     }
 }
