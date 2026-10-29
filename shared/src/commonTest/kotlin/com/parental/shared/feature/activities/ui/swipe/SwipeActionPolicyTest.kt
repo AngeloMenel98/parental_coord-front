@@ -21,6 +21,7 @@ class SwipeActionPolicyTest {
         canDelete: Boolean = false,
         canCancel: Boolean = false,
         canDecline: Boolean = false,
+        assignedConfirmed: Boolean = false,
     ) = Actividad(
         id = "a1",
         title = "Visita al médico",
@@ -31,6 +32,7 @@ class SwipeActionPolicyTest {
         canDelete = canDelete,
         canCancel = canCancel,
         canDecline = canDecline,
+        assignedConfirmed = assignedConfirmed,
     )
 
     @Test
@@ -53,6 +55,31 @@ class SwipeActionPolicyTest {
             listOf(SwipeAction.CANCEL, SwipeAction.DECLINE, SwipeAction.DELETE),
             acciones,
         )
+    }
+
+    @Test
+    fun `una asignación CONFIRMADA cierra el gesto — la tarjeta no ofrece cambiar de opinión`() {
+        // La persona ya dijo que asiste. Deslizar la tarjeta para "no asistir" sobre una
+        // asignación ya confirmada es una contradicción: el gesto desaparece (y por eso
+        // "No asistir" se mueve a la hoja de detalle, que es donde viven las demás
+        // acciones del ciclo de vida).
+        assertEquals(emptyList(), availableSwipeActions(row(canDecline = true, assignedConfirmed = true)))
+        assertEquals(
+            emptyList(),
+            availableSwipeActions(row(canDelete = true, canCancel = true, canDecline = true, assignedConfirmed = true)),
+        )
+        assertFalse(row(canDecline = true, assignedConfirmed = true).hasSwipeActions())
+    }
+
+    @Test
+    fun `la pista no promete acciones que la app no tiene`() {
+        // 🔴 REGRESIÓN: la pista decía "para completar o posponer" y esas acciones NO
+        // existen en el swipe (que ofrece Cancelar / No asistir / Eliminar). El usuario la
+        // leyó en el teléfono y pidió cambios: una pista que promete lo que no hay es
+        // una pista rota, por muy bien escrita que esté.
+        val hint = SWIPE_HINT.lowercase()
+        assertFalse(hint.contains("completar"), "La pista promete «completar» y no existe esa acción: $SWIPE_HINT")
+        assertFalse(hint.contains("posponer"), "La pista promete «posponer» y no existe esa acción: $SWIPE_HINT")
     }
 
     @Test

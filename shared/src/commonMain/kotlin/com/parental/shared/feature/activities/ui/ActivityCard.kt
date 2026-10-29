@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
@@ -201,7 +202,7 @@ private fun ActivityCardBody(
                 }
 
                 // ── Pie: categoría + acción. FUERA del cuerpo clickeable ────────
-                if (canConfirm || info != null) {
+                if (canConfirm || info != null || row.actividad.assignedConfirmed) {
                     Spacer(modifier = Modifier.height(Spacing.sm))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         CategoryLabel(info = info, category = category)
@@ -211,6 +212,13 @@ private fun ActivityCardBody(
                                 isConfirming = isConfirming,
                                 onClick = onConfirm,
                             )
+                        } else if (row.actividad.assignedConfirmed) {
+                            // 🔴 ESTADO CONFIRMADO VISIBLE. Antes el botón "Confirmar"
+                            // simplemente desaparecía al confirmar, y la tarjeta quedaba
+                            // indistinguible de una que nunca fue tuya. Ahora dice que la
+                            // asistencia está confirmada.
+                            Spacer(modifier = Modifier.weight(1f))
+                            ConfirmedChip()
                         }
                     }
                 }
@@ -262,6 +270,38 @@ private fun CategoryLabel(info: CategoryInfo?, category: com.parental.shared.cor
         fontWeight = FontWeight.Medium,
         maxLines = 1,
     )
+}
+
+/**
+ * Chip "Confirmada": la asistencia de esta persona está confirmada.
+ *
+ * Es un chip, no un botón: ya no hay nada que confirmar y NO debe parecer pulsable.
+ */
+@Composable
+private fun ConfirmedChip() {
+    Surface(
+        shape = ParentalShapes.medium,
+        color = MaterialTheme.colorScheme.primaryContainer,
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = Spacing.sm, vertical = Spacing.xs),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Check,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                modifier = Modifier.size(Spacing.md),
+            )
+            Spacer(modifier = Modifier.width(Spacing.xs))
+            Text(
+                text = "Confirmada",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                fontWeight = FontWeight.Medium,
+            )
+        }
+    }
 }
 
 /**

@@ -7,13 +7,21 @@ import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.PersonOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -26,6 +34,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.customActions
@@ -33,6 +42,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import com.parental.shared.core.ui.theme.Spacing
 import com.parental.shared.feature.activities.domain.model.Actividad
 import kotlinx.coroutines.launch
 import kotlin.math.abs
@@ -219,11 +229,27 @@ private const val BAR_WIDTH_FRACTION = 0.55f
 
 @Composable
 private fun ActionButton(action: SwipeAction, onClick: () -> Unit) {
+    // 🔴 EL COLOR DISTINGUE LA ACCIÓN. Antes los tres botones eran `primary` lleno: el
+    // mismo aspecto para "No asistir", "Cancelar" y "Eliminar", con "Eliminar" —la
+    // única irreversible— painted like a neutral action. Se vio en el teléfono ("se
+    // siente mal el tipo de botones"). Ahora cada acción usa su propio papel del
+    // esquema: la destructiva en `error`, la reversible en `secondary` y la de la
+    // asistencia en `primary`. CERO colores nuevos: son papeles, no literales.
+    val container = when (action) {
+        SwipeAction.DELETE -> MaterialTheme.colorScheme.errorContainer
+        SwipeAction.CANCEL -> MaterialTheme.colorScheme.secondaryContainer
+        SwipeAction.DECLINE -> MaterialTheme.colorScheme.primaryContainer
+    }
+    val content = when (action) {
+        SwipeAction.DELETE -> MaterialTheme.colorScheme.onErrorContainer
+        SwipeAction.CANCEL -> MaterialTheme.colorScheme.onSecondaryContainer
+        SwipeAction.DECLINE -> MaterialTheme.colorScheme.onPrimaryContainer
+    }
     Button(
         onClick = onClick,
         colors = ButtonDefaults.buttonColors(
-            containerColor = MaterialTheme.colorScheme.primary,
-            contentColor = MaterialTheme.colorScheme.onPrimary,
+            containerColor = container,
+            contentColor = content,
         ),
         // 48dp de alto (R2 · `touchTarget`): tres botones en el 55% del ancho no caben
         // más anchos, así que la separación va en el `padding` y no en el ancho del botón.
@@ -231,9 +257,25 @@ private fun ActionButton(action: SwipeAction, onClick: () -> Unit) {
             .heightIn(min = SwipeTouchTargetHeight)
             .padding(horizontal = 4.dp),
     ) {
+        Icon(
+            imageVector = action.icon(),
+            contentDescription = null,
+            modifier = Modifier.size(SwipeIconSize),
+        )
+        Spacer(modifier = Modifier.width(Spacing.xs))
         Text(action.label, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 
+/** El vector de cada acción: el icono REFUERZA el color (el color nunca es la única señal). */
+private fun SwipeAction.icon(): ImageVector = when (this) {
+    SwipeAction.DELETE -> Icons.Filled.Delete
+    SwipeAction.CANCEL -> Icons.Filled.Close
+    SwipeAction.DECLINE -> Icons.Filled.PersonOff
+}
+
 /** Alto mínimo de los botones de acción — 48dp según R2 (target táctil). */
 internal val SwipeTouchTargetHeight = 48.dp
+
+/** Lado del icono del botón de acción — 18dp (es texto de apoyo, no el protagonist). */
+private val SwipeIconSize = 18.dp

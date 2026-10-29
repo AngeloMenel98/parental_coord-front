@@ -27,6 +27,17 @@ enum class SwipeAction(
 }
 
 /**
+ * Pista de la lista de tarjetas.
+ *
+ * 🔴 REGRESIÓN (visto en el teléfono): decía "Deslizá una tarjeta para completar o
+ * posponer" y esas dos acciones NO existen en el swipe —que ofrece Cancelar / No
+ * asistir / Eliminar, y sólo las que el servidor habilita—. La pista prometía algo que
+ * la app no puede hacer, y además sugería un gesto que la app no tiene. Ahora dice lo
+ * que el gesto hace de verdad: mostrar las acciones disponibles en ESA tarjeta.
+ */
+internal const val SWIPE_HINT = "Deslizá una tarjeta para ver sus acciones"
+
+/**
  * Acciones ofrecidas para [actividad], en el ORDEN en que deben mostrarse.
  *
  * 🔴 R1 · Esto **NO recalcula la política**: lee los tres `can_*` que el SERVIDOR manda
@@ -40,16 +51,33 @@ enum class SwipeAction(
  *
  * El orden (Cancelar, No asistir, Eliminar) pone lo reversible antes que lo
  * destructivo: "Eliminar" es la única sin deshacer más de 5000 ms.
+ *
+ * 🔴 ASIGNACIÓN CONFIRMADA → SIN GESTO. La persona ya dijo que asiste; una tarjeta
+ * confirmada no ofrece "cambiar de opinión" por swipe. Esto lo pidió quien usa la app
+ * ("el swipe no debería aparecer una vez que confirmó su asistencia"), y es coherente
+ * con el resto: lo que ya está confirmado no se re-confirma. Por eso "No asistir" se
+ * mueve a la HOJA DE DETALLE (donde ya viven "Finalizar" y "Confirmar asignación"): si
+ * alguien confirmó y luego no puede asistir, ese camino sigue existiendo — sólo que en
+ * un sitio donde se lee como una decisión, no como un gesto accidental.
  */
-fun availableSwipeActions(actividad: Actividad): List<SwipeAction> = buildList {
-    if (actividad.canCancel) add(SwipeAction.CANCEL)
-    if (actividad.canDecline) add(SwipeAction.DECLINE)
-    if (actividad.canDelete) add(SwipeAction.DELETE)
+fun availableSwipeActions(actividad: Actividad): List<SwipeAction> {
+    if (actividad.assignedConfirmed) return emptyList()
+    return buildList {
+        if (actividad.canCancel) add(SwipeAction.CANCEL)
+        if (actividad.canDecline) add(SwipeAction.DECLINE)
+        if (actividad.canDelete) add(SwipeAction.DELETE)
+    }
 }
 
-/** `true` si [actividad] admite alguna acción — evita pintar un menú vacío. */
-fun Actividad.hasSwipeActions(): Boolean =
-    canCancel || canDecline || canDelete
+/**
+ * `true` si [actividad] admite alguna acción — evita pintar un menú vacío.
+ *
+ * 🔴 Se DERIVA de [availableSwipeActions], no de los flags por separado: si las dos
+ * funciones no dijeran lo mismo, la UI preguntaría por una y el gesto ofrecería la
+ * otra (y volvería a aparecer el gesto en una tarjeta confirmada, que es justo lo que
+ * esta regla cierra).
+ */
+fun Actividad.hasSwipeActions(): Boolean = availableSwipeActions(this).isNotEmpty()
 
 /**
  * A1 · Motivo obligatorio: 3–200 caracteres **tras `trim()`**.

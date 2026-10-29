@@ -72,6 +72,8 @@ no new tokens; app copy in Spanish.
 | T5 | S8 | inline | done | 639b6c2 |
 | T6 | S6 | inline | done | — |
 | T7 | all | inline | done | — |
+| T8 | S2, S6 | inline (test-first) | done | — |
+| T9 | S3, S6 | inline | pending | — |
 
 - T1 — pure derivation + formatters, RED→GREEN: `buildMonthGrid(year, month)`
   (Monday-start cells incl. outside days), `buildDayDots(rows, resolve)` (date →
@@ -320,4 +322,37 @@ alternatives per the gentle-design skill.
   atenuados e inertes (como pedía el arteboard) y no llevan puntos. En pantalla, el
   calendario parece mentir. Pendiente de decisión: ¿puntos atenuados en los días de otro
   mes, y/o hacerlos pulsables?
+
+### L13 — T8 (lote de seguimiento, prompted por el uso en el teléfono)
+
+Lo que pidió quien usa la app después de probar la pantalla en su teléfono, más una
+ incoherencia que sólo se ve en el dispositivo:
+
+1. **La pista mentía.** Decía *"Deslizá una tarjeta para completar o posponer"* y esas dos
+   acciones **no existen** en el swipe: el servidor ofrece Cancelar / No asistir /
+   Eliminar, y para un miembro que no es el creador, SÓLO "No asistir". La pista venía
+   del arteboard, que asumía acciones que la app no tiene. Ahora: **"Deslizá una tarjeta
+   para ver sus acciones"** (`SWIPE_HINT`, con un guard que falla si vuelve a prometer
+   "completar" o "posponer").
+2. **El swipe se cierra cuando la asignación está confirmada** (`assignedConfirmed`):
+   `availableSwipeActions` devuelve lista vacía y `hasSwipeActions()` se DERIVA de ella
+   (que si no, la UI preguntaría por una función y el gesto ofrecería la otra).
+3. **"No asistir" se mudó a la hoja de detalle** (`TextButton` en `error`, visible si el
+   servidor manda `canDecline` y el estado no es terminal). Sin esto, cerrar el swipe
+   después de confirmar le habría quitado a la persona la única forma de decir "no
+   puedo asistir": una regresión funcional disfrazada de pulido. El gesto accidental se
+   queda en la tarjeta; la decisión va en la hoja.
+4. **Los botones del swipe dejaron de ser todos iguales**: `Eliminar` en `errorContainer`,
+   `Cancelar` en `secondaryContainer`, `No asistir` en `primaryContainer`, cada uno con su
+   icono (`Delete`, `Close`, `PersonOff`). Antes los tres eran `primary` lleno, con la
+   acción irreversible pintada como una neutra. CERO colores nuevos: son papeles del
+   esquema.
+5. **La tarjeta confirmada ahora se ve**: chip "Confirmada" (check + `primaryContainer`).
+   Antes el botón "Confirmar" desaparecía al confirmar y la tarjeta quedaba
+   indistinguible de una que nunca fue tuya.
+- **Pruebas**: 2 casos nuevos en `SwipeActionPolicyTest` (asignación confirmada → sin
+  gesto; la pista no promete acciones inexistentes). Suite: 23 / **204** / 0 fallos.
+- **En el dispositivo, el botón "Confirmar" ya se había usado**: "Turno con el pediatra"
+  pasó a `assisting` / `assignedConfirmed: true` — el flujo de confirmación funciona de
+  punta a punta contra el backend local.
 

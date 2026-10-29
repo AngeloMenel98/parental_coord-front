@@ -26,6 +26,7 @@ import com.parental.shared.core.ui.components.CategoryInfo
 import com.parental.shared.core.ui.theme.Spacing
 import com.parental.shared.feature.activities.domain.model.canConfirm
 import com.parental.shared.feature.activities.ui.swipe.ActivitySwipeBox
+import com.parental.shared.feature.activities.ui.swipe.SWIPE_HINT
 import com.parental.shared.feature.activities.ui.swipe.SwipeAction
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
@@ -85,7 +86,7 @@ internal fun AgendaTimeline(
             } else {
                 item(key = "agenda-hint") {
                     Text(
-                        text = "Deslizá una tarjeta para completar o posponer",
+                        text = SWIPE_HINT,
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(bottom = Spacing.sm),

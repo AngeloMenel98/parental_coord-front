@@ -60,6 +60,11 @@ import kotlinx.coroutines.launch
  */
 
 /**
+ * Estados en los que la actividad ya no admite "No asistir".
+ */
+private val TERMINAL_STATUSES = setOf("done", "cancelled", "not_assisting")
+
+/**
  * Raíz de la hoja — `activity-detail-modal`, T2-1.
  *
  * ⚠ R-13 (tope de altura): el `0.6f` vive AHORA en el token [SheetGeometry] (`create-activity`
@@ -81,6 +86,7 @@ internal fun ActividadDetailSheet(
     isConfirming: Boolean,
     onComplete: (String) -> Unit,
     isCompleting: Boolean,
+    onDecline: (String) -> Unit = {},
     currentUserId: String,
     attachments: List<ActivityAttachmentDto> = emptyList(),
     attachmentsLoading: Boolean = false,
@@ -179,6 +185,7 @@ internal fun ActividadDetailSheet(
                         isConfirming = isConfirming,
                         onComplete = onComplete,
                         isCompleting = isCompleting,
+                        onDecline = onDecline,
                         currentUserId = currentUserId,
                         // Sin este cable el CTA caía en el lambda por defecto
                         // (no-op) y el botón no hacía NADA aunque el picker
@@ -359,6 +366,7 @@ private fun DetailFooter(
     isConfirming: Boolean,
     onComplete: (String) -> Unit,
     isCompleting: Boolean,
+    onDecline: (String) -> Unit,
     currentUserId: String,
     onAddAttachment: (String, String, String, ByteArray) -> Unit,
     picker: FilePicker,
@@ -410,6 +418,24 @@ private fun DetailFooter(
                 }
             }
             else -> {}
+        }
+        // 🔴 "NO ASISTIR" VIVE AQUÍ, NO SÓLO EN EL SWIPE. El gesto se cierra cuando la
+        // asignación está confirmada (lo pidió quien usa la app), así que la acción tiene
+        // que existir en un sitio donde se lea como una DECISIÓN y no como un gesto
+        // accidental: la hoja de detalle, donde ya viven "Finalizar" y "Confirmar
+        // asignación". El flag `canDecline` lo manda el SERVIDOR (misma regla que el
+        // swipe) y la acción abre el diálogo de motivo obligatorio.
+        if (actividad.canDecline && actividad.status !in TERMINAL_STATUSES) {
+            TextButton(
+                onClick = { onDecline(actividad.id) },
+                modifier = Modifier.fillMaxWidth()
+                    .padding(start = Spacing.lg, end = Spacing.lg, bottom = Spacing.sm),
+            ) {
+                Text(
+                    text = "No asistir",
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
         }
         val editable = isAttachmentsEditable(actividad.status, actividad.assignedTo)
         if (editable) {
