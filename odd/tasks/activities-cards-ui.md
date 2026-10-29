@@ -66,7 +66,7 @@ no new tokens; app copy in Spanish.
 | ID | Spec | Route | Status | Commit |
 |----|------|-------|--------|--------|
 | T1 | S3, S4, S5 | inline (test-first) | done | c086ac2 |
-| T2 | S2, S4 | inline | pending | — |
+| T2 | S2, S4 | inline | done | 1908266 |
 | T3 | S5 | inline | pending | — |
 | T4 | S3 | inline | pending | — |
 | T5 | S8 | inline | pending | — |
@@ -142,3 +142,34 @@ alternatives per the gentle-design skill.
 - **Slice boundary**: T1 = 473 authored lines (142 source + 331 test). The branch-level
   warning (21567 lines / 46 commits since `origin/main`) is the ACCUMULATED branch, not
   this feature; this feature lands in slices of ~400–500 lines, one per task.
+
+### L5 — T2 done (commit 1908266)
+
+- **New**: `ui/ActivityCard.kt` (333 lines) — card with a 4dp category rail (`Spacing.xs`),
+  title + status pill, mono time (`TypeTokens.time`) + deadline line, category label and
+  an OUTLINED "Confirmar" button. Reuses `TagDot`, `categoryTagTriple`, `statusTagTriple`,
+  `ParentalShapes.medium` — **zero new colors, zero new tokens**.
+- **Rewritten**: `ui/AgendaList.kt` — day headers (`formatGroupTitle`/`formatDayTitle`,
+  with "· hoy" in `primary`) + one card per activity; the list background becomes
+  `surfaceVariant` so the `surface` cards read (without it the card is invisible against
+  the screen). The "Sin fecha de inicio" group keeps its label.
+- **The swipe contract was NOT weakened**: the card declares the `swipe` slot WITHOUT a
+  default and `AgendaList.kt` mounts `ActivitySwipeBox` at the render point. The guard
+  `SwipeMountingTest` now watches the NEW piece (`ActivityCard`) instead of
+  `AgendaTimelineRow` — same intent, three more cases (slot declared, no default, every
+  call mounts the gesture). It went 12 → 15 tests.
+- **The Confirmar button is a SIBLING of the clickable body** (`R2-T2-8`): the clickable
+  region is title + time + deadline; the foot row (category label + button) is outside it.
+  A tap next to the button must NOT open the detail — that was the bug the swipe change
+  found in `WeekActivityNode`.
+- **`OutlinedButton`, not `Surface` + `clickable`**: Material applies
+  `minimumInteractiveComponentSize()`, so the real touch target is 48dp even though the
+  artboard drew 36dp. S8 demands 48dp, so the artboard's height loses.
+- **Evidence**: `:shared:compileDebugKotlinAndroid` → 0 `e:`; `:shared:testDebugUnitTest
+  --rerun-tasks` → 22 suites / **189 tests / 0 failures / 0 errors** (186 + 3 guard cases);
+  `TEST-...SwipeMountingTest.xml` → `tests="15" failures="0"`.
+- **No device attached** (`adb devices` → empty): the visual check of the new card is
+  still OUTSTANDING. It needs a human (or an emulator) — it is listed as open proof at
+  close, not as a passed check.
+- **Slice**: T2 = 381 authored lines (333 new card + 145/−101 in the list + 48 in the
+  guard).
