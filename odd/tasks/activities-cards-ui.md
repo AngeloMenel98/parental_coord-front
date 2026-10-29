@@ -67,8 +67,8 @@ no new tokens; app copy in Spanish.
 |----|------|-------|--------|--------|
 | T1 | S3, S4, S5 | inline (test-first) | done | c086ac2 |
 | T2 | S2, S4 | inline | done | 1908266 |
-| T3 | S5 | inline | pending | — |
-| T4 | S3 | inline | pending | — |
+| T3 | S5 | inline | done | 8821e18 |
+| T4 | S3 | inline | done | 0b41805 |
 | T5 | S8 | inline | pending | — |
 | T6 | S6 | inline | pending | — |
 | T7 | all | inline | pending | — |
@@ -173,3 +173,46 @@ alternatives per the gentle-design skill.
   close, not as a passed check.
 - **Slice**: T2 = 381 authored lines (333 new card + 145/−101 in the list + 48 in the
   guard).
+
+### L6 — T3 done (commit 8821e18)
+
+- **Top bar**: `surface` + `HorizontalDivider` de 1dp `outlineVariant` debajo. Acciones:
+  **ícono de calendario** (lo abre T4), **ícono de vista** (`CalendarViewWeek` ⇄
+  `AutoMirrored.Filled.List`) y "+". El control segmentado de "Vista" y los rótulos "Vista"
+  y "Filtrar" se fueron: ≈64dp verticales para las tarjetas.
+- **Filtros**: una fila de `FilterChip` con contador (`tabCounts` sobre la lista YA
+  cargada), scrolleable en horizontal como la del arteboard.
+- **Íconos verificados en el AAR, no de memoria**: `DateRange` y `AutoMirrored.Filled.List`
+  están en material-icons-**core**; `CalendarViewWeek` en **extended**. (Los artefactos
+  multiplatform de JetBrains son klib: no se pueden grepear, hay que abrir el AAR.)
+- **`design/system.md` actualizado**: describía una barra `primaryContainer` y un control
+  segmentado que ya no existen. Un doc que describe cromo muerto es un doc que miente.
+- **Desviación documentada**: el título del mes de la hoja usa `formatMonthYear`
+  ("Mayo De 2026"), la convención de copy de la app, en vez del "mayo 2026" en minúsculas
+  del arteboard. Inventar un segundo formato de mes en la misma app es peor que no
+  seguir el mock al pie de la letra.
+- **Evidencia**: compile 0 `e:`; suite 22/189/0 fallos.
+
+### L7 — T4 done (commit 0b41805)
+
+- **La hoja** (`ui/CalendarJumpSheet.kt`): mes, rejilla de lunes a domingo, un punto POR
+  CATEGORÍA por día (máximo 3), días de otro mes atenuados e inertes, "hoy" con disco
+  `primary`, flechas de mes y pie con "Hoy" / "Cerrar".
+- **El salto**: en modo Agenda la lista se desplaza al encabezado del día elegido (o al
+  grupo más cercano hacia adelante, si ese día no tiene actividades); en modo Semana el día
+  se SELELECCIONA y la semana se reancla.
+- **La selección expresa gana a la regla automática**: al cambiar de semana, la pantalla
+  re-resuelve el día seleccionado; la elección de la hoja se aplica DESPUÉS (dos
+  `LaunchedEffect` en orden de declaración), así que la última palabra es del usuario.
+- **`agendaHeaderIndex` + `AGENDA_HINT_ITEMS`**: el índice del encabezado se cuenta en las
+  dos capas (la lista y el salto), y la constante de la pista vive en `CalendarJump.kt` para
+  que no se separen. 3 pruebas nuevas fijan el índice ABSOLUTO.
+- **Los puntos se memorizan por lista Y por catálogo** (`remember(filteredRows,
+  uiState.categories)`): si las actividades llegan antes que las categorías, un `remember`
+  con sólo la lista dejaría los puntos en `outline` para siempre.
+- **Dos bugs propios, corregidos antes de commitear**: (1) el rótulo accesible de la celda
+  pasaba `today = date` y marcaba "hoy" en TODOS los días; ahora recibe el `today` real.
+  (2) el círculo de "hoy" medía `statusBadge * 3.5f` (una medida fuera de la escala): se
+  redondeó a `Spacing.xl` (24dp).
+- **Evidencia**: compile 0 `e:`; suite 22/**192**/0 fallos (189 + 3 del índice del
+  encabezado).
