@@ -65,7 +65,7 @@ no new tokens; app copy in Spanish.
 
 | ID | Spec | Route | Status | Commit |
 |----|------|-------|--------|--------|
-| T1 | S3, S4, S5 | inline (test-first) | pending | — |
+| T1 | S3, S4, S5 | inline (test-first) | done | c086ac2 |
 | T2 | S2, S4 | inline | pending | — |
 | T3 | S5 | inline | pending | — |
 | T4 | S3 | inline | pending | — |
@@ -77,7 +77,8 @@ no new tokens; app copy in Spanish.
   (Monday-start cells incl. outside days), `buildDayDots(rows, resolve)` (date →
   distinct categories by first start, cap 3), `jumpTargetDate(date, groups)`
   (exact → nearest following → latest preceding → null), `tabCounts(actividades)`,
-  `formatGroupTitle(date, today)` ("lunes 12 de mayo"), `dayCellSemanticLabel(...)`.
+  `formatDayTitle` / `formatGroupTitle` ("martes 12 de mayo" para 2026-05-12),
+  `dayCellSemanticLabel(...)`.
 - T2 — `ActivityCard.kt` + `AgendaList.kt` rewrite: group headers, cards, feed
   hint, swipe mounted per card, focusRequesters re-registration per id.
 - T3 — chrome: top bar (calendar + view-toggle icons, surface + hairline), filters
@@ -113,3 +114,31 @@ alternatives per the gentle-design skill.
 - `StatusTag`/`categoryTagTriple`/`TypeTokens.time` are reused as-is — the card is
   a new composition of existing tokens, no new color values.
 - The sheet reuses the repo's `ModalBottomSheet` pattern (detail/create sheets).
+
+### L4 — T1 done (commit c086ac2)
+
+- **RED observed**: `CalendarJumpTest.kt` written first; first run failed to compile with
+  `Unresolved reference 'buildDayDots' / 'jumpTargetDate' / 'tabCounts' / 'formatGroupTitle' /
+  'dayCellSemanticLabel'` (17 `e:` lines). Then the test file itself missed
+  `import kotlinx.datetime.plus` — fixed, still RED.
+- **GREEN**: `./gradlew :shared:testDebugUnitTest --tests "...CalendarJumpTest"` →
+  `tests="24" skipped="0" failures="0" errors="0"` in
+  `shared/build/test-results/testDebugUnitTest/TEST-...CalendarJumpTest.xml`.
+- **Full suite**: `./gradlew :shared:testDebugUnitTest --rerun-tasks` → 22 suites / **186
+  tests / 0 failures / 0 errors** (162 pre-existing + 24 new).
+- **Three test expectations were WRONG, not the implementation** (recorded because the
+  fix is the evidence): 2026-05-12 is a **martes**, not a lunes (Jan 1 2026 = jueves →
+  May 1 = viernes → May 12 = martes), and the "following group" assertion contradicted its
+  own name — the artboard says "más cercano **hacia adelante**", so 2026-05-15 jumps to
+  2026-05-20, not to 2026-05-13. The weekday is now pinned with BOTH a Monday and a
+  Tuesday case so the mapping cannot drift again.
+- **`kotlinx-datetime` 0.6.1 has NO `LocalDate.daysInMonth`**: the month length comes from
+  `firstOfMonth.plus(1, DateTimeUnit.MONTH).minus(1, DateTimeUnit.DAY).dayOfMonth`.
+  `LocalDate.plus(value, DateTimeUnit)` DOES exist (`DateTimeUnit.MONTH` is `MonthBased`,
+  a `DateBased`) — verified in the library sources, not assumed.
+- **Delegation unavailable**: `subagent_run(gentle-ai-worker)` was rejected 3× with
+  "Writer bootstrap requires the original safe project root" (also with an explicit
+  `workspace_root`). T1 was therefore done inline — bounded (2 new files), no ceremony.
+- **Slice boundary**: T1 = 473 authored lines (142 source + 331 test). The branch-level
+  warning (21567 lines / 46 commits since `origin/main`) is the ACCUMULATED branch, not
+  this feature; this feature lands in slices of ~400–500 lines, one per task.
