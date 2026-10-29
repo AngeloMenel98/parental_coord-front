@@ -3,12 +3,12 @@
   "chosen": "03-tarjetas-a-la-vista.html",
   "handoffs": {
     "03-tarjetas-a-la-vista.html": {
-      "status": "in_progress",
+      "status": "implemented",
       "queued": false,
       "sentAt": "2026-10-29T16:23:01.958Z",
       "startedAt": "2026-10-29T16:25:44.819Z",
-      "implementedAt": null,
-      "note": "Implementing 03 in Compose as ODD feature activities-cards-ui (cards + calendar day-jump sheet)."
+      "implementedAt": "2026-10-29T18:57:32.287Z",
+      "note": "Implemented in Compose: cards per activity in AGENDA mode, compact chrome with filter counts, and the calendar sheet with per-category dots that jumps the feed to a day. 202 unit tests green; APK built. Visual check on a device still pending."
     }
   }
 }
