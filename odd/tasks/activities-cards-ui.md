@@ -69,9 +69,9 @@ no new tokens; app copy in Spanish.
 | T2 | S2, S4 | inline | done | 1908266 |
 | T3 | S5 | inline | done | 8821e18 |
 | T4 | S3 | inline | done | 0b41805 |
-| T5 | S8 | inline | pending | — |
-| T6 | S6 | inline | pending | — |
-| T7 | all | inline | pending | — |
+| T5 | S8 | inline | done | 639b6c2 |
+| T6 | S6 | inline | done | — |
+| T7 | all | inline | done | — |
 
 - T1 — pure derivation + formatters, RED→GREEN: `buildMonthGrid(year, month)`
   (Monday-start cells incl. outside days), `buildDayDots(rows, resolve)` (date →
@@ -216,3 +216,73 @@ alternatives per the gentle-design skill.
   redondeó a `Spacing.xl` (24dp).
 - **Evidencia**: compile 0 `e:`; suite 22/**192**/0 fallos (189 + 3 del índice del
   encabezado).
+
+### L8 — T5 done (commit 639b6c2)
+
+- **Un fix real**: la celda del calendario NO fusionaba sus descendientes — TalkBack
+  anunciaba la celda ("martes 12 de mayo, 3 actividades…") y ADEMÁS el número del día
+  suelto, en dos nodos. Ahora `mergeDescendants = true`.
+- **Guard de accesibilidad de fuente** (`ActivityCardAccessibilityTest`, 10 casos): este repo
+  no tiene infraestructura de Compose UI, así que el contrato se defiende leyendo el
+  código, igual que hace `SwipeMountingTest`. Defiende: la tarjeta es UN nodo de
+  semántica; el cuerpo tiene UN SOLO `clickable`; el botón "Confirmar" se pinta como
+  HERMANO (después del cuerpo clickeable) y es un `OutlinedButton` de Material; la celda
+  fusiona y usa `dayCellSemanticLabel`; las celdas de otro mes son inertes; los puntos
+  siguen decorativos; y los objetivos táctiles nuevos usan el token de 48dp.
+- **Mutación comprobada**: quitar `mergeDescendants` del cuerpo de la tarjeta pone el
+  guard en ROJO (1 de 10 falla). Un guard que no puede fallar no es un guard.
+- **Dos fallos propios del test, no del código**: las rutas a `core/ui/...` están TRES
+  niveles arriba de `…/feature/activities/ui`, no cuatro. Corregido con un helper
+  `sharedRoot()`.
+
+### L9 — T6 done (regresión)
+
+- `SwipeMountingTest` — **15 casos, 0 fallos**. El guard de montaje sigue en pie sobre la
+  tarjeta: la lista desliza, la semana desliza y ninguna superficie puede perder el gesto
+  en silencio.
+- Suite completa `--rerun-tasks` — **23 suites / 202 tests / 0 fallos / 0 errores / 0
+  omitidos**. El baseline de este repo antes del cambio era 162; las 40 pruebas nuevas son
+  24 de `CalendarJumpTest` + 3 de `agendaHeaderIndex` + 3 de montaje de swipe + 10 de
+  accesibilidad.
+- No hay regresión de comportamiento: `AgendaTimeline` conserva su firma, el caller de
+  `ActivitiesScreen.kt` sigue siendo único y `onSwipeAction` sigue sin valor por defecto.
+
+### L10 — T7 done (cierre)
+
+- `:shared:compileDebugKotlinAndroid` → 0 líneas `e:`.
+- `:shared:testDebugUnitTest --rerun-tasks` → 23 suites / 202 tests / 0 fallos.
+- `:androidApp:assembleDebug` → **BUILD SUCCESSFUL** (exit 0), APK de 18.8 MB en
+  `androidApp/build/outputs/apk/debug/androidApp-debug.apk`.
+- **Lo que NO está verificado**: el aspecto visual. `adb devices` no lista ningún
+  dispositivo, así que la comparación con el arteboard (tarjetas, hoja de calendario, salto
+  de día) NO se hizo en pantalla. Queda como prueba pendiente para una persona (o un
+  emulador), no como un control pasado.
+- **Risk: item 3** — el cambio toca código que otras superficies ya consumen: la firma de
+  `AgendaTimeline` (la usa la pantalla), el cromo de la barra superior y el guard de
+  montaje del gesto. La mitigación fue la regresión explícita de T6 y el guard de
+  accesibilidad; el control que falta es el visual en dispositivo.
+- **Evaluación nativa (RDD)**: `gentle-ai review mode status` → *on* (global). `assess`
+  sobre el rango comprometido `6a9120f..HEAD` (18 rutas, 3246 líneas — las 2000+ son
+  los HTML del diseño) → riesgo **medium**, `reviewDue: false` ("under_budget"),
+  `writerProfile: large` (runtime), plan: `writerSelfVerification: true`,
+  `independentVerifier: false`, `structuralReadbackOnly: false`. El plan no pide revisor
+  externo ni revisión nativa: el propio cierre con compilación + suite + APK es la
+  verificación. **No se abrió ninguna revisión nativa** (`reviewDue` false ⇒ no hay
+  `inspect`/`START` que hacer).
+- **Fuera de alcance, sin tocar**: el modo SEMANA (pinta igual que antes), la hoja de
+  detalle, el alta de actividades, los adjuntos, el realtime y el backend.
+
+### L11 — desviaciones registradas
+
+1. El título del mes de la hoja usa `formatMonthYear` ("Mayo De 2026"), la convención de
+   copy de la app, en vez del "mayo 2026" en minúsculas del arteboard.
+2. El círculo de "hoy" mide 24dp (`Spacing.xl`), no los 28dp del arteboard: se redondeó al
+   valor de la escala en vez de inventar una medida.
+3. El botón "Confirmar" es un `OutlinedButton` de Material (objetivo táctil real de 48dp),
+   no el botón de 36dp del arteboard.
+4. La etiqueta de categoría del pie NO es pulsable (queda fuera del cuerpo clickeable):
+   el cuerpo es título + hora + límite, como en la fila que reemplaza. El rótulo
+   accesible ya anuncia la categoría.
+5. La lista de la agenda pasa a fondo `surfaceVariant` (las tarjetas son `surface`): sin
+   ese contraste la tarjeta sería invisible.
+
