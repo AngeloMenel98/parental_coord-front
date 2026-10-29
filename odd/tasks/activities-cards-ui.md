@@ -273,7 +273,6 @@ alternatives per the gentle-design skill.
   detalle, el alta de actividades, los adjuntos, el realtime y el backend.
 
 ### L11 — desviaciones registradas
-
 1. El título del mes de la hoja usa `formatMonthYear` ("Mayo De 2026"), la convención de
    copy de la app, en vez del "mayo 2026" en minúsculas del arteboard.
 2. El círculo de "hoy" mide 24dp (`Spacing.xl`), no los 28dp del arteboard: se redondeó al
@@ -285,4 +284,40 @@ alternatives per the gentle-design skill.
    accesible ya anuncia la categoría.
 5. La lista de la agenda pasa a fondo `surfaceVariant` (las tarjetas son `surface`): sin
    ese contraste la tarjeta sería invisible.
+
+### L12 — VERIFICACIÓN EN DISPOSITIVO FÍSICO (la prueba pendiente, CERRADA)
+
+- **Dispositivo**: Xiaomi 24094RAD4G (HyperOS, Android 16, `Europe/Madrid`), conectado
+  por **adb wireless** (`adb pair` + `adb connect`, puerto aleatorio). El `adb install`
+  bloqueado por MIUI (`INSTALL_FAILED_USER_RESTRICTED` → `persist.security.adbinput`
+  vacío) se resolvió instalando el APK a mano desde Descargas; `adb shell input` tampoco
+  sirve (MIUI bloquea `INJECT_EVENTS`), así que la navegación la hizo la persona.
+- **Backend**: `ENV_FILE=.env.prod` en `:3000` contra Supabase (pooler), `db: ok`, health
+  por `http://192.168.0.17:3000/api/health` → 200.
+- **Datos de prueba** creados en la DB de Supabase para poder ver la pantalla con
+  contenido: usuario `ui.prueba@parental.test`, vínculo "Prueba UI Actividades", hija
+  "Martina Prueba" y 4 actividades (29/29/30 oct y 1 nov), todas asignadas a ese usuario
+  para que aparezca el botón "Confirmar".
+- **Lo que se vio en pantalla y coincide con el arteboard 03**: barra superior en `surface`
+  con hairline y los tres íconos (calendario / vista / +); fila de filtros con contadores
+  ("Todos 4 · Eventos 3 · Obligaciones 1"); tarjetas con riel de color de categoría,
+  título, insignia de estado, hora monoespaciada, línea de límite, etiqueta de categoría
+  y botón "Confirmar" con check; encabezado de grupo en minúsculas con "· hoy" en `primary`;
+  pista "Deslizá una tarjeta para completar o posponer".
+- **La hoja de calendario funciona**: mes "Octubre De 2026", encabezado LU…DO, rejilla de
+  lunes a domingo, días de otro mes atenuados, el 29 con disco `primary` (hoy), **puntos
+  de categoría bajo el 29 (verde + azul) y bajo el 30 (rojo)** — es decir, exactamente los
+  días con actividades — y pie con "Hoy" / "Cerrar".
+- **0 errores de app** en logcat (0 `FATAL EXCEPTION`).
+- **Dos cosas que se aclararon y NO son defectos de la app**:
+  1. Las horas (22:00, 23:30…) son correctas: el teléfono y la máquina están en
+     `Europe/Madrid` (CET, +1) y los instantes se pintan en la zona del dispositivo. Mis
+     datos de prueba se sembraron con offset `-03:00` y por eso caen a esa hora.
+  2. "Límite: 31 oct 08:31" sale del BACKEND: el `CreateActivityDto` no lleva `deadline`
+     y el servicio pone un default de `now + 36h` a todas. No es la tarjeta.
+- **Un hallazgo real de UX** (no del mock, de verlo en el teléfono): la actividad del **1
+  de noviembre no se ve en la rejilla de octubre**, porque los días de otro mes están
+  atenuados e inertes (como pedía el arteboard) y no llevan puntos. En pantalla, el
+  calendario parece mentir. Pendiente de decisión: ¿puntos atenuados en los días de otro
+  mes, y/o hacerlos pulsables?
 

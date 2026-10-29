@@ -16,9 +16,16 @@ import kotlinx.serialization.json.Json
 actual object Platform {
     private const val PREFS_NAME = "parental_coordination_prefs"
 
-    // Base URL for Android: emulator uses 10.0.2.2, real device should use production URL
-    actual val baseUrl: String = "http://10.0.2.2:3000/api"
-    actual val wsUrl: String = "ws://10.0.2.2:3000/realtime"
+    // Base URL for Android.
+    //
+    // `10.0.2.2` es el alias que el EMULADOR usa para llegar al host: en un teléfono
+    // físico no existe. Para un dispositivo real en la misma red que esta máquina se
+    // usa la IP LAN del host (aquí `192.168.0.17`, la de la iface `wlp4s0`).
+    //
+    // ⚠ El teléfono y el(host) tienen que estar en la MISMA red, y el cleartext HTTP
+    // necesita permiso: lo da `androidApp/src/androidMain/res/xml/network_security_config.xml`.
+    actual val baseUrl: String = "http://192.168.0.17:3000/api"
+    actual val wsUrl: String = "ws://192.168.0.17:3000/realtime"
 
     private var prefs: SharedPreferences? = null
 
