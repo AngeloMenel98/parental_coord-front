@@ -6,10 +6,12 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CalendarViewWeek
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -269,10 +271,33 @@ private fun ActividadesListScreen(
     val weekStart = parseIsoDate(weekStartIso) ?: mondayStart(today)
     val selectedDate = parseIsoDate(selectedDateIso) ?: today
 
+    // T4 (S3) · Estado de la hoja de calendario y del salto de día.
+    // `showCalendar` es `rememberSaveable`: sobrevive a la rotación con la hoja abierta.
+    var showCalendar by rememberSaveable { mutableStateOf(false) }
+    // El mes visible es una FECHA (cadena ISO), no un `LocalDate`: `LocalDate` no es
+    // `Saveable` y la hoja debe reabrirse en el mismo mes tras rotar.
+    var visibleMonthIso by rememberSaveable { mutableStateOf(today.toString()) }
+    val calendarSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    // El destino del salto se guarda un instante y lo consume un `LaunchedEffect`: el
+    // índice del encabezado depende de los grupos, que pueden cambiar con los datos.
+    var pendingJumpDate by remember { mutableStateOf<LocalDate?>(null) }
+    // En modo Semana, el día elegido en la hoja es una SELECCIÓN EXPRESA: no la puede
+    // pisar la regla que re-resuelve el día al cambiar de semana. Se guarda un instante
+    // y se aplica DESPUÉS de esa regla (los dos `LaunchedEffect` corren en orden de
+    // declaración), así que la última palabra es la del usuario.
+    var pendingWeekSelection by remember { mutableStateOf<LocalDate?>(null) }
+    val listState = rememberLazyListState()
+
     val filteredRows = remember(uiState.actividades, uiState.selectedTab, zone) {
         buildTimelineRows(filterActivities(uiState.actividades, uiState.selectedTab), zone)
     }
     val agendaGroups = remember(filteredRows) { buildAgendaGroups(filteredRows) }
+    // Los puntos se calculan una vez por lista Y por catálogo de categorías: si las
+    // actividades llegan antes que las categorías, un `remember` con sólo la lista
+    // dejaría los puntos en `outline` para siempre.
+    val dayDots = remember(filteredRows, uiState.categories) {
+        buildDayDots(filteredRows, resolve)
+    }
     val weekDates = remember(weekStart) { buildWeekDates(weekStart) }
     val dayBuckets = remember(filteredRows, weekDates) {
         weekDates.associateWith { date -> buildDayBucket(date, filteredRows) }
@@ -357,6 +382,20 @@ private fun ActividadesListScreen(
                         actionIconContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
                     ),
                     actions = {
+                        // T4 (S3) · El ícono de calendario abre la hoja con los días que
+                        // tienen actividades. Se abre SIEMPRE en el mes de la fecha
+                        // seleccionada, para que "Hoy" y el mes no se contradigan.
+                        IconButton(
+                            onClick = {
+                                visibleMonthIso = selectedDate.toString()
+                                showCalendar = true
+                            },
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.DateRange,
+                                contentDescription = "Abrir calendario para saltar a un día",
+                            )
+                        }
                         // El control segmentado de "Vista" se fue: ahora es un ícono.
                         // En modo Agenda ofrece la semana; en modo Semana, la lista.
                         IconButton(
@@ -421,7 +460,6 @@ private fun ActividadesListScreen(
                 onSelectTab = onSelectTab,
                 counts = tabCounts(uiState.actividades),
             )
-
             when {
                 uiState.isLoading && uiState.actividades.isEmpty() -> ListSkeleton()
                 uiState.listError != null -> EmptyState(
@@ -472,10 +510,61 @@ private fun ActividadesListScreen(
                         onPreviousWeek = { navigateWeek(-1) },
                         onNextWeek = { navigateWeek(1) },
                         focusRequesters = focusRequesters,
+                        listState = listState,
                     )
                 }
             }
         }
+        }
+
+        // T4 (S3) · La hoja de calendario se compone como HERMANA del Scaffold, dentro
+        // de la misma `Box` que la lista. Es una ventana modal real: su scrim cubre el
+        // feed y el árbol accesible queda acotado por ella (mismo patrón que la hoja de
+        // detalle, que vive un nivel más arriba).
+        if (showCalendar) {
+            LaunchedEffect(Unit) { calendarSheetState.show() }
+            CalendarJumpSheet(
+                sheetState = calendarSheetState,
+                today = today,
+                visibleMonth = parseIsoDate(visibleMonthIso) ?: today,
+                onMonthChange = { visibleMonthIso = it.toString() },
+                // Los puntos son de los días con actividades DEL FILTRO ACTIVO: si el
+                // usuario está en "Eventos", la hoja muestra los días con eventos.
+                dayDots = dayDots,
+                onSelectDate = { date ->
+                    showCalendar = false
+                    if (timelineMode == TimelineMode.SEMANA) {
+                        // En modo Semana el día elegido SE SELECCIONA: la semana se
+                        // reancla a ese día y la vista muestra su agenda.
+                        onWeekStartChange(mondayStart(date).toString())
+                        pendingWeekSelection = date
+                    } else {
+                        // En modo Agenda el día elegido es un SALTO: la lista se
+                        // desplaza al encabezado de ese día (o al grupo más cercano
+                        // hacia adelante, si ese día no tiene actividades).
+                        pendingJumpDate = jumpTargetDate(date, agendaGroups)
+                    }
+                },
+                onDismiss = { showCalendar = false },
+            )
+        }
+
+        // El salto se APLICA cuando ya se sabe el índice del encabezado: los grupos
+        // dependen de los datos, que pueden llegar después del toque.
+        LaunchedEffect(pendingJumpDate, agendaGroups) {
+            val target = pendingJumpDate ?: return@LaunchedEffect
+            val index = agendaHeaderIndex(agendaGroups, target)
+            if (index != null) listState.scrollToItem(index)
+            pendingJumpDate = null
+        }
+
+        // La selección expresa de la hoja se aplica DESPUÉS de la regla que re-resuelve
+        // el día al cambiar de semana. Este efecto está declarado después de aquél a
+        // propósito: en el mismo frame, el orden de ejecución es el orden de declaración.
+        LaunchedEffect(pendingWeekSelection, weekStartIso) {
+            val picked = pendingWeekSelection ?: return@LaunchedEffect
+            onSelectedDateChange(picked.toString())
+            pendingWeekSelection = null
         }
     }
 }
@@ -501,6 +590,7 @@ private fun TimelineContent(
     onPreviousWeek: () -> Unit,
     onNextWeek: () -> Unit,
     focusRequesters: MutableMap<String, FocusRequester>,
+    listState: androidx.compose.foundation.lazy.LazyListState,
 ) {
     // R4-T5-4 · SITIO 1 de 2. `Crossfade` (no `AnimatedContent`: es experimental
     // en CMP 1.7.1 y añadiría un `@OptIn`, contra la disciplina de DD-2). El
@@ -529,6 +619,7 @@ private fun TimelineContent(
                 // `AgendaTimeline` ni siquiera compila.
                 onSwipeAction = onSwipeAction,
                 focusRequesters = focusRequesters,
+                listState = listState,
             )
 
             TimelineMode.SEMANA -> WeekTimeline(

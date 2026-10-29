@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -63,6 +64,7 @@ internal fun AgendaTimeline(
      */
     onSwipeAction: (String, SwipeAction) -> Unit,
     focusRequesters: MutableMap<String, FocusRequester>,
+    listState: LazyListState,
 ) {
     val today = remember(zone) { currentDateIn(zone) }
     Box(
@@ -72,6 +74,7 @@ internal fun AgendaTimeline(
         contentAlignment = Alignment.TopCenter,
     ) {
         LazyColumn(
+            state = listState,
             modifier = Modifier
                 .fillMaxWidth()
                 .widthIn(max = Spacing.maxContentWidth),

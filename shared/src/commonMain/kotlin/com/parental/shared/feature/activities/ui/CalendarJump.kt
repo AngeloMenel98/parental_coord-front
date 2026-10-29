@@ -29,6 +29,14 @@ import kotlinx.datetime.plus
 internal const val MAX_DAY_DOTS = 3
 
 /**
+ * Ítems que preceden al primer encabezado del feed: la pista "Deslizá una tarjeta…".
+ *
+ * Vive aquí —y no en `AgendaList.kt`— porque el índice del encabezado se cuenta en las dos
+ * capas, y una constante en una sola es la única forma de que no se separen.
+ */
+internal const val AGENDA_HINT_ITEMS = 1
+
+/**
  * Celdas del mes en grilla de lunes a domingo.
  *
  * Devuelve fechas REALES —incluidas las del mes anterior y del siguiente que completan
@@ -97,6 +105,25 @@ internal fun jumpTargetDate(date: LocalDate, groups: List<AgendaGroup>): LocalDa
     if (dated.contains(date)) return date
     return dated.filter { it > date }.minOrNull()
         ?: dated.filter { it < date }.maxOrNull()
+}
+
+/**
+ * Índice del encabezado de un día dentro de la lista del feed, o `null` si ese día no
+ * tiene grupo.
+ *
+ * El feed de la agenda es una `LazyColumn` con esta forma:
+ * `[pista, encabezado, tarjetas…, encabezado, tarjetas…]`. El índice se cuenta sobre ESA
+ * forma, y [AGENDA_HINT_ITEMS] (la pista) está aquí para que el número y la lista no
+ * puedan separarse: la prueba de `CalendarJumpTest` fija el índice ABSOLUTO, así que
+ * quitar la pista sin actualizar esta cuenta rompe la prueba, no el scroll.
+ */
+internal fun agendaHeaderIndex(groups: List<AgendaGroup>, date: LocalDate): Int? {
+    var index = AGENDA_HINT_ITEMS
+    groups.forEach { group ->
+        if (group.date == date) return index
+        index += 1 + group.rows.size
+    }
+    return null
 }
 
 /** Contadores de las pestañas de filtro, derivados de la lista YA cargada (S5). */

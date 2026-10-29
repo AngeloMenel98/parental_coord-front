@@ -185,6 +185,33 @@ class CalendarJumpTest {
         assertEquals(setOf(LocalDate(2026, 5, 12), LocalDate(2026, 5, 13)), dots.keys)
     }
 
+    // ── S3 · agendaHeaderIndex ───────────────────────────────────────────
+
+    @Test
+    fun `el indice del encabezado cuenta la pista y las tarjetas previas`() {
+        val groups = listOf(
+            AgendaGroup(LocalDate(2026, 5, 12), listOf(row("a"), row("b"))),
+            AgendaGroup(LocalDate(2026, 5, 13), listOf(row("c"))),
+            AgendaGroup(null, listOf(row("d"))),
+        )
+
+        // La lista del feed es: [pista, encabezado, tarjetas…, encabezado, tarjetas…].
+        assertEquals(1, agendaHeaderIndex(groups, LocalDate(2026, 5, 12)))
+        assertEquals(4, agendaHeaderIndex(groups, LocalDate(2026, 5, 13)))
+    }
+
+    @Test
+    fun `un dia que no tiene grupo no tiene encabezado`() {
+        val groups = listOf(AgendaGroup(LocalDate(2026, 5, 12), listOf(row("a"))))
+
+        assertNull(agendaHeaderIndex(groups, LocalDate(2026, 5, 20)))
+    }
+
+    @Test
+    fun `una lista sin grupos no tiene ningun encabezado`() {
+        assertNull(agendaHeaderIndex(emptyList(), LocalDate(2026, 5, 12)))
+    }
+
     // ── S3 · jumpTargetDate ───────────────────────────────────────────────
 
     @Test
