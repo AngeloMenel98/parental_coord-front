@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Actividades · Dirección 02 — Un día a la vez</title>
+<style>
+  :root {
+    --primary: #00696D; --on-primary: #FFFFFF;
+    --primary-container: #9CF1F6; --on-primary-container: #002022;
+    --secondary-container: #CCE8EA; --on-secondary-container: #051F21;
+    --surface: #FAFDFC; --on-surface: #191C1D;
+    --surface-variant: #DAE4E5; --on-surface-variant: #3F4849;
+    --outline: #6F797A; --outline-variant: #BEC8C9;
+    --serif: Georgia, 'Times New Roman', serif;
+    --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    --mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: var(--sans); background: #E4ECEC; min-height: 100vh; display: flex; justify-content: center; padding: 24px 0; }
+  .phone { width: 390px; min-height: 844px; background: var(--surface); color: var(--on-surface); display: flex; flex-direction: column; border-radius: 24px; overflow: hidden; box-shadow: 0 8px 32px rgba(0,32,34,.18); position: relative; }
+  button { font-family: inherit; }
+  :focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 4px; }
+
+  /* ── Cabecera de mes + tira de semana ── */
+  .month-bar { display: flex; align-items: baseline; padding: 20px 16px 8px; flex: none; }
+  .month-bar h1 { font-family: var(--serif); font-size: 24px; font-weight: 400; flex: 1; }
+  .month-nav { display: flex; gap: 4px; }
+  .mini-btn { width: 40px; height: 40px; border: 0; background: transparent; border-radius: 50%; color: var(--on-surface-variant); cursor: pointer; font-size: 16px; }
+  .mini-btn:hover { background: rgba(0,105,109,.06); }
+  .week-strip { display: flex; padding: 4px 12px 12px; gap: 4px; flex: none; }
+  .day-cell { flex: 1; border: 0; background: none; cursor: pointer; padding: 6px 0 8px; border-radius: 16px; display: flex; flex-direction: column; align-items: center; gap: 4px; color: var(--on-surface-variant); }
+  .day-cell .dow { font-size: 11px; font-weight: 500; font-variant: small-caps; letter-spacing: .5px; }
+  .day-cell .num { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 50%; font-size: 16px; font-weight: 500; color: var(--on-surface); }
+  .day-cell.today .num { border: 1px solid var(--primary); color: var(--primary); }
+  .day-cell[aria-pressed="true"] .num { background: var(--primary); color: var(--on-primary); border: 0; }
+  .day-cell .dots { display: flex; gap: 2px; height: 8px; align-items: center; }
+  .day-cell .dots i { width: 6px; height: 6px; border-radius: 50%; }
+  .day-cell:hover { background: rgba(0,105,109,.05); }
+
+  /* ── Filtros compactos ── */
+  .filters { display: flex; gap: 8px; padding: 0 16px 12px; flex: none; }
+  .fchip { height: 32px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--outline); background: transparent; font-size: 14px; color: var(--on-surface-variant); cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+  .fchip[aria-pressed="true"] { background: var(--secondary-container); border-color: transparent; color: var(--on-secondary-container); font-weight: 500; }
+  .fchip .count { font-size: 11px; background: rgba(0,32,34,.08); border-radius: 8px; padding: 0 6px; line-height: 16px; }
+
+  /* ── Agenda del día con nodos ── */
+  .day-agenda { flex: 1; overflow-y: auto; padding: 4px 16px 96px; }
+  .day-title { font-size: 14px; font-weight: 600; color: var(--on-surface-variant); padding: 4px 0 12px; }
+  .tl { position: relative; }
+  .tl::before { content: ""; position: absolute; left: 51px; top: 8px; bottom: 8px; width: 1px; background: var(--outline); }
+  .ev { display: flex; align-items: flex-start; gap: 12px; padding: 8px 0; }
+  .ev .time { width: 40px; flex: none; text-align: right; font-family: var(--mono); font-size: 12px; font-weight: 500; letter-spacing: .5px; color: var(--on-surface-variant); padding-top: 12px; }
+  .ev .disc { width: 40px; height: 40px; flex: none; border-radius: 50%; display: grid; place-items: center; color: #fff; position: relative; z-index: 1; }
+  .ev .disc svg { width: 20px; height: 20px; }
+  .ev .card { flex: 1; min-width: 0; background: #fff; border: 1px solid var(--outline-variant); border-radius: 12px; padding: 10px 12px; cursor: pointer; }
+  .ev .card:hover { background: rgba(0,105,109,.04); }
+  .ev .card h3 { font-size: 16px; font-weight: 500; line-height: 24px; }
+  .ev .card .sub { font-size: 12px; color: var(--on-surface-variant); margin-top: 2px; }
+  .ev .actions { display: flex; gap: 8px; margin-top: 8px; align-items: center; }
+  .status-inline { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 500; }
+  .status-inline i { width: 8px; height: 8px; border-radius: 50%; }
+  .confirm { border: 0; background: var(--primary); color: var(--on-primary); font-size: 12px; font-weight: 500; border-radius: 12px; min-height: 36px; padding: 0 12px; cursor: pointer; margin-left: auto; display: inline-flex; align-items: center; gap: 4px; }
+  .done-card h3 { color: var(--on-surface-variant); font-weight: 400; text-decoration: line-through; text-decoration-color: var(--outline-variant); }
+
+  .undated { margin-top: 16px; border: 1px solid var(--outline-variant); border-radius: 12px; background: #fff; overflow: hidden; }
+  .undated summary { list-style: none; cursor: pointer; padding: 12px; display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; color: var(--on-surface-variant); }
+  .undated summary::-webkit-details-marker { display: none; }
+  .undated summary .caret { margin-left: auto; transition: transform 150ms; }
+  .undated[open] summary .caret { transform: rotate(90deg); }
+  .undated .item { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--outline-variant); font-size: 14px; cursor: pointer; }
+  .undated .item:hover { background: rgba(0,105,109,.04); }
+  .undated .item i { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+
+  /* ── FAB + Nav ── */
+  .fab { position: absolute; right: 16px; bottom: 76px; width: 56px; height: 56px; border-radius: 16px; border: 0; background: var(--primary); color: var(--on-primary); display: grid; place-items: center; cursor: pointer; box-shadow: 0 4px 12px rgba(0,32,34,.3); }
+  .fab:hover { background: #005557; }
+  .navbar { flex: none; display: flex; border-top: 1px solid var(--outline-variant); background: var(--surface); }
+  .nav-item { flex: 1; border: 0; background: none; padding: 8px 0 12px; font-size: 12px; color: var(--on-surface-variant); cursor: pointer; }
+  .nav-item svg { display: block; margin: 0 auto 2px; }
+  .nav-item .pill { display: inline-block; padding: 3px 16px; border-radius: 16px; }
+  .nav-item[aria-current="page"] { color: var(--primary); font-weight: 600; }
+  .nav-item[aria-current="page"] .pill { background: var(--primary-container); }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .day-cell, .card, .item, .fab { transition: background 150ms; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .undated summary .caret { transition: none; }
+  }
+</style>
+</head>
+<body>
+<div class="phone">
+  <div class="month-bar">
+    <h1>mayo 2026</h1>
+    <div class="month-nav">
+      <button class="mini-btn" aria-label="Semana anterior">‹</button>
+      <button class="mini-btn" aria-label="Semana siguiente">›</button>
+    </div>
+  </div>
+
+  <div class="week-strip" role="group" aria-label="Semana del 11 al 17 de mayo">
+    <button class="day-cell" aria-pressed="false"><span class="dow">lun</span><span class="num">11</span><span class="dots"><i style="background:#3F51B5"></i></span></button>
+    <button class="day-cell today" aria-pressed="true"><span class="dow">mar</span><span class="num">12</span><span class="dots"><i style="background:#D81B60"></i><i style="background:#3F51B5"></i><i style="background:#F4511E"></i></span></button>
+    <button class="day-cell" aria-pressed="false"><span class="dow">mié</span><span class="num">13</span><span class="dots"><i style="background:#8E24AA"></i><i style="background:#00897B"></i></span></button>
+    <button class="day-cell" aria-pressed="false"><span class="dow">jue</span><span class="num">14</span><span class="dots"></span></button>
+    <button class="day-cell" aria-pressed="false"><span class="dow">vie</span><span class="num">15</span><span class="dots"><i style="background:#E53935"></i></span></button>
+    <button class="day-cell" aria-pressed="false"><span class="dow">sáb</span><span class="num">16</span><span class="dots"><i style="background:#F4511E"></i></span></button>
+    <button class="day-cell" aria-pressed="false"><span class="dow">dom</span><span class="num">17</span><span class="dots"></span></button>
+  </div>
+
+  <div class="filters" role="group" aria-label="Filtrar">
+    <button class="fchip" aria-pressed="true">Todos <span class="count">7</span></button>
+    <button class="fchip" aria-pressed="false">Eventos <span class="count">4</span></button>
+    <button class="fchip" aria-pressed="false">Obligaciones <span class="count">3</span></button>
+  </div>
+
+  <main class="day-agenda">
+    <p class="day-title">Hoy, martes 12 de mayo</p>
+    <div class="tl">
+      <div class="ev">
+        <span class="time">09:30</span>
+        <span class="disc" style="background:#D81B60" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg></span>
+        <div class="card" tabindex="0" role="button" aria-label="09:30, Turno con el pediatra, Salud, Asignada. Acción disponible: confirmar">
+          <h3>Turno con el pediatra</h3>
+          <p class="sub">Salud · Consultorio Ramos Mejía</p>
+          <div class="actions">
+            <span class="status-inline" style="color:#1565C0"><i style="background:#1E88E5"></i>Asignada</span>
+            <button class="confirm">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+              Confirmar
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="ev">
+        <span class="time">11:00</span>
+        <span class="disc" style="background:#3F51B5" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg></span>
+        <div class="card done-card" tabindex="0" role="button" aria-label="11:00, Entrega de la libreta de comunicaciones, Educación, Cumplida">
+          <h3>Entrega de la libreta de comunicaciones</h3>
+          <p class="sub">Educación</p>
+          <div class="actions">
+            <span class="status-inline" style="color:#2E7D32"><i style="background:#43A047"></i>Cumplida</span>
+          </div>
+        </div>
+      </div>
+      <div class="ev">
+        <span class="time">17:30</span>
+        <span class="disc" style="background:#F4511E" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 17.27 18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg></span>
+        <div class="card" tabindex="0" role="button" aria-label="17:30, Clase de natación, Recreación, En progreso">
+          <h3>Clase de natación</h3>
+          <p class="sub">Recreación · Límite: hoy 16:00</p>
+          <div class="actions">
+            <span class="status-inline" style="color:#BF360C"><i style="background:#E65100"></i>En progreso</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <details class="undated">
+      <summary>
+        Sin fecha de inicio
+        <span class="status-inline" style="color:#5D4037"><i style="background:#8D6E63"></i>2</span>
+        <span class="caret" aria-hidden="true">›</span>
+      </summary>
+      <div class="item" tabindex="0" role="button" aria-label="Renovar el carnet del club, Otros, Creada"><i style="background:#8D6E63"></i>Renovar el carnet del club</div>
+      <div class="item" tabindex="0" role="button" aria-label="Vacuna antigripal, Salud, Creada"><i style="background:#D81B60"></i>Vacuna antigripal</div>
+    </details>
+  </main>
+
+  <button class="fab" aria-label="Nueva actividad">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+  </button>
+
+  <nav class="navbar" aria-label="Navegación principal">
+    <button class="nav-item"><span class="pill"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg></span>Inicio</button>
+    <button class="nav-item" aria-current="page"><span class="pill"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M19 4h-1V2h-2v2H8V2H6v2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2zm0 16H5V10h14v10zM5 8V6h14v2H5z"/></svg></span>Actividades</button>
+    <button class="nav-item"><span class="pill"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M21 7H3a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h18a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2zm-2 8a2 2 0 1 1 0-4 2 2 0 0 1 0 4z"/></svg></span>Gastos</button>
+    <button class="nav-item"><span class="pill"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16 11c1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3 1.34 3 3 3zm-8 0c1.66 0 3-1.34 3-3S9.66 5 8 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5C15 14.17 10.33 13 8 13zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg></span>Terceros</button>
+  </nav>
+</div>
+</body>
+</html>

@@ -1,0 +1,27 @@
+{
+  "title": "Actividades — mejoras de UI/UX",
+  "brief": "Tres direcciones para mejorar la UI/UX de la pantalla Actividades (agenda de actividades de una app de coordinación parental, Kotlin Multiplatform, Android primero). Parten de la anatomía actual: TopAppBar con alta, controles Vista/Filtrar, lista agenda con riel y punto de categoría, chips de categoría/estado, nav inferior.",
+  "artboards": [
+    {
+      "file": "01-pulido-evolutivo.html",
+      "title": "Pulido evolutivo",
+      "tradeoff": "Mantiene la estructura actual: quita los rótulos Vista/Filtrar (gana ~64dp verticales), reemplaza la columna de fecha por encabezados de día pegajosos en serif y añade contadores a los filtros. Cambio acotado y sin curva de aprendizaje, pero la ganancia de jerarquía es modesta y la densidad apenas mejora.",
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "02-un-dia-a-la-vez.html",
+      "title": "Un día a la vez",
+      "tradeoff": "Tira de semana con puntos de categoría + agenda del día seleccionado con discos de 40dp y FAB para el alta. Lectura por día rapidísima y timeline real con horas; pierde la vista continua de varios días y exige un toque más para comparar entre días.",
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "03-tarjetas-a-la-vista.html",
+      "title": "Tarjetas a la vista",
+      "tradeoff": "Una tarjeta por actividad con riel de color de categoría, estado siempre visible arriba a la derecha y acciones inline (Confirmar). El ícono de calendario abre una hoja con el mes y puntos de categoría en los días con actividades para saltar a cualquier día. Máxima escaneabilidad de estado y menos toques para la acción principal; a cambio, más peso visual y menos ítems por pantalla que la lista actual.",
+      "width": 390,
+      "height": 844
+    }
+  ]
+}

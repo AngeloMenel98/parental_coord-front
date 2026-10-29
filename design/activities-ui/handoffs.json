@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "chosen": "03-tarjetas-a-la-vista.html",
+  "handoffs": {
+    "03-tarjetas-a-la-vista.html": {
+      "status": "in_progress",
+      "queued": false,
+      "sentAt": "2026-10-29T16:23:01.958Z",
+      "startedAt": "2026-10-29T16:25:44.819Z",
+      "implementedAt": null,
+      "note": "Implementing 03 in Compose as ODD feature activities-cards-ui (cards + calendar day-jump sheet)."
+    }
+  }
+}
