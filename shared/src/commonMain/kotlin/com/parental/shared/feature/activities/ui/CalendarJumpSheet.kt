@@ -214,7 +214,10 @@ private fun CalendarDayCell(
             .height(AgendaGeometry.touchTargetLegacy)
             .clip(MaterialTheme.shapes.small)
             .clickable(onClick = onClick)
-            .semantics { contentDescription = label },
+            // `mergeDescendants`: el número del día y los puntos son parte de la MISMA
+            // celda. Sin fusionar, TalkBack anunciaría la celda ("martes 12 de mayo, 3
+            // actividades…") y ADEMÁS el número suelto ("12") en dos nodos distintos.
+            .semantics(mergeDescendants = true) { contentDescription = label },
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
