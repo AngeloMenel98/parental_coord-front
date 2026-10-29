@@ -15,7 +15,7 @@ Source: `shared/src/commonMain/kotlin/com/parental/shared/core/ui/theme/Color.kt
 | --- | --- | --- |
 | `primary` | `#00696D` | Filled buttons, selected states, active nav indicator |
 | `onPrimary` | `#FFFFFF` | Text/icons on `primary` |
-| `primaryContainer` | `#9CF1F6` | TopAppBar container, selected chip containers |
+| `primaryContainer` | `#9CF1F6` | Selected chip containers |
 | `onPrimaryContainer` | `#002022` | Text on `primaryContainer` |
 | `secondary` | `#4A6365` | Secondary actions |
 | `secondaryContainer` | `#CCE8EA` | Tonal surfaces |
@@ -99,7 +99,13 @@ Sources: `shared/src/commonMain/kotlin/com/parental/shared/core/ui/components/`
 - **TagDot** (`TagDot.kt`): filled circle, `CircleShape`.
 - **BottomNavBar** (`BottomNavBar.kt`): 4 items — Inicio, Actividades, Gastos, Terceros (M3 `NavigationBar`).
 - **Agenda row** (`feature/activities/ui/AgendaTimelineRow.kt` + `ActivityBody.kt`): 48dp date column (day `titleMedium` SemiBold over abbreviated month `labelSmall`), 1dp `outline` timeline line, 14dp category dot, body = mono time + `bodyLarge` title (Medium, 2-line ellipsis; Done rows dim to `onSurfaceVariant`), optional deadline line, meta chips (`CategoryBadge` + `StatusTag`), `ConfirmarChip` sibling of the body (never inside the clickable area), `›` chevron when not confirmable.
-- **Chrome** (`feature/activities/ui/CalendarChrome.kt`): "Vista" label + segmented Agenda/Semana, "Filtrar" label + `FilterChip`s (Todos / Eventos / Obligaciones), content capped at 640dp, horizontal padding 16.
+- **Chrome** (`feature/activities/ui/ActivityFilters.kt` + `ActivitiesScreen.kt`): the
+  top bar is `surface` with a 1dp `outlineVariant` hairline underneath; its actions are the
+  view toggle (calendar-week icon ⇄ list icon) and "+". The filters are ONE horizontal
+  row of `FilterChip`s — Todos / Eventos / Obligaciones — each with the count taken from
+  the loaded list (`tabCounts`), horizontally scrollable. The old "Vista" segmented
+  control and the "Vista" / "Filtrar" labels are gone: the view switch is the top-bar
+  icon. Content capped at 640dp, horizontal padding 16.
 - **EmptyState** (`CalendarChrome.kt`): `EventBusy` icon (decorative) + `titleMedium` title + optional body + optional button; one semantics node, action outside.
 - **ListSkeleton** (`CalendarChrome.kt`): 4 static cards, `surfaceVariant` blocks, reuses the real timeline line.
 - Accessibility contract: merged row semantics, decorative icons cleared, color never the only signal (weight + label carry status), touch targets ≥ 44dp (48 in new work), WCAG AA pairs verified in source comments.

@@ -24,68 +24,16 @@ import com.parental.shared.core.ui.theme.Spacing
  * fue lo que dejó a T4 cumplir su promesa de delta cero; por eso el colapso es una
  * tarea aparte y no una limpieza de paso.
  *
+ * 🪓 2026-10-29 — `TimelineControls` se fue a `ActivityFilters.kt` (T3 de
+ * `odd/tasks/activities-cards-ui.md`, S5). El control segmentado de "Vista" y los dos
+ * rótulos ("Vista" y "Filtrar") desaparecieron: el cambio de vista es ahora un ícono de
+ * la barra superior y los filtros son una línea de chips con contador. Con el bloque
+ * fuera, este archivo vuelve a tener aire bajo su techo de 220.
+ *
  * ADOPCIÓN DE TOKENS — sólo nombres, ningún valor cambia; cada valor sigue siendo de su
  * tarea. Este archivo queda SIN HOLGURA contra su techo de 220: lo que quepa en otro
  * sitio, va en otro sitio.
  */
-
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
-@Composable
-internal fun TimelineControls(
-    mode: TimelineMode,
-    onModeChange: (TimelineMode) -> Unit,
-    selectedTab: ActivityTab,
-    onSelectTab: (ActivityTab) -> Unit,
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .widthIn(max = Spacing.maxContentWidth)
-            .padding(horizontal = Spacing.lg, vertical = Spacing.sm),
-        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-    ) {
-        Text(
-            text = "Vista",
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-            TimelineMode.entries.forEachIndexed { index, timelineMode ->
-                SegmentedButton(
-                    selected = mode == timelineMode,
-                    onClick = { onModeChange(timelineMode) },
-                    shape = SegmentedButtonDefaults.itemShape(
-                        index = index,
-                        count = TimelineMode.entries.size,
-                    ),
-                    modifier = Modifier.heightIn(min = AgendaGeometry.touchTargetLegacy),
-                ) {
-                    Text(timelineMode.label)
-                }
-            }
-        }
-
-        Text(
-            text = "Filtrar",
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        FlowRow(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-            verticalArrangement = Arrangement.spacedBy(Spacing.xs),
-        ) {
-            ActivityTab.entries.forEach { tab ->
-                FilterChip(
-                    selected = selectedTab == tab,
-                    onClick = { onSelectTab(tab) },
-                    label = { Text(tab.label) },
-                    modifier = Modifier.heightIn(min = AgendaGeometry.touchTargetLegacy),
-                )
-            }
-        }
-    }
-}
 
 /**
  * Los TRES estados vacíos/error del calendario, en un solo composable — `R3-T5-3`.

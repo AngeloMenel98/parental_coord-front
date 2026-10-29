@@ -9,6 +9,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CalendarViewWeek
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -21,6 +23,7 @@ import androidx.compose.ui.semantics.contentDescription
 import com.parental.shared.core.ui.components.BottomNavBar
 import com.parental.shared.core.ui.components.CategoryInfo
 import com.parental.shared.core.ui.theme.MotionTokens
+import com.parental.shared.core.ui.theme.Spacing
 import com.parental.shared.feature.activities.domain.model.canConfirm
 import com.parental.shared.feature.activities.ui.detail.ActividadDetailSheet
 import com.parental.shared.feature.activities.ui.create.CreateActivitySheet
@@ -342,23 +345,59 @@ private fun ActividadesListScreen(
     ) {
         Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("Actividades") },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                ),
-                actions = {
-                    // T-FE-17 · El "+" abre el modal de alta (`openCreate`). Antes era un
-                    // placeholder inerte (PRD §8); ya no lo es: el backend de `create` existe.
-                    IconButton(onClick = onOpenCreate) {
-                        Icon(
-                            imageVector = Icons.Default.Add,
-                            contentDescription = "Nueva actividad",
-                        )
-                    }
-                },
-            )
+            // T3 (S5) · La barra va en `surface` con un hairline `outlineVariant`
+            // debajo —la del arteboard— en vez del `primaryContainer` de antes. El
+            // contenedor `primaryContainer` queda para los chips seleccionados.
+            Column {
+                TopAppBar(
+                    title = { Text("Actividades") },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        titleContentColor = MaterialTheme.colorScheme.onSurface,
+                        actionIconContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    ),
+                    actions = {
+                        // El control segmentado de "Vista" se fue: ahora es un ícono.
+                        // En modo Agenda ofrece la semana; en modo Semana, la lista.
+                        IconButton(
+                            onClick = {
+                                onTimelineModeChange(
+                                    if (timelineMode == TimelineMode.AGENDA) {
+                                        TimelineMode.SEMANA
+                                    } else {
+                                        TimelineMode.AGENDA
+                                    },
+                                )
+                            },
+                        ) {
+                            Icon(
+                                imageVector = if (timelineMode == TimelineMode.AGENDA) {
+                                    Icons.Filled.CalendarViewWeek
+                                } else {
+                                    Icons.AutoMirrored.Filled.List
+                                },
+                                contentDescription = if (timelineMode == TimelineMode.AGENDA) {
+                                    "Vista: lista. Cambiar a semana"
+                                } else {
+                                    "Vista: semana. Cambiar a lista"
+                                },
+                            )
+                        }
+                        // T-FE-17 · El "+" abre el modal de alta (`openCreate`). Antes era un
+                        // placeholder inerte (PRD §8); ya no lo es: el backend de `create` existe.
+                        IconButton(onClick = onOpenCreate) {
+                            Icon(
+                                imageVector = Icons.Default.Add,
+                                contentDescription = "Nueva actividad",
+                            )
+                        }
+                    },
+                )
+                HorizontalDivider(
+                    thickness = Spacing.hairline,
+                    color = MaterialTheme.colorScheme.outlineVariant,
+                )
+            }
         },
         bottomBar = {
             BottomNavBar(
@@ -375,11 +414,12 @@ private fun ActividadesListScreen(
             modifier = Modifier.fillMaxSize().padding(padding),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            TimelineControls(
-                mode = timelineMode,
-                onModeChange = onTimelineModeChange,
+            // T3 (S5) · Los filtros son UNA línea de chips con contador. Los rótulos
+            // "Vista" y "Filtrar" y el control segmentado se fueron con el nuevo cromo.
+            ActivityFiltersRow(
                 selectedTab = uiState.selectedTab,
                 onSelectTab = onSelectTab,
+                counts = tabCounts(uiState.actividades),
             )
 
             when {
