@@ -196,6 +196,29 @@ class SwipeMountingTest {
         )
     }
 
+    @Test
+    fun `la tarjeta de la lista declara el hueco swipe`() {
+        val firma = declaredParameters(source("ActivityCard.kt"), "ActivityCard")
+        assertTrue(
+            "swipe: @Composable (content: @Composable () -> Unit) -> Unit" in firma,
+            "`ActivityCard` debe declarar el hueco con el tipo exacto de ranura. " +
+                "Firma real:\n$firma",
+        )
+    }
+
+    @Test
+    fun `el hueco de la tarjeta NO lleva valor por defecto`() {
+        val firma = declaredParameters(source("ActivityCard.kt"), "ActivityCard")
+        val linea = firma.lines().firstOrNull { "swipe:" in it }
+        assertTrue(linea != null, "No se encuentra el parámetro `swipe` en:\n$firma")
+        assertFalse(
+            "=" in linea,
+            "🔴 `ActivityCard.swipe` lleva valor por defecto. ESO ES EL DEFECTO: un hueco con " +
+                "default convierte «no monté el gesto» en un `c()` silencioso.\n" +
+                "Firma real:\n$firma",
+        )
+    }
+
     // ── 3 · TODA superficie de fila deslizable pasa el hueco ────────────────────────────
 
     @Test
@@ -207,6 +230,19 @@ class SwipeMountingTest {
                 "swipe =" in site.arguments,
                 "🔴 `${site.callee}()` en ${site.file} NO monta el gesto (falta `swipe =`). " +
                     "Esa superficie se queda sin swipe aunque todo lo demás compile.",
+            )
+        }
+    }
+
+    @Test
+    fun `toda llamada a ActivityCard monta el gesto`() {
+        val sites = callSites("ActivityCard")
+        assertTrue(sites.isNotEmpty(), "No se encontró ninguna llamada a `ActivityCard`")
+        sites.forEach { site ->
+            assertTrue(
+                "swipe =" in site.arguments,
+                "🔴 `${site.callee}()` en ${site.file} NO monta el gesto (falta `swipe =`). " +
+                    "La superficie de la lista se quedaría sin gesto aunque compile.",
             )
         }
     }
@@ -257,10 +293,14 @@ class SwipeMountingTest {
     }
 
     @Test
-    fun `superficie 3 — modo LISTA — AgendaTimeline monta el gesto y la pantalla se lo pasa`() {
-        val list = callSites("AgendaTimelineRow", listOf(File(uiDir, "AgendaList.kt")))
-        assertEquals(1, list.size, "Se esperaba exactamente un sitio de fila en la lista")
-        assertTrue("swipe =" in list.single().arguments, "La fila de la lista no monta el gesto")
+    fun `superficie 3 — modo LISTA — la tarjeta monta el gesto y la pantalla se lo pasa`() {
+        // La lista AGENDA ya no pinta filas: pinta TARJETAS (`ActivityCard`). El guard
+        // sigue siendo el MISMO —"toda superficie deslizable monta el gesto"—, cambia la
+        // pieza que vigila. Debilitarlo (borrarlo) sería dejar la lista sin gesto en
+        // silencio, que es exactamente como se rompió esto la primera vez.
+        val list = callSites("ActivityCard", listOf(File(uiDir, "AgendaList.kt")))
+        assertEquals(1, list.size, "Se esperaba exactamente un sitio de tarjeta en la lista")
+        assertTrue("swipe =" in list.single().arguments, "La tarjeta de la lista no monta el gesto")
         assertTrue("ActivitySwipeBox(" in list.single().arguments, "El hueco no crea la capa de gesto")
 
         // Y el cable de arriba: sin esto el gesto se pintaría pero no dispararía nada.
