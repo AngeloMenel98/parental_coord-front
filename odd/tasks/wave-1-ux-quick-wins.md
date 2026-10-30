@@ -237,9 +237,9 @@ ending the session; both icons are labelled for screen readers and are at least 
 | T06 | Localize relative dates, fix truncated dates | S6 | F | delegated | done | `feat(core): add the shared money and date formatters` |
 | T07 | "Asignada a: [name]" on the activity card | S7 | F | delegated | done | `feat(activities): show the assignee and the children on the card` |
 | T08 | Children on the activity card | S8 | F | delegated | done | `feat(activities): show the assignee and the children on the card` |
-| T09 | Detail sheet: date + time range, children, assignee | S9 | F+B | delegated | pending | — |
-| T10 | Notification copy: Spanish, title ≠ body, capped | S10 | B | delegated | pending | — |
-| T11 | Children filter in Activities | S11 | F | delegated | pending | — |
+| T09 | Detail sheet: date + time range, children, assignee | S9 | F+B | delegated | partial — back done, front pending | `feat(activities): expose the children ids on the activity detail` |
+| T10 | Notification copy: Spanish, title ≠ body, capped | S10 | B | delegated | done | `feat(notifications): rewrite the copy in Spanish with title and body` |
+| T11 | Children filter in Activities | S11 | F | delegated | done | `feat(activities): filter the list by child` |
 | T12 | Global top bar: bell + badge + logout | S12 | F | delegated | pending | — |
 
 ---
@@ -300,3 +300,22 @@ ending the session; both icons are labelled for screen readers and are at least 
   semantic label (the ONE phrase the card announces) grew with the card: it now says
   "Asignada a: …" and "Para: …", so TalkBack reads them with the rest and not as loose
   fragments.
+- **L7 — resumed state, reconciled before writing:** the session resumed with the wave
+  half-landed and uncommitted in both repos. The front working tree carried the whole of
+  T11 (four sources plus two new tests); the back carried the whole of T09-back and T10.
+  The task table above was the authority, not the editor's todo list, which still showed
+  T05–T08 as open after their commits. The pre-existing back dirt (`src/worker.module.ts`,
+  `.atl/skill-registry.md`, `design/`) was left exactly as found and no commit touches it.
+- **L8 — T11 evidence:** the worked tree did NOT compile — the new test file declared
+  `UNUSED_CLIENT` as a class property and used it from `private class` fakes, which cannot
+  see an outer instance, and `FakeBondsApi` read the outer `bondId`. Both now follow the
+  convention the rest of the suite uses: a `private companion object` holding
+  `UNUSED_CLIENT`, and `bondId` passed into the fake. GREEN: 33 suites / 270 tests / 0
+  failures.
+- **L9 — T09-back + T10 evidence:** back focused suite GREEN: 13 suites / 302 tests / 0
+  failures. T10 covers S10 without relying on the reader's eye: the titles are a `const`
+  tuple with a compile-time length assertion, and the spec pins title ≤ 40, body ≤ 100,
+  `title !== body`, and the 80-character-activity-title case. The date rendering pins
+  `America/Argentina/Buenos_Aires` so the server's TZ cannot change the copy. T09 stays
+  PARTIAL on purpose: the back now exposes `childrenIds`, but the front detail sheet still
+  shows only "Asignado a" and neither the time range nor the children.
