@@ -195,6 +195,34 @@ internal fun formatDetailDate(
     return "${ldt.dayOfMonth} ${ES_MONTHS[ldt.monthNumber - 1]} ${ldt.year}"
 }
 
+/**
+ * "Cuándo" del detalle — `"5 ago 2026 · 16:30"`, o el RANGO cuando hay fin programado
+ * ([S9] · D-4): `"5 ago 2026 · 16:30 – 18:00"`, y con el día repetido si el rango cruza
+ * la medianoche (`"5 ago 2026 · 22:00 – 6 ago 2026 · 01:00"`), porque dos horas sin fecha
+ * en un rango que cambia de día dicen menos que nada.
+ *
+ * La fecha sola NO alcanza para D-4: una actividad es un hecho con hora. El separador
+ * `·` y el guion del rango son los del PRD.
+ */
+internal fun formatDetailDateTime(
+    startRaw: String?,
+    endRaw: String? = null,
+    zone: TimeZone = TimeZone.currentSystemDefault(),
+): String? {
+    val start = parseInstant(startRaw)?.toLocalDateTime(zone) ?: return null
+    val head = "${start.dayOfMonth} ${ES_MONTHS[start.monthNumber - 1]} ${start.year} · " +
+        formatTime(start.hour, start.minute)
+    // Un fin ilegible (o ausente) no invalida el inicio: se muestra la hora de comienzo.
+    val end = parseInstant(endRaw)?.toLocalDateTime(zone) ?: return head
+    val tail = if (end.date == start.date) {
+        formatTime(end.hour, end.minute)
+    } else {
+        "${end.dayOfMonth} ${ES_MONTHS[end.monthNumber - 1]} ${end.year} · " +
+            formatTime(end.hour, end.minute)
+    }
+    return "$head – $tail"
+}
+
 internal fun criticalityLabel(criticality: String): String = when (criticality) {
     "critical" -> "Alta"
     "high" -> "Alta"

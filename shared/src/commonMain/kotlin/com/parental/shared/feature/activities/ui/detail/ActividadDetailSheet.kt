@@ -35,8 +35,10 @@ import com.parental.shared.core.ui.theme.SheetGeometry
 import com.parental.shared.core.ui.theme.Spacing
 import com.parental.shared.feature.activities.domain.model.ActividadDetalle
 import com.parental.shared.feature.activities.domain.model.canConfirm
+import com.parental.shared.feature.activities.domain.model.resolveChildNames
 import com.parental.shared.feature.activities.domain.model.visibleDeclinedReason
 import com.parental.shared.feature.activities.ui.*
+import com.parental.shared.feature.bonds.domain.model.VinculoChild
 import kotlinx.coroutines.launch
 
 /*
@@ -95,6 +97,8 @@ internal fun ActividadDetailSheet(
     onRenameAttachment: (String, String, String) -> Unit = { _, _, _ -> },
     onReplaceAttachment: (String, String, String, String, ByteArray) -> Unit = { _, _, _, _, _ -> },
     onDeleteAttachment: (String, String) -> Unit = { _, _ -> },
+    /** S9 · D-5 — hijos del vínculo, para resolver `childrenIds` a nombres. */
+    children: List<VinculoChild> = emptyList(),
 ) {
     val scope = rememberCoroutineScope()
     val closeFocus = remember { FocusRequester() }
@@ -163,6 +167,7 @@ internal fun ActividadDetailSheet(
                             state = state,
                             resolve = resolve,
                             memberNames = memberNames,
+                            children = children,
                             onInertAction = onInertAction,
                             attachments = attachments,
                             onAddAttachment = onAddAttachment,
@@ -227,6 +232,7 @@ private fun DetailContent(
     resolve: (String) -> CategoryInfo?,
     memberNames: Map<String, String>,
     onInertAction: (String) -> Unit,
+    children: List<VinculoChild> = emptyList(),
     attachments: List<ActivityAttachmentDto> = emptyList(),
     onAddAttachment: (String, String, String, ByteArray) -> Unit = { _, _, _, _ -> },
     onRenameAttachment: (String, String, String) -> Unit = { _, _, _ -> },
@@ -237,14 +243,7 @@ private fun DetailContent(
 ) {
     val a = state.actividad
     val isSalud = resolve(a.categoryId)?.name.equals("Salud", ignoreCase = true)
-    // R-7 · Los pares opcionales se OMITEN si no hay valor; sólo "Asignado a" tiene valor por
-    // defecto y "Prioridad" nunca se oculta. Cero guiones suspensivos.
-    val pairs = buildList {
-        formatDetailDate(a.scheduledStart)?.let { add("Fecha" to it) }
-        formatDetailDate(a.deadline)?.let { add("Límite evidencia" to it) }
-        add("Asignado a" to (a.assignedTo?.let { memberNames[it] } ?: "Sin asignar"))
-        add("Prioridad" to criticalityLabel(a.criticality))
-    }
+    val pairs = detailPairs(a, memberNames, children)
     LazyColumn(
         modifier = modifier.fillMaxWidth(),
         contentPadding = PaddingValues(Spacing.lg, Spacing.md, Spacing.lg, Spacing.md),

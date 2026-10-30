@@ -38,4 +38,45 @@ class TimelineFormattersDateTest {
         assertNull(formatDetailDate("no-es-una-fecha", utc))
         assertNull(formatDetailDate(null, utc))
     }
+
+    @Test
+    fun `S9 D4 la fecha del detalle lleva la hora`() {
+        assertEquals(
+            "5 ago 2026 · 16:30",
+            formatDetailDateTime("2026-08-05T16:30:00Z", null, utc),
+        )
+    }
+
+    @Test
+    fun `S9 D4 con fin programado se muestra el rango`() {
+        assertEquals(
+            "5 ago 2026 · 16:30 – 18:00",
+            formatDetailDateTime("2026-08-05T16:30:00Z", "2026-08-05T18:00:00Z", utc),
+        )
+    }
+
+    @Test
+    fun `S9 D4 un rango que cruza la medianoche repite el dia`() {
+        // Dos horas sueltas ("22:00 - 01:00") en un rango que cambia de día no dicen cuándo
+        // termina. El día se repite.
+        assertEquals(
+            "5 ago 2026 · 22:00 – 6 ago 2026 · 01:00",
+            formatDetailDateTime("2026-08-05T22:00:00Z", "2026-08-06T01:00:00Z", utc),
+        )
+    }
+
+    @Test
+    fun `S9 D4 sin inicio no hay par de fecha`() {
+        assertNull(formatDetailDateTime(null, "2026-08-05T18:00:00Z", utc))
+        assertNull(formatDetailDateTime("no-es-una-fecha", null, utc))
+    }
+
+    @Test
+    fun `S9 D4 un fin ilegible no borra el inicio`() {
+        // Degradar a "cuándo empieza" es mejor que perder el par entero.
+        assertEquals(
+            "5 ago 2026 · 16:30",
+            formatDetailDateTime("2026-08-05T16:30:00Z", "no-es-una-fecha", utc),
+        )
+    }
 }

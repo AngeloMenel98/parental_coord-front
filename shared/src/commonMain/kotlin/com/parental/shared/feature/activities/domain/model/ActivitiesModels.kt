@@ -64,6 +64,15 @@ data class ActividadDetalle(
      * al no miembro), no este campo: si llega aquí, ya es del vínculo del usuario.
      */
     val declinedReason: String? = null,
+    /**
+     * S9 · D-5 — ids de los hijos a los que concierne la actividad. El servidor los manda
+     * en el detalle (`ActivityDetailDto.childrenIds`); el nombre se resuelve en el cliente
+     * con `resolveChildNames`, porque `memberNames` mapea MIEMBROS del vínculo, no hijos.
+     *
+     * Con default `emptyList()` un servidor anterior a S9 degrada a "sin hijos" en vez de
+     * romper la deserialización.
+     */
+    val childrenIds: List<String> = emptyList(),
 ) {
     /** Código corto derivado del id (el backend no expone un campo short-id). */
     val code: String get() = "ACT-" + id.take(4).uppercase()

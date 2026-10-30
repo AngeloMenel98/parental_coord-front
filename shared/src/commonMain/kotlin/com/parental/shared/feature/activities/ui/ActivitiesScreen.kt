@@ -176,6 +176,7 @@ fun ActividadesScreen(
                 sheetState = sheetState,
                 resolve = resolve,
                 memberNames = uiState.memberNames,
+                children = uiState.children,
                 snackbarHostState = snackbarHostState,
                 onDismissRequest = { uiState.detail.openedId?.let { viewModel.closeDetail(it) } },
                 onRetry = viewModel::retryDetail,
