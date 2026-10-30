@@ -4,6 +4,7 @@ import com.parental.shared.core.error.onFailure
 import com.parental.shared.core.error.onSuccess
 import com.parental.shared.feature.home.data.remote.HomeApi
 import com.parental.shared.feature.home.domain.model.HomeSummary
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -26,8 +27,9 @@ class HomeViewModel(
     private val homeApi: HomeApi,
     private val token: String,
     private val userName: String,
+    private val dispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private val scope = CoroutineScope(SupervisorJob() + dispatcher)
 
     private val _uiState = MutableStateFlow(HomeUiState(userName = userName))
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
@@ -45,42 +47,17 @@ class HomeViewModel(
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
                         summary = summary,
+                        complianceError = if (summary.bondId != null && summary.compliance == null) {
+                            "No se pudo cargar el cumplimiento"
+                        } else {
+                            null
+                        },
                     )
-                    // Fetch compliance for the first bond
-                    val bondId = summary.bondId
-                    if (bondId != null) {
-                        fetchCompliance(bondId)
-                    }
                 }
                 .onFailure { e ->
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
                         error = e.message ?: "Failed to load home data",
-                    )
-                }
-        }
-    }
-
-    private fun fetchCompliance(bondId: String) {
-        scope.launch {
-            _uiState.value = _uiState.value.copy(
-                complianceLoading = true,
-                complianceError = null,
-            )
-
-            homeApi.getCompliance(bondId, token)
-                .onSuccess { compliance ->
-                    val currentSummary = _uiState.value.summary
-                    _uiState.value = _uiState.value.copy(
-                        complianceLoading = false,
-                        complianceError = null,
-                        summary = currentSummary?.copy(compliance = compliance),
-                    )
-                }
-                .onFailure { e ->
-                    _uiState.value = _uiState.value.copy(
-                        complianceLoading = false,
-                        complianceError = e.message ?: "Failed to load compliance",
                     )
                 }
         }

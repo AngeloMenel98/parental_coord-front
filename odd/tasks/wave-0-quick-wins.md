@@ -117,7 +117,7 @@ submit an end that is not after the start (inline, in Spanish), and sends
 | ID | Task | Specs | Route | Status | Commit |
 |---|---|---|---|---|---|
 | T01 | Remove the "Confirmada" chip from the activity card | S1 | inline | done | `feat(activities): remove the Confirmada chip from the activity card` |
-| T02 | Populate `compliance` in `HomeSummary` | S2 | inline | pending | — |
+| T02 | Populate `compliance` in `HomeSummary` | S2 | delegated | done | `feat(home): carry the compliance inside the home summary` |
 | T03 | `childrenIds` in the front model + child-name resolver | S3 | inline | pending | — |
 | T04 | "Fin programado" in the create form + end-after-start validation | S4 | inline | pending | — |
 
@@ -181,3 +181,19 @@ submit an end that is not after the start (inline, in Spanish), and sends
   (`sdd/activity-swipe-actions`). The branch's diff against `origin/main` also contains the
   33 commits of the swipe program inherited from that base; wave 0's own commits are the
   four work units after `d18ed1e`, one per task.
+- **L7 — T02 evidence:** delegated to `gentle-ai-worker` (bounded surfaces:
+  `feature/home/**` + its `commonTest`); the parent reviewed the diff and ran the suite
+  again. RED: the new tests could not compile — `buildHomeSummary` did not exist, `HomeApi`
+  was final, its constructor did not accept a `BondsApi` and `HomeViewModel` had no
+  dispatcher. GREEN: `HomeApi` is now `open` (like `NotificationsApi`) and takes an
+  injectable `BondsApi`, `getHomeSummary` embeds the compliance of the first bond through
+  the pure `buildHomeSummary(bonds, compliance)`, and the ViewModel no longer makes the
+  second `fetchCompliance` trip. Suite: 26 suites / 220 tests / 0 failures.
+  Two deliberate adjustments by the parent: the worker's out-of-surface edit to
+  `ApiClient.kt` was reverted (the constructor default already injects the same
+  `BondsApi`, so the DI line was noise), and the now-unreachable
+  `complianceLoading → ComplianceCardLoading` branch in `HomeScreen` was **left alone on
+  purpose**: the compliance card's loading state collapsed into the screen's loading
+  state, but `ComplianceCardLoading` is public API of the `shared` framework, and the
+  Home screen's structure changes anyway with the metric cards (T20). The cleanup belongs
+  to that task, not to this one.
