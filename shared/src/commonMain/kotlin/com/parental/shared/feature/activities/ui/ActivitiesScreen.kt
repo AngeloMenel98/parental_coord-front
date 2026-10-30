@@ -223,6 +223,9 @@ fun ActividadesScreen(
                 onAssigneeChange = viewModel::setCreateAssignee,
                 onDateChange = viewModel::setCreateDate,
                 onTimeChange = viewModel::setCreateTime,
+                onEndDateChange = viewModel::setCreateEndDate,
+                onEndTimeChange = viewModel::setCreateEndTime,
+                onClearEnd = viewModel::clearCreateEnd,
                 onSubmit = viewModel::submitCreate,
                 // ⚠ Reintentar = `submitCreate` tal cual: reutiliza el MISMO `createForm` intacto
                 //   (D19), así que el reintento no pierde ni un carácter de lo escrito.

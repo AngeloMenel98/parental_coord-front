@@ -153,6 +153,9 @@ internal fun CreateActivitySheet(
     onAssigneeChange: (String?) -> Unit,
     onDateChange: (LocalDate) -> Unit,
     onTimeChange: (TimeOfDay) -> Unit,
+    onEndDateChange: (LocalDate) -> Unit,
+    onEndTimeChange: (TimeOfDay) -> Unit,
+    onClearEnd: () -> Unit,
     onSubmit: () -> Unit,
     onRetry: () -> Unit,
     onDismissRequest: () -> Unit,
@@ -174,6 +177,8 @@ internal fun CreateActivitySheet(
 
     var showDatePicker by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
+    var showEndDatePicker by remember { mutableStateOf(false) }
+    var showEndTimePicker by remember { mutableStateOf(false) }
     var confirmDiscard by remember { mutableStateOf(false) }
 
     // ⚠ El descarte con cambios pasa por AQUÍ y no por [onDismissRequest] directamente, porque los
@@ -308,6 +313,70 @@ internal fun CreateActivitySheet(
                         modifier = Modifier.fillMaxWidth(),
                     )
 
+                    CreateFieldBlock(
+                        label = "Fin programado",
+                        error = showError(CreateField.END_DATE),
+                    ) {
+                        // 🔴 APILADOS, como "Fecha" y "Hora" del inicio: dos campos de texto
+                        //   con icono en una fila se estrujan en 320dp y el rótulo se corta.
+                        OutlinedTextField(
+                            value = form.endDate?.let(::formatDdMmAaaa).orEmpty(),
+                            onValueChange = {},
+                            label = { Text("Fecha fin") },
+                            placeholder = { Text("dd/mm/aaaa") },
+                            readOnly = true,
+                            // El TEXTO del error lo pinta el bloque ("Fin programado"), una sola
+                            // vez; aquí sólo el estado del campo (borde en `error`).
+                            isError = errorFor(CreateField.END_DATE) != null,
+                            trailingIcon = {
+                                IconButton(
+                                    onClick = {
+                                        touched = touched + CreateField.END_DATE
+                                        showEndDatePicker = true
+                                    },
+                                ) {
+                                    Icon(
+                                        Icons.Filled.CalendarMonth,
+                                        contentDescription = "Elegir fecha fin",
+                                    )
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        OutlinedTextField(
+                            // 🔴 Sin fecha de fin NO hay hora de fin: A-16 dice que la
+                            //   actividad sin fin no muestra fin. Un "10:00" fantasma
+                            //   prometería una hora que no existe.
+                            value = form.endDate?.let { formatTime(form.endTime.hour, form.endTime.minute) }.orEmpty(),
+                            onValueChange = {},
+                            label = { Text("Hora fin") },
+                            readOnly = true,
+                            isError = errorFor(CreateField.END_DATE) != null,
+                            trailingIcon = {
+                                IconButton(
+                                    onClick = {
+                                        touched = touched + CreateField.END_DATE
+                                        showEndTimePicker = true
+                                    },
+                                ) {
+                                    Icon(
+                                        Icons.Filled.Schedule,
+                                        contentDescription = "Elegir hora fin",
+                                    )
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        if (form.endDate != null) {
+                            TextButton(
+                                onClick = {
+                                    onClearEnd()
+                                    touched = touched - CreateField.END_DATE
+                                },
+                            ) { Text("Borrar fin programado") }
+                        }
+                    }
+
                     AssigneeSection(
                         candidates = memberCandidates,
                         selectedId = form.assignedTo,
@@ -380,6 +449,54 @@ internal fun CreateActivitySheet(
             },
             dismissButton = {
                 TextButton(onClick = { showTimePicker = false }) { Text("Cancelar") }
+            },
+        )
+    }
+
+    if (showEndDatePicker) {
+        val pickerState = rememberDatePickerState(
+            initialSelectedDateMillis = form.endDate?.toPickerMillis()
+                ?: form.startDate?.toPickerMillis()
+                ?: todayUtcMillis(),
+            selectableDates = selectableDates,
+        )
+        DatePickerDialog(
+            onDismissRequest = { showEndDatePicker = false },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        pickerState.selectedDateMillis?.let(::pickerMillisToDate)?.let(onEndDateChange)
+                        showEndDatePicker = false
+                    },
+                ) { Text("Aceptar") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showEndDatePicker = false }) { Text("Cancelar") }
+            },
+        ) {
+            DatePicker(state = pickerState)
+        }
+    }
+
+    if (showEndTimePicker) {
+        val timeState = rememberTimePickerState(
+            initialHour = form.endTime.hour,
+            initialMinute = form.endTime.minute,
+        )
+        AlertDialog(
+            onDismissRequest = { showEndTimePicker = false },
+            title = { Text("Hora fin") },
+            text = { TimeInput(state = timeState) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        onEndTimeChange(TimeOfDay(timeState.hour, timeState.minute))
+                        showEndTimePicker = false
+                    },
+                ) { Text("Aceptar") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showEndTimePicker = false }) { Text("Cancelar") }
             },
         )
     }

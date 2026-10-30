@@ -111,4 +111,58 @@ class CreateFormValidationTest {
         assertTrue(set.contains("a"))
         assertTrue(set.contains("b"))
     }
+
+    @Test
+    fun `fin programado igual al inicio es invalido`() {
+        val errors = validateCreateForm(
+            validForm.copy(
+                endDate = kotlinx.datetime.LocalDate(2026, 10, 5),
+                endTime = TimeOfDay(9, 0),
+            ),
+        )
+        assertTrue(errors.any { it.field == CreateField.END_DATE })
+        assertEquals(
+            "El fin programado debe ser posterior al inicio",
+            errors.first { it.field == CreateField.END_DATE }.message,
+        )
+    }
+
+    @Test
+    fun `fin programado anterior al inicio es invalido`() {
+        val errors = validateCreateForm(
+            validForm.copy(
+                endDate = kotlinx.datetime.LocalDate(2026, 10, 5),
+                endTime = TimeOfDay(8, 30),
+            ),
+        )
+        assertTrue(errors.any { it.field == CreateField.END_DATE })
+    }
+
+    @Test
+    fun `fin programado posterior al inicio es valido`() {
+        val errors = validateCreateForm(
+            validForm.copy(
+                endDate = kotlinx.datetime.LocalDate(2026, 10, 5),
+                endTime = TimeOfDay(10, 0),
+            ),
+        )
+        assertTrue(errors.none { it.field == CreateField.END_DATE })
+    }
+
+    @Test
+    fun `fin programado al dia siguiente es valido`() {
+        val errors = validateCreateForm(
+            validForm.copy(
+                endDate = kotlinx.datetime.LocalDate(2026, 10, 6),
+                endTime = TimeOfDay(8, 0),
+            ),
+        )
+        assertTrue(errors.none { it.field == CreateField.END_DATE })
+    }
+
+    @Test
+    fun `sin fin programado no se valida la fecha fin`() {
+        val errors = validateCreateForm(validForm.copy(endDate = null))
+        assertTrue(errors.none { it.field == CreateField.END_DATE })
+    }
 }

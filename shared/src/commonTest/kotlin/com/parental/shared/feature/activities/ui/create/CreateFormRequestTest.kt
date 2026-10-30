@@ -3,7 +3,9 @@ package com.parental.shared.feature.activities.ui.create
 import com.parental.shared.feature.activities.domain.model.CreateActividadRequest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 /**
  * T-FE-07 — construcción del cuerpo del POST (AS-3, D15).
@@ -143,5 +145,39 @@ class CreateFormRequestTest {
 
         val request = form.toRequest()
         assertEquals("event", request.type)
+    }
+
+    @Test
+    fun `scheduledEnd es null cuando no hay fin programado`() {
+        val form = CreateForm(
+            title = "Evento",
+            description = "",
+            categoryId = "cat-x",
+            childrenIds = setOf("c-1"),
+            startDate = kotlinx.datetime.LocalDate(2026, 10, 5),
+            startTime = TimeOfDay(10, 0),
+            endDate = null,
+        )
+
+        val request = form.toRequest()
+        assertNull(request.scheduledEnd)
+    }
+
+    @Test
+    fun `scheduledEnd se envia en ISO con offset Z cuando hay fin programado`() {
+        val form = CreateForm(
+            title = "Evento",
+            description = "",
+            categoryId = "cat-x",
+            childrenIds = setOf("c-1"),
+            startDate = kotlinx.datetime.LocalDate(2026, 10, 5),
+            startTime = TimeOfDay(10, 0),
+            endDate = kotlinx.datetime.LocalDate(2026, 10, 5),
+            endTime = TimeOfDay(11, 0),
+        )
+
+        val request = form.toRequest()
+        assertNotNull(request.scheduledEnd)
+        assertTrue(request.scheduledEnd!!.endsWith("Z"))
     }
 }

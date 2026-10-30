@@ -119,7 +119,7 @@ submit an end that is not after the start (inline, in Spanish), and sends
 | T01 | Remove the "Confirmada" chip from the activity card | S1 | inline | done | `feat(activities): remove the Confirmada chip from the activity card` |
 | T02 | Populate `compliance` in `HomeSummary` | S2 | delegated | done | `feat(home): carry the compliance inside the home summary` |
 | T03 | `childrenIds` in the front model + child-name resolver | S3 | delegated | done | `feat(activities): carry the children ids and resolve their names` |
-| T04 | "Fin programado" in the create form + end-after-start validation | S4 | inline | pending | — |
+| T04 | "Fin programado" in the create form + end-after-start validation | S4 | delegated | done | `feat(activities): add the optional scheduled end to the create form` |
 
 ---
 
@@ -206,3 +206,25 @@ submit an end that is not after the start (inline, in Spanish), and sends
   0 failures. One correction by the parent: the resolver returned an EMPTY string for a
   child with no legible name, which would have painted an empty chip on the card — a
   nameless child is now omitted entirely, and the test says so.
+- **L9 — T04 evidence:** delegated to `gentle-ai-worker` (bounded surfaces: the create
+  package, the activities ViewModel and its `commonTest`); the parent reviewed the diff
+  and ran the suite again. RED (behavioural this time, not a compile error):
+  `scheduledEnd` came back `null` with an end set, and a form whose end equalled the start
+  produced no error at all. GREEN: the form carries `endDate` + `endTime`, `toRequest()`
+  emits the end as ISO-8601 with an explicit offset, and `validateCreateForm` rejects an
+  end that is not strictly after the start with "El fin programado debe ser posterior al
+  inicio". Suite: 27 suites / 233 tests / 0 failures.
+  Four adjustments by the parent: the three new sheet callbacks are **required** (the
+  worker left silent no-op defaults — a call site that forgot the wiring would have
+  swallowed the field); the end date and end time are **stacked full width** like the
+  start ones (two fields with icons in a weighted row squeeze on a 320 dp screen); the
+  end time shows **nothing while there is no end date** (A-16: no end, no end time — a
+  phantom "10:00" would promise a time that does not exist); and the inline error text is
+  painted **once**, by the block.
+  `ActivitiesScreen.kt` was also touched (three wiring lines). It was outside the
+  worker's allowed surfaces but the wiring is what makes the field reach the ViewModel;
+  the parent allowed it and reviewed the three lines.
+- **L10 — what wave 0 does NOT deliver:** the end time is sent to the server but no
+  surface shows it yet. A-17 ("if set, it is shown in the agenda card and in detail")
+  lands with T08/T09/T15, and the compliance card's period copy ("Este mes") lands with
+  T35. The card and the detail sheet are untouched in this wave.

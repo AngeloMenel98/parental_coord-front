@@ -88,7 +88,7 @@ internal fun CreateForm.toRequest(): com.parental.shared.feature.activities.doma
         categoryId = requireNotNull(categoryId) { "categoryId es obligatorio" },
         assignedTo = assignedTo,
         scheduledStart = toIsoWithOffset(requireNotNull(startDate) { "startDate es obligatorio" }, startTime, zone),
-        scheduledEnd = null,
+        scheduledEnd = endDate?.let { toIsoWithOffset(it, endTime, zone) },
         childrenIds = childrenIds.toList(),
     )
 }

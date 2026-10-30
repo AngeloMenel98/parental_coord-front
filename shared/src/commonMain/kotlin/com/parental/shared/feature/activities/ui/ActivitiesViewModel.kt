@@ -582,6 +582,23 @@ class ActividadesViewModel(
         mutateCreateForm { it.copy(startTime = time) }
 
     /**
+     * Elige la fecha de fin programado. La hora de fin se inicializa a `inicio + 1h`,
+     * truncada a 23:59, para que el caso común ya sea válido sin tocar el reloj (A-15).
+     */
+    fun setCreateEndDate(date: LocalDate) = mutateCreateForm { form ->
+        val startMinutes = form.startTime.hour * 60 + form.startTime.minute
+        val endMinutes = (startMinutes + 60).coerceAtMost(23 * 60 + 59)
+        form.copy(
+            endDate = date,
+            endTime = TimeOfDay(endMinutes / 60, endMinutes % 60),
+        )
+    }
+
+    fun setCreateEndTime(time: TimeOfDay) = mutateCreateForm { it.copy(endTime = time) }
+
+    fun clearCreateEnd() = mutateCreateForm { it.copy(endDate = null) }
+
+    /**
      * `POST /activities/:bondId/create`. Corta en DOS puntos:
      * · `create is Loading` ⇒ un solo POST en vuelo (doble envío imposible);
      * · `validateCreateForm(...).isNotEmpty()` ⇒ ni siquiera sale la petición si el formulario

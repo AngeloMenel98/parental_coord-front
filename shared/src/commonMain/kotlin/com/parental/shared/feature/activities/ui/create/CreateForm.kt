@@ -1,6 +1,10 @@
 package com.parental.shared.feature.activities.ui.create
 
 import kotlinx.datetime.LocalDate
+import kotlinx.datetime.LocalDateTime
+import kotlinx.datetime.LocalTime
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toInstant
 
 /*
  * Estado del formulario de alta — `create-activity`, T-FE-06.
@@ -25,6 +29,9 @@ data class CreateForm(
     val assignedTo: String? = null,
     val startDate: LocalDate? = null,
     val startTime: TimeOfDay = TimeOfDay(9, 0),
+    /** El fin existe SÓLO si hay fecha; la hora es la wall-clock del picker (A-14…A-16). */
+    val endDate: LocalDate? = null,
+    val endTime: TimeOfDay = TimeOfDay(10, 0),
 )
 
 enum class CreateField {
@@ -33,6 +40,7 @@ enum class CreateField {
     CATEGORY,
     CHILDREN,
     DATE,
+    END_DATE,
 }
 
 data class CreateFormError(val field: CreateField, val message: String)
@@ -60,5 +68,21 @@ fun validateCreateForm(form: CreateForm): List<CreateFormError> = buildList {
     }
     if (form.startDate == null) {
         add(CreateFormError(CreateField.DATE, "Elige una fecha"))
+    }
+    val endDate = form.endDate
+    if (endDate != null && form.startDate != null) {
+        val zone = TimeZone.currentSystemDefault()
+        val start = LocalDateTime(form.startDate, LocalTime(form.startTime.hour, form.startTime.minute))
+            .toInstant(zone)
+        val end = LocalDateTime(endDate, LocalTime(form.endTime.hour, form.endTime.minute))
+            .toInstant(zone)
+        if (end <= start) {
+            add(
+                CreateFormError(
+                    CreateField.END_DATE,
+                    "El fin programado debe ser posterior al inicio",
+                ),
+            )
+        }
     }
 }
