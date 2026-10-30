@@ -45,6 +45,8 @@ import com.parental.shared.core.ui.theme.ParentalShapes
 import com.parental.shared.core.ui.theme.ProgressStroke
 import com.parental.shared.core.ui.theme.Spacing
 import com.parental.shared.core.ui.theme.TypeTokens
+import com.parental.shared.feature.activities.domain.model.resolveChildNames
+import com.parental.shared.feature.bonds.domain.model.VinculoChild
 import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
@@ -87,6 +89,8 @@ internal fun ActivityCard(
     canConfirm: Boolean,
     isConfirming: Boolean,
     focusRequesters: MutableMap<String, FocusRequester>,
+    memberNames: Map<String, String>,
+    children: List<VinculoChild>,
     onSelectActividad: (String) -> Unit,
     onConfirm: (String) -> Unit,
     swipe: @Composable (content: @Composable () -> Unit) -> Unit,
@@ -111,6 +115,8 @@ internal fun ActivityCard(
                 semanticLabel = semanticLabel,
                 canConfirm = canConfirm,
                 isConfirming = isConfirming,
+                memberNames = memberNames,
+                children = children,
                 onClick = { onSelectActividad(row.actividad.id) },
                 onConfirm = { onConfirm(row.actividad.id) },
             )
@@ -126,6 +132,8 @@ private fun ActivityCardBody(
     semanticLabel: String,
     canConfirm: Boolean,
     isConfirming: Boolean,
+    memberNames: Map<String, String>,
+    children: List<VinculoChild>,
     onClick: () -> Unit,
     onConfirm: () -> Unit,
 ) {
@@ -197,6 +205,23 @@ private fun ActivityCardBody(
                     row.deadline?.let { deadline ->
                         Spacer(modifier = Modifier.height(Spacing.xs))
                         DeadlineLabel(deadline = deadline, zone = zone, overdue = isOverdue(row))
+                    }
+
+                    // S7/S8 · Asignatario e hijos DENTRO del cuerpo clickeable,
+                    // bajo la misma etiqueta de semántica fusionada.
+                    val assigneeName = row.actividad.assignedTo
+                        ?.let { memberNames[it]?.takeIf { name -> name.isNotBlank() } }
+                    if (assigneeName != null) {
+                        Spacer(modifier = Modifier.height(Spacing.xs))
+                        AssigneeLine(name = assigneeName)
+                    }
+
+                    val childNames = remember(row.actividad.childrenIds, children) {
+                        resolveChildNames(children, row.actividad.childrenIds)
+                    }
+                    if (childNames.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(Spacing.xs))
+                        ChildrenLine(names = childNames)
                     }
                 }
 
@@ -327,6 +352,47 @@ private fun DeadlineLabel(deadline: Instant, zone: TimeZone, overdue: Boolean) {
         overflow = TextOverflow.Ellipsis,
     )
 }
+
+/** Línea de asignatario — S7. Se omite si no hay nombre resuelto (sin "Sin asignar"). */
+@Composable
+private fun AssigneeLine(name: String) {
+    Text(
+        text = "Asignada a: $name",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+    )
+}
+
+/**
+ * Línea de hijos — S8. No se pinta si no hay nombres resueltos.
+ *
+ * 🔴 LOS NOMBRES EN UNA LÍNEA, NO UNA FILA DE CHIPS. El PRD sugiere "avatares o una
+ *   lista compacta de chips (`+N` si desborda)", pero medir chips con
+ *   `SubcomposeLayout` dentro de una tarjeta de una lista es un motor de medición por
+ *   cada tarjeta — y su caso degradado es malo: un nombre largo hace que NINGÚN chip
+ *   quepa y la tarjeta acaba mostrando "+1" sin el nombre de nadie. Una línea con los
+ *   dos primeros nombres y el "+N" del resto dice lo mismo, no se corta a medias y no
+ *   mide nada.
+ */
+@Composable
+private fun ChildrenLine(names: List<String>) {
+    if (names.isEmpty()) return
+    val visible = names.take(MAX_VISIBLE_CHILDREN)
+    val overflow = names.size - visible.size
+    val suffix = if (overflow > 0) " +$overflow" else ""
+    Text(
+        text = "Para: ${visible.joinToString(", ")}$suffix",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+    )
+}
+
+/** Cuántos hijos se nombran en la tarjeta antes de resumir el resto como "+N". */
+private const val MAX_VISIBLE_CHILDREN = 2
 
 /**
  * ¿Está vencida? El estado llega en minúsculas del backend (`overdue`). No hay mapa de

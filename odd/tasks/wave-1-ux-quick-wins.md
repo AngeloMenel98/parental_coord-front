@@ -235,8 +235,8 @@ ending the session; both icons are labelled for screen readers and are at least 
 |---|---|---|---|---|---|---|
 | T05 | Locale-aware currency formatter, 2 decimals | S5 | F | delegated | done | `feat(core): add the shared money and date formatters` |
 | T06 | Localize relative dates, fix truncated dates | S6 | F | delegated | done | `feat(core): add the shared money and date formatters` |
-| T07 | "Asignada a: [name]" on the activity card | S7 | F | delegated | pending | — |
-| T08 | Children on the activity card | S8 | F | delegated | pending | — |
+| T07 | "Asignada a: [name]" on the activity card | S7 | F | delegated | done | `feat(activities): show the assignee and the children on the card` |
+| T08 | Children on the activity card | S8 | F | delegated | done | `feat(activities): show the assignee and the children on the card` |
 | T09 | Detail sheet: date + time range, children, assignee | S9 | F+B | delegated | pending | — |
 | T10 | Notification copy: Spanish, title ≠ body, capped | S10 | B | delegated | pending | — |
 | T11 | Children filter in Activities | S11 | F | delegated | pending | — |
@@ -289,3 +289,14 @@ ending the session; both icons are labelled for screen readers and are at least 
     two different things in the same family. `formatShortDate` is now named, and the
     absolute fallback is numeric on purpose: a month spelled out is what got truncated
     into "05 dé".
+- **L6 — T07 + T08 evidence:** delegated to `gentle-ai-worker` (bounded surfaces); the
+  parent reviewed the diff and re-ran the suite. RED: the new tests did not compile
+  (`memberNames` / `children` did not exist on the card or on the label). GREEN: 31
+  suites / 260 tests / 0 failures. What the parent changed: the worker had built the
+  children as a row of CHIPS measured with `SubcomposeLayout`, and its degraded case is
+  bad — a long child name makes NINGÚN chip fit and the card ends up showing "+1" with
+  nobody's name on it. It is now ONE line ("Para: Ana, Luis" / "Para: Ana, Luis +1"),
+  which says the same thing, never cuts a name in half and measures nothing. The
+  semantic label (the ONE phrase the card announces) grew with the card: it now says
+  "Asignada a: …" and "Para: …", so TalkBack reads them with the rest and not as loose
+  fragments.

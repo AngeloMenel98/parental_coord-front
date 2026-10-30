@@ -33,6 +33,7 @@ import com.parental.shared.feature.activities.ui.openedId
 import com.parental.shared.feature.activities.ui.swipe.SwipeAction
 import com.parental.shared.feature.activities.ui.swipe.SwipeReasonDialog
 import com.parental.shared.feature.activities.ui.swipe.SWIPE_UNDO_LABEL
+import com.parental.shared.feature.bonds.domain.model.VinculoChild
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
@@ -512,6 +513,8 @@ private fun ActividadesListScreen(
                         onConfirm = onConfirm,
                         isConfirming = isConfirming,
                         currentUserId = currentUserId,
+                        memberNames = uiState.memberNames,
+                        children = uiState.children,
                         onSwipeAction = onSwipeAction,
                         onSelectDate = { date -> onSelectedDateChange(date.toString()) },
                         onPreviousWeek = { navigateWeek(-1) },
@@ -592,6 +595,8 @@ private fun TimelineContent(
     onConfirm: (String) -> Unit,
     isConfirming: Boolean,
     currentUserId: String,
+    memberNames: Map<String, String>,
+    children: List<VinculoChild>,
     onSwipeAction: (String, SwipeAction) -> Unit,
     onSelectDate: (LocalDate) -> Unit,
     onPreviousWeek: () -> Unit,
@@ -621,6 +626,8 @@ private fun TimelineContent(
                 onConfirm = onConfirm,
                 isConfirming = isConfirming,
                 currentUserId = currentUserId,
+                memberNames = memberNames,
+                children = children,
                 // R2-T2-7 · La LISTA es la superficie principal de la acción y hasta ahora
                 // no tenía gesto: sólo lo tenía la agenda de día. Sin este argumento
                 // `AgendaTimeline` ni siquiera compila.

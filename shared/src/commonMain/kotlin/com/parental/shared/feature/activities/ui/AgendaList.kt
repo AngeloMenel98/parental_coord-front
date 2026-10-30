@@ -26,6 +26,7 @@ import com.parental.shared.core.ui.components.CategoryInfo
 import com.parental.shared.core.ui.theme.Spacing
 import com.parental.shared.feature.activities.domain.model.canConfirm
 import com.parental.shared.feature.activities.ui.swipe.ActivitySwipeBox
+import com.parental.shared.feature.bonds.domain.model.VinculoChild
 import com.parental.shared.feature.activities.ui.swipe.SWIPE_HINT
 import com.parental.shared.feature.activities.ui.swipe.SwipeAction
 import kotlinx.datetime.LocalDate
@@ -59,6 +60,8 @@ internal fun AgendaTimeline(
     onConfirm: (String) -> Unit,
     isConfirming: Boolean,
     currentUserId: String,
+    memberNames: Map<String, String>,
+    children: List<VinculoChild>,
     /**
      * R2-T2-7 · ÚNICO punto por el que la lista Agenda dispara una acción de swipe.
      * Callback, no singleton: la tarjeta sigue siendo función pura de sus datos.
@@ -103,10 +106,18 @@ internal fun AgendaTimeline(
                                 row = row,
                                 info = info,
                                 zone = zone,
-                                semanticLabel = activitySemanticLabel(row, info, zone),
+                                semanticLabel = activitySemanticLabel(
+                                    row = row,
+                                    info = info,
+                                    zone = zone,
+                                    memberNames = memberNames,
+                                    children = children,
+                                ),
                                 canConfirm = row.actividad.canConfirm(currentUserId),
                                 isConfirming = isConfirming,
                                 focusRequesters = focusRequesters,
+                                memberNames = memberNames,
+                                children = children,
                                 onSelectActividad = onSelectActividad,
                                 onConfirm = onConfirm,
                                 // R2-T2-7 · El gesto se monta AQUÍ, en el punto de render

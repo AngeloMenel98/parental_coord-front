@@ -2,6 +2,8 @@ package com.parental.shared.feature.activities.ui
 
 import com.parental.shared.core.ui.components.CategoryInfo
 import com.parental.shared.feature.activities.domain.model.Actividad
+import com.parental.shared.feature.activities.domain.model.resolveChildNames
+import com.parental.shared.feature.bonds.domain.model.VinculoChild
 import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalDateTime
@@ -125,11 +127,20 @@ internal fun activitySemanticLabel(
     row: TimelineRow,
     info: CategoryInfo?,
     zone: TimeZone,
+    memberNames: Map<String, String> = emptyMap(),
+    children: List<VinculoChild> = emptyList(),
 ): String {
     val dateTime = row.localStart?.let { localStart ->
         "${formatAgendaDate(localStart.date)} ${formatTime(localStart.hour, localStart.minute)}"
     } ?: NO_START_LABEL
     val category = info?.name?.takeIf { it.isNotBlank() } ?: "desconocida"
+    val assignee = row.actividad.assignedTo
+        ?.let { memberNames[it]?.takeIf { name -> name.isNotBlank() } }
+        ?.let { name -> "Asignada a: $name" }
+    val childNames = resolveChildNames(children, row.actividad.childrenIds)
+    val childrenLine = childNames.takeIf { it.isNotEmpty() }
+        ?.joinToString(", ")
+        ?.let { names -> "Para: $names" }
     val deadline = row.deadline?.let { "Límite ${formatDeadline(it, zone)}" }
     return listOfNotNull(
         dateTime,
@@ -137,6 +148,8 @@ internal fun activitySemanticLabel(
         "Categoría $category",
         typeLabel(row.actividad.type),
         statusSemanticLabel(row.actividad.status),
+        assignee,
+        childrenLine,
         deadline,
     ).joinToString(", ")
 }
