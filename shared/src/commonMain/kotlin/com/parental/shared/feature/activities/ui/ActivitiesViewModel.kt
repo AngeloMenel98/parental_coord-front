@@ -88,6 +88,8 @@ data class ActivitiesUiState(
     val listError: String? = null,
     val actividades: List<Actividad> = emptyList(),
     val selectedTab: ActivityTab = ActivityTab.TODOS,
+    /** S11 · ids de hijos seleccionados en el filtro. Vacío = "Todos". */
+    val selectedChildren: Set<String> = emptySet(),
     /** Detalle por id — R1. `Closed` = no hay hoja; el resto lleva el id de la actividad. */
     val detail: DetailUiState = DetailUiState.Closed,
     /** uuid → info resuelta de GET /categories + preferencias por nombre. */
@@ -385,6 +387,19 @@ class ActividadesViewModel(
     /** Filtro puramente client-side sobre la lista ya cargada (sin refetch). */
     fun selectTab(tab: ActivityTab) {
         _uiState.value = _uiState.value.copy(selectedTab = tab)
+    }
+
+    /** S11 · Toggle multi-select de un hijo en el filtro. */
+    fun toggleChildFilter(id: String) {
+        val current = _uiState.value.selectedChildren
+        _uiState.value = _uiState.value.copy(
+            selectedChildren = if (id in current) current - id else current + id,
+        )
+    }
+
+    /** S11 · "Todos" deselecciona todos los hijos. */
+    fun clearChildFilter() {
+        _uiState.value = _uiState.value.copy(selectedChildren = emptySet())
     }
 
     /** Reintentar desde el estado de error de la lista → esqueleto + refetch. */

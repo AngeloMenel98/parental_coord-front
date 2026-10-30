@@ -19,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import com.parental.shared.core.ui.theme.AgendaGeometry
 import com.parental.shared.core.ui.theme.Spacing
+import com.parental.shared.feature.bonds.domain.model.VinculoChild
 
 /*
  * Fila de filtros — T3 de `odd/tasks/activities-cards-ui.md` (S5).
@@ -65,6 +66,80 @@ internal fun ActivityFiltersRow(
                         Spacer(modifier = Modifier.width(Spacing.xs))
                         Text(
                             text = (counts[tab] ?: 0).toString(),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontWeight = FontWeight.Medium,
+                        )
+                    }
+                },
+                modifier = Modifier.heightIn(min = AgendaGeometry.touchTargetLegacy),
+            )
+        }
+    }
+}
+
+/**
+ * S11 · Fila de filtro de hijos.
+ *
+ * Aparece SOLO cuando hay más de un hijo. "Todos" limpia la selección; cada hijo es un
+ * chip multi-select. Los contadores respetan la pestaña ya aplicada.
+ */
+@Composable
+internal fun ChildrenFiltersRow(
+    children: List<VinculoChild>,
+    selectedChildren: Set<String>,
+    counts: Map<String, Int>,
+    onSelectAll: () -> Unit,
+    onToggleChild: (String) -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .widthIn(max = Spacing.maxContentWidth)
+            .horizontalScroll(rememberScrollState())
+            .padding(horizontal = Spacing.lg, vertical = Spacing.sm),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        FilterChip(
+            selected = selectedChildren.isEmpty(),
+            onClick = onSelectAll,
+            label = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "Todos",
+                        style = MaterialTheme.typography.labelLarge,
+                    )
+                    Spacer(modifier = Modifier.width(Spacing.xs))
+                    Text(
+                        text = (counts[CHILD_FILTER_ALL] ?: 0).toString(),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontWeight = FontWeight.Medium,
+                    )
+                }
+            },
+            modifier = Modifier.heightIn(min = AgendaGeometry.touchTargetLegacy),
+        )
+
+        children.forEach { child ->
+            val name = listOfNotNull(child.firstName, child.lastName)
+                .joinToString(" ")
+                .trim()
+                .takeIf { it.isNotBlank() }
+                ?: child.id
+            FilterChip(
+                selected = child.id in selectedChildren,
+                onClick = { onToggleChild(child.id) },
+                label = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = name,
+                            style = MaterialTheme.typography.labelLarge,
+                        )
+                        Spacer(modifier = Modifier.width(Spacing.xs))
+                        Text(
+                            text = (counts[child.id] ?: 0).toString(),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontWeight = FontWeight.Medium,

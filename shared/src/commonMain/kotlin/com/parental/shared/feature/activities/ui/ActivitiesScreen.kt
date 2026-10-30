@@ -146,6 +146,8 @@ fun ActividadesScreen(
         ActividadesListScreen(
             uiState = uiState,
             onSelectTab = viewModel::selectTab,
+            onToggleChild = viewModel::toggleChildFilter,
+            onClearChildren = viewModel::clearChildFilter,
             onSelectActividad = { id -> originId = id; viewModel.selectActividad(id) },
             onRetryList = viewModel::retry,
             resolve = resolve,
@@ -244,6 +246,8 @@ fun ActividadesScreen(
 private fun ActividadesListScreen(
     uiState: ActivitiesUiState,
     onSelectTab: (ActivityTab) -> Unit,
+    onToggleChild: (String) -> Unit,
+    onClearChildren: () -> Unit,
     onSelectActividad: (String) -> Unit,
     onRetryList: () -> Unit,
     resolve: (String) -> CategoryInfo?,
@@ -296,8 +300,11 @@ private fun ActividadesListScreen(
     var pendingWeekSelection by remember { mutableStateOf<LocalDate?>(null) }
     val listState = rememberLazyListState()
 
-    val filteredRows = remember(uiState.actividades, uiState.selectedTab, zone) {
-        buildTimelineRows(filterActivities(uiState.actividades, uiState.selectedTab), zone)
+    val filteredRows = remember(uiState.actividades, uiState.selectedTab, uiState.selectedChildren, zone) {
+        buildTimelineRows(
+            filterActivities(uiState.actividades, uiState.selectedTab, uiState.selectedChildren),
+            zone,
+        )
     }
     val agendaGroups = remember(filteredRows) { buildAgendaGroups(filteredRows) }
     // Los puntos se calculan una vez por lista Y por catálogo de categorías: si las
@@ -468,6 +475,18 @@ private fun ActividadesListScreen(
                 onSelectTab = onSelectTab,
                 counts = tabCounts(uiState.actividades),
             )
+            if (uiState.children.size > 1) {
+                val childCounts = remember(uiState.actividades, uiState.selectedTab) {
+                    childFilterCounts(uiState.actividades, uiState.selectedTab)
+                }
+                ChildrenFiltersRow(
+                    children = uiState.children,
+                    selectedChildren = uiState.selectedChildren,
+                    counts = childCounts,
+                    onSelectAll = onClearChildren,
+                    onToggleChild = onToggleChild,
+                )
+            }
             when {
                 uiState.isLoading && uiState.actividades.isEmpty() -> ListSkeleton()
                 uiState.listError != null -> EmptyState(

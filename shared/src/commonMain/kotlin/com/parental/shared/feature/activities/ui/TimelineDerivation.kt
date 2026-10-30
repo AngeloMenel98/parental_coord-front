@@ -25,13 +25,47 @@ import kotlinx.datetime.toLocalDateTime
  *     el orden es por inicio y luego por claves de texto, nunca por estado.
  */
 
+/** Token para el chip "Todos" del filtro de hijos. */
+internal const val CHILD_FILTER_ALL = "all"
+
 internal fun filterActivities(
     all: List<Actividad>,
     tab: ActivityTab,
-): List<Actividad> = when (tab) {
-    ActivityTab.TODOS -> all
-    ActivityTab.EVENTOS -> all.filter { it.type == "event" }
-    ActivityTab.OBLIGACIONES -> all.filter { it.type == "obligation" }
+    selectedChildren: Set<String> = emptySet(),
+): List<Actividad> {
+    val byTab = when (tab) {
+        ActivityTab.TODOS -> all
+        ActivityTab.EVENTOS -> all.filter { it.type == "event" }
+        ActivityTab.OBLIGACIONES -> all.filter { it.type == "obligation" }
+    }
+    return if (selectedChildren.isEmpty()) {
+        byTab
+    } else {
+        byTab.filter { actividad -> actividad.childrenIds.any { it in selectedChildren } }
+    }
+}
+
+/**
+ * Contadores para el filtro de hijos.
+ *
+ * Cada chip cuenta las actividades que coinciden CON ESE HIJO *y* con la pestaña ya
+ * aplicada. El chip "Todos" ([CHILD_FILTER_ALL]) cuenta todo lo que deja pasar la
+ * pestaña actual (es decir, sin filtro de hijos).
+ */
+internal fun childFilterCounts(
+    actividades: List<Actividad>,
+    selectedTab: ActivityTab,
+): Map<String, Int> {
+    val base = filterActivities(actividades, selectedTab)
+    return buildMap {
+        put(CHILD_FILTER_ALL, base.size)
+        base
+            .flatMap { it.childrenIds }
+            .distinct()
+            .forEach { childId ->
+                put(childId, base.count { childId in it.childrenIds })
+            }
+    }
 }
 
 internal fun buildTimelineRows(
