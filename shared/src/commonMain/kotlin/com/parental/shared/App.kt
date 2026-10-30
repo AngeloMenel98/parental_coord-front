@@ -78,6 +78,13 @@ private fun AppContent(
     authRepository: AuthRepository,
     sessionManager: SessionManager,
 ) {
+    // S12 · G-3 — la salida vive en la barra global de todas las vistas, así que el
+    // efecto es UNO solo: no hay dos lambdas que puedan divergir.
+    val logout: () -> Unit = {
+        authRepository.logout()
+        sessionManager.clear()
+    }
+
     val currentScreen = if (sessionManager.loginPending) {
         // Login in progress (bonds fetch pending) — keep on Login screen
         Screen.Login
@@ -156,10 +163,7 @@ private fun AppContent(
             }
             AdminScreen(
                 viewModel = viewModel,
-                onLogout = {
-                    authRepository.logout()
-                    sessionManager.clear()
-                },
+                onLogout = logout,
             )
         }
 
@@ -221,11 +225,13 @@ private fun AppContent(
             DisposableEffect(unreadPoller) {
                 onDispose { unreadPoller.destroy() }
             }
-            // Poll-only (S8): el bucle corre SOLO con Home visible. En la lista el VM
-            // ya sincroniza el badge; en Actividades no hay campana que actualizar.
-            // Al volver de la lista este efecto rearranca y fetcha de inmediato.
-            LaunchedEffect(unreadPoller, bottomRoute, showNotifications) {
-                if (bottomRoute == "home" && !showNotifications) {
+            // Poll-only (S8): el bucle corre mientras haya una campana a la vista. Desde
+            // S12 la campana vive también en Actividades (barra global), así que ya no
+            // alcanza con "sólo Home": el contador tiene que estar fresco en las dos. En
+            // la lista el VM ya sincroniza el badge, por eso ahí se detiene. Al volver de
+            // la lista este efecto rearranca y fetcha de inmediato.
+            LaunchedEffect(unreadPoller, showNotifications) {
+                if (!showNotifications) {
                     unreadPoller.start()
                 } else {
                     unreadPoller.stop()
@@ -259,6 +265,7 @@ private fun AppContent(
                 NotificationsScreen(
                     viewModel = notificationsViewModel,
                     onBack = { showNotifications = false },
+                    onLogout = logout,
                 )
             } else if (bottomRoute == "activities") {
                 when {
@@ -289,6 +296,11 @@ private fun AppContent(
                         ActividadesScreen(
                             viewModel = activitiesViewModel,
                             onNavigateBottom = onNavigateBottom,
+                            // S12 · la campana de la barra global abre la lista que ya
+                            // vive en esta rama de Home; el contador es el mismo.
+                            unreadCount = unreadCount,
+                            onOpenNotifications = { showNotifications = true },
+                            onLogout = logout,
                         )
                     }
                 }
@@ -306,10 +318,7 @@ private fun AppContent(
                 }
                 HomeScreen(
                     viewModel = viewModel,
-                    onLogout = {
-                        authRepository.logout()
-                        sessionManager.clear()
-                    },
+                    onLogout = logout,
                     onNavigateBottom = onNavigateBottom,
                     unreadCount = unreadCount,
                     onOpenNotifications = { showNotifications = true },

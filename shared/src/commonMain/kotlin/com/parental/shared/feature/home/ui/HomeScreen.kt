@@ -29,8 +29,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -48,12 +46,12 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.parental.shared.core.ui.components.AppTopBar
 import com.parental.shared.core.ui.components.BottomNavBar
 import com.parental.shared.feature.home.domain.model.ChildProfile
 import com.parental.shared.feature.home.domain.model.ComplianceMember
 import com.parental.shared.feature.home.domain.model.ComplianceResponse
 import com.parental.shared.feature.home.domain.model.HomeSummary
-import com.parental.shared.feature.notifications.ui.NotificationsBell
 import kotlinx.datetime.Clock
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
@@ -73,33 +71,14 @@ fun HomeScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = "Coordinación Parental",
-                        fontWeight = FontWeight.Bold,
-                    )
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
-                    actionIconContentColor = MaterialTheme.colorScheme.onPrimary,
-                ),
-                actions = {
-                    NotificationsBell(
-                        unreadCount = unreadCount,
-                        onClick = onOpenNotifications,
-                    )
-                    TextButton(
-                        onClick = onLogout,
-                        modifier = Modifier.heightIn(min = 48.dp),
-                        colors = ButtonDefaults.textButtonColors(
-                            contentColor = MaterialTheme.colorScheme.onPrimary,
-                        ),
-                    ) {
-                        Text("Cerrar sesión")
-                    }
-                },
+            // S12 · G-1…G-5 — la barra global: campana con contador y salir con
+            // confirmación. El botón de texto "Cerrar sesión" se fue con ella: el ícono
+            // ocupa menos y el diálogo evita el cierre accidental.
+            AppTopBar(
+                title = "Coordinación Parental",
+                unreadCount = unreadCount,
+                onOpenNotifications = onOpenNotifications,
+                onLogout = onLogout,
             )
         },
         bottomBar = {

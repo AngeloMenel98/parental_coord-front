@@ -19,9 +19,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -32,9 +32,6 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -49,6 +46,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.parental.shared.core.ui.components.AppTopBar
 import com.parental.shared.core.util.formatRelativeTime
 import com.parental.shared.feature.notifications.domain.model.NotificationItem
 
@@ -64,6 +62,11 @@ import com.parental.shared.feature.notifications.domain.model.NotificationItem
 fun NotificationsScreen(
     viewModel: NotificationsViewModel,
     onBack: () -> Unit,
+    /**
+     * S12 · G-1/G-2 — la barra global lleva la salida en TODAS las vistas. Esta pantalla
+     * es una sub-vista de Home, así que la recibe desde `App.kt` igual que las demás.
+     */
+    onLogout: () -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -78,10 +81,13 @@ fun NotificationsScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    Text(text = "Notificaciones", fontWeight = FontWeight.Bold)
-                },
+            // S12 · La barra global, con la flecha de vuelta como `navigationIcon`. Sin
+            // campana: esta vista YA es la lista de notificaciones, así que una campana
+            // acá abriría la pantalla en la que el usuario está. El resto de las
+            // acciones ("Marcar todas", refrescar) sigue siendo de esta pantalla.
+            AppTopBar(
+                title = "Notificaciones",
+                onLogout = onLogout,
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
@@ -91,14 +97,17 @@ fun NotificationsScreen(
                     }
                 },
                 actions = {
-                    TextButton(
+                    // G-2 · "íconos solamente": "Marcar todas" era el único botón de
+                    // texto que quedaba en una barra. El doble tilde es la convención,
+                    // y el `contentDescription` lo dice para quien no ve el ícono.
+                    IconButton(
                         onClick = { viewModel.markAllRead() },
                         enabled = !uiState.isMarkingAll && uiState.unreadCount > 0,
-                        colors = ButtonDefaults.textButtonColors(
-                            contentColor = MaterialTheme.colorScheme.onPrimary,
-                        ),
                     ) {
-                        Text("Marcar todas")
+                        Icon(
+                            imageVector = Icons.Default.DoneAll,
+                            contentDescription = "Marcar todas como leídas",
+                        )
                     }
                     IconButton(
                         onClick = { viewModel.refresh() },
@@ -110,12 +119,6 @@ fun NotificationsScreen(
                         )
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
-                    navigationIconContentColor = MaterialTheme.colorScheme.onPrimary,
-                    actionIconContentColor = MaterialTheme.colorScheme.onPrimary,
-                ),
             )
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },

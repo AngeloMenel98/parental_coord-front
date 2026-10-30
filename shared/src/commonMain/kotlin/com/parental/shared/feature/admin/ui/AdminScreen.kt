@@ -16,6 +16,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.parental.shared.core.ui.components.AppTopBar
 import com.parental.shared.core.ui.theme.StatusTokens
 import com.parental.shared.feature.admin.domain.model.AdminBond
 import com.parental.shared.feature.admin.domain.model.AdminUser
@@ -31,17 +32,13 @@ fun AdminScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("Admin Panel", fontWeight = FontWeight.Bold) },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
-                ),
-                actions = {
-                    TextButton(onClick = onLogout) {
-                        Text("Logout", color = MaterialTheme.colorScheme.onPrimary)
-                    }
-                },
+            // S12 · G-1…G-5 — la misma barra de toda la app. SIN campana a propósito:
+            // el admin no tiene vínculo ni endpoint de notificaciones, así que una
+            // campana acá sería un control sin destino. La salida SÍ, ahora con
+            // confirmación.
+            AppTopBar(
+                title = "Admin Panel",
+                onLogout = onLogout,
             )
         },
     ) { padding ->

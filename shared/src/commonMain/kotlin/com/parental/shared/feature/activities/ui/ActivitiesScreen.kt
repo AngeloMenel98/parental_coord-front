@@ -22,6 +22,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.semantics.contentDescription
+import com.parental.shared.core.ui.components.AppTopBar
 import com.parental.shared.core.ui.components.BottomNavBar
 import com.parental.shared.core.ui.components.CategoryInfo
 import com.parental.shared.core.ui.theme.MotionTokens
@@ -53,6 +54,12 @@ internal enum class TimelineMode(val label: String) {
 fun ActividadesScreen(
     viewModel: ActividadesViewModel,
     onNavigateBottom: (String) -> Unit = {},
+    /** S12 · G-5 — contador de no leídas para la campana de la barra global. */
+    unreadCount: Int = 0,
+    /** S12 · G-2 — abre la lista de notificaciones. `null` esconde la campana. */
+    onOpenNotifications: (() -> Unit)? = null,
+    /** S12 · G-3 — salida con confirmación, igual que en el resto de las vistas. */
+    onLogout: () -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -153,6 +160,9 @@ fun ActividadesScreen(
             resolve = resolve,
             snackbarHostState = snackbarHostState,
             onNavigateBottom = onNavigateBottom,
+            unreadCount = unreadCount,
+            onOpenNotifications = onOpenNotifications,
+            onLogout = onLogout,
             onConfirm = viewModel::confirmAssignment,
             isConfirming = uiState.isConfirming,
             onOpenCreate = viewModel::openCreate,
@@ -254,6 +264,9 @@ private fun ActividadesListScreen(
     resolve: (String) -> CategoryInfo?,
     snackbarHostState: SnackbarHostState,
     onNavigateBottom: (String) -> Unit,
+    unreadCount: Int,
+    onOpenNotifications: (() -> Unit)?,
+    onLogout: () -> Unit,
     onConfirm: (String) -> Unit,
     isConfirming: Boolean,
     /**
@@ -390,11 +403,15 @@ private fun ActividadesListScreen(
             // debajo —la del arteboard— en vez del `primaryContainer` de antes. El
             // contenedor `primaryContainer` queda para los chips seleccionados.
             Column {
-                TopAppBar(
-                    title = { Text("Actividades") },
+                AppTopBar(
+                    title = "Actividades",
+                    onLogout = onLogout,
+                    unreadCount = unreadCount,
+                    onOpenNotifications = onOpenNotifications,
                     colors = TopAppBarDefaults.topAppBarColors(
                         containerColor = MaterialTheme.colorScheme.surface,
                         titleContentColor = MaterialTheme.colorScheme.onSurface,
+                        navigationIconContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
                         actionIconContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
                     ),
                     actions = {
