@@ -118,7 +118,7 @@ submit an end that is not after the start (inline, in Spanish), and sends
 |---|---|---|---|---|---|
 | T01 | Remove the "Confirmada" chip from the activity card | S1 | inline | done | `feat(activities): remove the Confirmada chip from the activity card` |
 | T02 | Populate `compliance` in `HomeSummary` | S2 | delegated | done | `feat(home): carry the compliance inside the home summary` |
-| T03 | `childrenIds` in the front model + child-name resolver | S3 | inline | pending | — |
+| T03 | `childrenIds` in the front model + child-name resolver | S3 | delegated | done | `feat(activities): carry the children ids and resolve their names` |
 | T04 | "Fin programado" in the create form + end-after-start validation | S4 | inline | pending | — |
 
 ---
@@ -197,3 +197,12 @@ submit an end that is not after the start (inline, in Spanish), and sends
   state, but `ComplianceCardLoading` is public API of the `shared` framework, and the
   Home screen's structure changes anyway with the metric cards (T20). The cleanup belongs
   to that task, not to this one.
+- **L8 — T03 evidence:** delegated to `gentle-ai-worker` (bounded surfaces: the activity
+  domain models + their `commonTest`); the parent reviewed the diff and ran the suite.
+  RED: the new tests did not compile — `childrenIds` and `resolveChildNames` did not
+  exist. GREEN: `Actividad` now carries `childrenIds` (default `emptyList()`, so every
+  existing construction site still compiles) and `resolveChildNames(children, ids)` is the
+  single seam that turns ids into "Nombre Apellido". Suite: 27 suites / 226 tests /
+  0 failures. One correction by the parent: the resolver returned an EMPTY string for a
+  child with no legible name, which would have painted an empty chip on the card — a
+  nameless child is now omitted entirely, and the test says so.

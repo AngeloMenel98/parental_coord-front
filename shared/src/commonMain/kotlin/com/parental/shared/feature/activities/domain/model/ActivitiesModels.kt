@@ -22,6 +22,8 @@ data class Actividad(
     val assignedConfirmed: Boolean = false, // flag-only: confirmar asignación no toca status
     val confirmedAt: String? = null,   // ISO-8601, null mientras assignedConfirmed=false
     val completedAt: String? = null,   // ISO-8601 (D14)
+    /** T03 · ids de los hijos vinculados a la actividad (backend: `ActivitySummaryDto.childrenIds`). */
+    val childrenIds: List<String> = emptyList(),
     // 🔴 R1 · Los TRES flags los calcula el SERVIDOR para el usuario que pregunta
     // (`ActivityPolicyService.evaluate`). El cliente NO los recalcula — a diferencia
     // de `canConfirm` más abajo, que sí es una regla local. Si el cliente los
