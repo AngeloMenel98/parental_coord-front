@@ -161,9 +161,24 @@ internal fun statusSemanticLabel(status: String): String = when (status.uppercas
     else -> "Estado ${status.ifBlank { "desconocido" }}"
 }
 
-internal fun formatDetailDate(raw: String?): String? {
+/**
+ * Fecha del detalle de actividad: `"5 ago 2026"`.
+ *
+ * 🔴 EL AÑO SALE SIEMPRE (a diferencia de [formatLongDate], que lo omite en el año en
+ *   curso): aquí la fecha es un dato de un hecho pasado, y un "5 de agosto" sin año
+ *   no dice en qué año pasó. Y el mes sale COMPLETO y en minúsculas: la abreviatura
+ *   `ES_MONTHS` (`ago`, `dic`) nunca se corta — un mes truncado a dos letras ("05 dé")
+ *   es un dato ilegible, no una fecha.
+ *
+ * La zona es un parámetro con default de producción para que el test sea
+ * determinista sin tocar el reloj del sistema.
+ */
+internal fun formatDetailDate(
+    raw: String?,
+    zone: TimeZone = TimeZone.currentSystemDefault(),
+): String? {
     val instant = parseInstant(raw) ?: return null
-    val ldt = instant.toLocalDateTime(TimeZone.currentSystemDefault())
+    val ldt = instant.toLocalDateTime(zone)
     return "${ldt.dayOfMonth} ${ES_MONTHS[ldt.monthNumber - 1]} ${ldt.year}"
 }
 

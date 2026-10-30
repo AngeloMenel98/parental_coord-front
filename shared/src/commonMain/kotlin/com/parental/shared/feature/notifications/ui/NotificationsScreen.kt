@@ -49,6 +49,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.parental.shared.core.util.formatRelativeTime
 import com.parental.shared.feature.notifications.domain.model.NotificationItem
 
 /**

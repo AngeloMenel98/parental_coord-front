@@ -1,17 +1,21 @@
-package com.parental.shared.feature.notifications.ui
+package com.parental.shared.core.util
 
 import kotlinx.datetime.Instant
+import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
 /**
- * S3 · tiempo relativo de la fila.
+ * S6 · El tiempo relativo de la app, en un solo lugar.
  *
  * La API entrega ISO-8601 y no un epoch; el formateo vive en la UI. `now` y la
  * zona son parámetros para que el test no dependa del reloj ni del TZ de la máquina.
+ *
+ * El vocabulario es el del PRD (`PRD_expense` issue #2): en castellano, con el mes
+ * COMPLETO y sin truncar.
  */
-class NotificationTimeFormatterTest {
+class RelativeTimeTest {
 
     private val now = Instant.parse("2026-10-26T12:00:00Z")
     private val utc = TimeZone.UTC
@@ -19,12 +23,12 @@ class NotificationTimeFormatterTest {
     private fun format(iso: String) = formatRelativeTime(iso, now, utc)
 
     @Test
-    fun `S3 menos de un minuto es ahora`() {
+    fun `menos de un minuto es ahora`() {
         assertEquals("ahora", format("2026-10-26T11:59:30Z"))
     }
 
     @Test
-    fun `S3 minutos y horas`() {
+    fun `minutos y horas`() {
         assertEquals("hace 5 min", format("2026-10-26T11:55:00Z"))
         assertEquals("hace 59 min", format("2026-10-26T11:01:00Z"))
         assertEquals("hace 1 h", format("2026-10-26T11:00:00Z"))
@@ -32,23 +36,30 @@ class NotificationTimeFormatterTest {
     }
 
     @Test
-    fun `S3 dias hasta una semana`() {
+    fun `dias hasta una semana`() {
         assertEquals("hace 1 d", format("2026-10-25T12:00:00Z"))
         assertEquals("hace 6 d", format("2026-10-20T12:00:00Z"))
     }
 
     @Test
-    fun `S3 una semana o mas usa fecha local`() {
+    fun `una semana o mas usa fecha corta numerica`() {
         assertEquals("19/10/2026", format("2026-10-19T12:00:00Z"))
     }
 
     @Test
-    fun `S3 una fecha futura por skew se lee como ahora`() {
+    fun `la fecha corta no se trunca`() {
+        // "05 dé" era un mes cortado a dos letras: la fecha corta es NUMÉRICA.
+        assertEquals("03/12/2026", formatShortDate(LocalDate(2026, 12, 3)))
+        assertEquals("09/01/2026", formatShortDate(LocalDate(2026, 1, 9)))
+    }
+
+    @Test
+    fun `una fecha futura por skew se lee como ahora`() {
         assertEquals("ahora", format("2026-10-26T12:05:00Z"))
     }
 
     @Test
-    fun `S3 un createdAt ilegible no inventa una fecha`() {
+    fun `un createdAt ilegible no inventa una fecha`() {
         assertEquals("", format("no-es-una-fecha"))
     }
 }
