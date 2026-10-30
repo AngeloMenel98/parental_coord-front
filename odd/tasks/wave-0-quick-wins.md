@@ -228,3 +228,10 @@ submit an end that is not after the start (inline, in Spanish), and sends
   surface shows it yet. A-17 ("if set, it is shown in the agenda card and in detail")
   lands with T08/T09/T15, and the compliance card's period copy ("Este mes") lands with
   T35. The card and the detail sheet are untouched in this wave.
+- **L11 — close-out:** `gentle_review assess` over the wave-0 range
+  (`d18ed1e..HEAD`, committed) returned **risk medium**, `reviewDue: false`
+  (`under_budget`), plan: writer self-verification stands, no separate verifier, no
+  native review started. The suite the workers ran was re-run by the parent after every
+  adjustment: **27 suites / 233 tests / 0 failures**. Wave 0 is closed: T01, T02, T03 and
+  T04 are done, committed and green. The next authorized slice is wave 1 (T05-T12,
+  ≈3-6 h each, also free of dependencies), which needs its own feature document.
