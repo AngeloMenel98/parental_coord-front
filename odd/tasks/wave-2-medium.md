@@ -142,7 +142,7 @@ scheduler precedent exists and, since `bcf4c67`, the worker actually boots.
 | T14 | Expense model migration: `category_id`, `activity_id`, `deleted_at` | B | S2 | — | pending | — |
 | T15 | Agenda: "Todo el día" + per-day indicators | F | S3 | — | pending | — |
 | T16 | Swipe to change week (pager) | F | S4 | — | pending | — |
-| T17 | Notification delete UI: acción por fila + "borrar todas" (bandeja de no leídas) | F | S5 | inline | done | F `cca2715` |
+| T17 | Notification delete UI: acción por fila + "borrar todas" (bandeja de no leídas) | F | S5 | inline | done | F `e52cc7e` |
 | T35 | Compliance formula: exclude `cancelled`, period copy | B+F | S6 | — | pending | — |
 | T18 | Verify window in the front | F | S7 | — | blocked on T25 | — |
 | T19 | Expense detail + approve/reject/pay | F | S7 | — | blocked on T24 | — |
@@ -258,5 +258,5 @@ T23 depends on this.
   "swipe and/or action menu", and the action menu is the trash icon.
 
 - **2026-10-31 · next.** Backend root of the critical path is T14 (`T14 → T22 → T24 →
-  T28 → T29/T27 → T19/T20`). T17 landed as F `cca2715`: 35 suites / 294 tests
+  T28 → T29/T27 → T19/T20`). T17 landed as F `e52cc7e`: 35 suites / 294 tests
   green, `assembleDebug` clean.
