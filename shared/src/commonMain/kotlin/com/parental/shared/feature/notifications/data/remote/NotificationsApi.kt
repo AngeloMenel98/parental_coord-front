@@ -86,12 +86,14 @@ open class NotificationsApi(
         token: String,
         limit: Int = DEFAULT_PAGE_SIZE,
         offset: Int = 0,
+        unreadOnly: Boolean = false,
     ): ApiResult<NotificationsPage> {
         return try {
             val response = client.get("$baseUrl/notifications") {
                 header("Authorization", "Bearer $token")
                 parameter("limit", limit)
                 parameter("offset", offset)
+                parameter("unreadOnly", unreadOnly)
             }
             if (response.status.isSuccess()) {
                 ApiResult.Success(response.body<NotificationsPageDto>().toDomain())

@@ -31,6 +31,9 @@ class NotificationsViewModelTest {
     private class FakeNotificationsApi : NotificationsApi(UNUSED_CLIENT, "http://unused") {
         var listCalls = 0
         val requestedOffsets = mutableListOf<Int>()
+
+        /** Qué `unreadOnly` mandó el ViewModel en cada `list` (S1). */
+        val requestedUnreadOnly = mutableListOf<Boolean>()
         var unreadCalls = 0
         var markReadCalls = 0
         var markAllCalls = 0
@@ -49,9 +52,11 @@ class NotificationsViewModelTest {
             token: String,
             limit: Int,
             offset: Int,
+            unreadOnly: Boolean,
         ): ApiResult<NotificationsPage> {
             listCalls++
             requestedOffsets += offset
+            requestedUnreadOnly += unreadOnly
             return listResult ?: ApiResult.Success(page)
         }
 
@@ -184,10 +189,21 @@ class NotificationsViewModelTest {
         assertEquals(listOf("n-1", "n-2", "n-3"), viewModel.uiState.value.items.map { it.id })
     }
 
-    // ── S5 · marcar una ────────────────────────────────────────────────────
+    // ── S1 · la lista es una bandeja de no leídas ──────────────────────────
 
     @Test
-    fun `S5 marcar una la deja leida y baja el badge`() {
+    fun `S1 el listado pide solo las no leidas`() {
+        val api = FakeNotificationsApi()
+
+        build(api)
+
+        assertEquals(listOf(true), api.requestedUnreadOnly)
+    }
+
+    // ── S5 · eliminar una = marcarla leída y sacarla de la vista ───────────
+
+    @Test
+    fun `S5 eliminar una la saca de la lista y baja el badge`() {
         val api = FakeNotificationsApi().apply {
             page = NotificationsPage(listOf(item("n-1"), item("n-2")), total = 2, limit = 20, offset = 0)
             unreadResult = ApiResult.Success(2)
@@ -197,14 +213,27 @@ class NotificationsViewModelTest {
         viewModel.markRead("n-1")
 
         assertEquals(listOf("n-1"), api.markedReadIds)
-        assertTrue(viewModel.uiState.value.items.first { it.id == "n-1" }.isRead)
-        assertFalse(viewModel.uiState.value.items.first { it.id == "n-2" }.isRead)
+        assertEquals(listOf("n-2"), viewModel.uiState.value.items.map { it.id })
         assertEquals(1, viewModel.uiState.value.unreadCount)
         assertEquals(1, badge.count.value)
     }
 
     @Test
-    fun `S5 si falla la fila sigue sin leer y NO se pierde la lista`() {
+    fun `S5 eliminar baja el total para no dejar Cargar mas colgado`() {
+        val api = FakeNotificationsApi().apply {
+            page = NotificationsPage(listOf(item("n-1"), item("n-2")), total = 5, limit = 2, offset = 0)
+        }
+        val viewModel = build(api)
+
+        viewModel.markRead("n-1")
+
+        assertEquals(1, viewModel.uiState.value.items.size)
+        assertEquals(4, viewModel.uiState.value.total)
+        assertTrue(viewModel.uiState.value.canLoadMore)
+    }
+
+    @Test
+    fun `S5 si falla la fila sigue en la lista y NO se pierde`() {
         val api = FakeNotificationsApi().apply {
             page = NotificationsPage(listOf(item("n-1")), total = 1, limit = 20, offset = 0)
             unreadResult = ApiResult.Success(1)
@@ -214,8 +243,8 @@ class NotificationsViewModelTest {
 
         viewModel.markRead("n-1")
 
-        assertFalse(viewModel.uiState.value.items.single().isRead)
         assertEquals(1, viewModel.uiState.value.items.size)
+        assertEquals("n-1", viewModel.uiState.value.items.single().id)
         assertEquals(1, badge.count.value)
         assertEquals("Notification \"n-1\" not found", viewModel.uiState.value.snackbarMessage)
     }
@@ -246,24 +275,26 @@ class NotificationsViewModelTest {
         assertEquals(0, badge.count.value)
     }
 
-    // ── S6 · marcar todas ──────────────────────────────────────────────────
+    // ── S6 · borrar todas ──────────────────────────────────────────────────
 
     @Test
-    fun `S6 marcar todas apaga todas las filas y el badge`() {
+    fun `S6 borrar todas vacia la lista y el badge`() {
         val api = FakeNotificationsApi().apply {
             page = NotificationsPage(
-                listOf(item("n-1"), item("n-2", isRead = true)),
+                listOf(item("n-1"), item("n-2")),
                 total = 2,
                 limit = 20,
                 offset = 0,
             )
-            unreadResult = ApiResult.Success(1)
+            unreadResult = ApiResult.Success(2)
         }
         val viewModel = build(api)
 
         viewModel.markAllRead()
 
-        assertTrue(viewModel.uiState.value.items.all { it.isRead })
+        assertTrue(viewModel.uiState.value.items.isEmpty())
+        assertEquals(0, viewModel.uiState.value.total)
+        assertFalse(viewModel.uiState.value.canLoadMore)
         assertEquals(0, viewModel.uiState.value.unreadCount)
         assertEquals(0, badge.count.value)
         assertFalse(viewModel.uiState.value.isMarkingAll)

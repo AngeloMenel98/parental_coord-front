@@ -19,8 +19,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.DoneAll
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -32,11 +33,14 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -51,7 +55,15 @@ import com.parental.shared.core.util.formatRelativeTime
 import com.parental.shared.feature.notifications.domain.model.NotificationItem
 
 /**
- * Centro de notificaciones (slice 4): lista paginada, marcar una / todas.
+ * Centro de notificaciones (slice 4): lista paginada de **no leídas**, eliminar una
+ * y "borrar todas".
+ *
+ * Decisión de producto (2026-10-31): "eliminar" NO borra filas — el backend no
+ * tiene delete y el doc de la wave fija que eliminar = marcar leída. Como el
+ * listado se pide con `unreadOnly=true`, lo marcado desaparece de la vista y no
+ * vuelve al refrescar. Consecuencia asumida: las leídas no se pueden volver a ver
+ * (no hay endpoint de "marcar como no leída"), así que NO hay "Deshacer": un undo
+ * sólo local que se pierde al refrescar sería una promesa falsa.
  *
  * Sin WebSocket ni push: la pantalla se refresca al abrirse, a mano (botón de la
  * barra) y cuando el poller del badge trae un conteo nuevo. El copy va en
@@ -70,6 +82,8 @@ fun NotificationsScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
+    // N-9: "borrar todas" es irreversible para el usuario, así que pide confirmación.
+    var showDeleteAllDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(uiState.snackbarMessage) {
         val message = uiState.snackbarMessage
@@ -77,6 +91,31 @@ fun NotificationsScreen(
             snackbarHostState.showSnackbar(message)
             viewModel.consumeSnackbar()
         }
+    }
+
+    if (showDeleteAllDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteAllDialog = false },
+            title = { Text("¿Borrar todas las notificaciones?") },
+            text = {
+                Text("Se van a marcar como leídas y no van a volver a aparecer en esta lista.")
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showDeleteAllDialog = false
+                        viewModel.markAllRead()
+                    },
+                ) {
+                    Text("Borrar todas")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteAllDialog = false }) {
+                    Text("Cancelar")
+                }
+            },
+        )
     }
 
     Scaffold(
@@ -97,16 +136,16 @@ fun NotificationsScreen(
                     }
                 },
                 actions = {
-                    // G-2 · "íconos solamente": "Marcar todas" era el único botón de
-                    // texto que quedaba en una barra. El doble tilde es la convención,
-                    // y el `contentDescription` lo dice para quien no ve el ícono.
+                    // G-2 · "íconos solamente". Bajo la bandeja de no leídas, "marcar
+                    // todas" y "borrar todas" son la misma operación, así que el ícono
+                    // honesto es el tacho, no el doble tilde.
                     IconButton(
-                        onClick = { viewModel.markAllRead() },
-                        enabled = !uiState.isMarkingAll && uiState.unreadCount > 0,
+                        onClick = { showDeleteAllDialog = true },
+                        enabled = !uiState.isMarkingAll && uiState.items.isNotEmpty(),
                     ) {
                         Icon(
-                            imageVector = Icons.Default.DoneAll,
-                            contentDescription = "Marcar todas como leídas",
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = "Borrar todas las notificaciones",
                         )
                     }
                     IconButton(
@@ -142,8 +181,9 @@ fun NotificationsScreen(
                 )
 
                 uiState.items.isEmpty() -> NotificationsMessage(
-                    title = "No tenés notificaciones",
-                    body = "Cuando haya novedades en tu coordinación, van a aparecer acá.",
+                    title = "No tenés notificaciones nuevas",
+                    body = "Cuando haya novedades en tu coordinación van a aparecer acá. " +
+                        "Las que ya leíste no se vuelven a mostrar.",
                 )
 
                 else -> LazyColumn(
@@ -155,7 +195,7 @@ fun NotificationsScreen(
                         NotificationRow(
                             item = item,
                             isMarking = item.id in uiState.readingIds,
-                            onClick = { viewModel.markRead(item.id) },
+                            onDelete = { viewModel.markRead(item.id) },
                         )
                     }
 
@@ -173,35 +213,34 @@ fun NotificationsScreen(
     }
 }
 
+/**
+ * Una fila de la bandeja. Toda fila que llega acá está SIN leer (`unreadOnly=true`),
+ * así que no hay estilo "leída": el toque en la fila, o el tacho del extremo, la
+ * elimina de la vista.
+ */
 @Composable
 private fun NotificationRow(
     item: NotificationItem,
     isMarking: Boolean,
-    onClick: () -> Unit,
+    onDelete: () -> Unit,
 ) {
     Surface(
         modifier = Modifier
             .fillMaxWidth()
             .clip(MaterialTheme.shapes.medium)
-            .semantics {
-                stateDescription = if (item.isRead) "Leída" else "No leída"
-            }
-            .clickable(enabled = !item.isRead && !isMarking, onClick = onClick),
-        color = if (item.isRead) {
-            MaterialTheme.colorScheme.surface
-        } else {
-            MaterialTheme.colorScheme.surfaceVariant
-        },
+            .semantics { stateDescription = "Sin leer" }
+            .clickable(enabled = !isMarking, onClick = onDelete),
+        color = MaterialTheme.colorScheme.surfaceVariant,
         shape = MaterialTheme.shapes.medium,
     ) {
         Row(modifier = Modifier.padding(12.dp)) {
-            UnreadDot(isUnread = !item.isRead)
+            UnreadDot(isUnread = true)
             Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = item.title,
                     style = MaterialTheme.typography.titleSmall,
-                    fontWeight = if (item.isRead) FontWeight.Normal else FontWeight.Bold,
+                    fontWeight = FontWeight.Bold,
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
@@ -215,6 +254,13 @@ private fun NotificationRow(
                     text = formatRelativeTime(item.createdAt),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+            IconButton(onClick = onDelete, enabled = !isMarking) {
+                Icon(
+                    imageVector = Icons.Default.Delete,
+                    contentDescription = "Eliminar notificación",
                 )
             }
         }
