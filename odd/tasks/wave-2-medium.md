@@ -61,9 +61,24 @@ is read. That is enough only because of S5's decision: the list is an unread inb
 ### S2 — T14 · Expense model migration (`category_id`, `activity_id`, `deleted_at`)
 
 Ruling R2 (one taxonomy, not two) + R6 (a converted attachment shares the storage
-object and gets its own expense row). The `expense` table exists and has none of the
-three columns. Acceptance: one additive, idempotent migration + the entity fields +
-a structural migration spec, in the shape of `AddActivityCategoryId`.
+object and gets its own expense row). The `expense` table existed and had none of the
+three columns. Delivered as B `23d193b`.
+
+- `category_id` → `category(id)` — the same table `activity.category_id` already uses;
+  no `expense_category`. `ON DELETE RESTRICT`: a category holding expenses cannot be
+  deleted without deciding what happens to that money.
+- `activity_id` → `activity(id)`, the expense's origin (R6/D-17). `ON DELETE SET NULL`:
+  deleting an activity can never delete money.
+- `deleted_at` — the expense "Eliminar", same convention as `activity.deleted_at`
+  (mark, never purge) with a **partial** index `WHERE deleted_at IS NOT NULL`.
+- **All three nullable and no backfill, deliberately.** Historical rows have no
+  category and no origin, and picking one for them would invent accounting data. Making
+  the category mandatory on create is a DTO rule for T22, not a schema rule — `SET NOT
+  NULL` here would force fabricating a category for every existing expense.
+- Verified against real Postgres in **test and dev**: `run` → 3 columns, 3 indexes, 2 FKs
+  with the right delete policy; `revert` → nothing left; `run` again. Data probe in a
+  rolled-back transaction: insert with category + activity OK, an unknown category UUID
+  rejected by `FK_expense_category`. 10 structural specs; full suite 71 / 776 green.
 
 ### S3 — T15 · Agenda: "Todo el día" section + per-day activity indicators (F)
 
@@ -139,7 +154,7 @@ scheduler precedent exists and, since `bcf4c67`, the worker actually boots.
 | ID | Task | Side | Specs | Route | Status | Commit |
 |---|---|---|---|---|---|---|
 | T13 | "Eliminar" una notificación = marcarla leída. **Sin cambio en la base** | B | S1 | — | closed (no work needed) | — |
-| T14 | Expense model migration: `category_id`, `activity_id`, `deleted_at` | B | S2 | — | pending | — |
+| T14 | Expense model migration: `category_id`, `activity_id`, `deleted_at` | B | S2 | inline | done | B `23d193b` |
 | T15 | Agenda: "Todo el día" + per-day indicators | F | S3 | — | pending | — |
 | T16 | Swipe to change week (pager) | F | S4 | — | pending | — |
 | T17 | Notification delete UI: acción por fila + "borrar todas" (bandeja de no leídas) | F | S5 | inline | done | F `e52cc7e` |
@@ -257,6 +272,14 @@ T23 depends on this.
   persisted (no "mark unread" endpoint) would lie to the user. No swipe: N-5 says
   "swipe and/or action menu", and the action menu is the trash icon.
 
-- **2026-10-31 · next.** Backend root of the critical path is T14 (`T14 → T22 → T24 →
-  T28 → T29/T27 → T19/T20`). T17 landed as F `e52cc7e`: 35 suites / 294 tests
-  green, `assembleDebug` clean.
+- **2026-11-01 · T14 delivered as B `23d193b`.** The root of the expenses critical path.
+  Chose nullable + no backfill over `NOT NULL` (see S2): the schema cannot invent a
+  category for rows that never had one, so "required" belongs to the T22 DTO.
+  Structural specs first (RED: module missing), then the migration. Applied to dev and
+  test — **prod (Supabase) is now one migration behind**: `npx typeorm-ts-node-commonjs
+  -d src/database/data-source.ts migration:run` with the prod env is a remote write and
+  needs explicit approval.
+
+- **2026-11-01 · next.** `T14 → T22` is the critical path (`T14 → T22 → T24 → T28 →
+  T29/T27 → T19/T20`). T22 is the expense policy + audit service, the first *behavior*
+  on top of these columns.
