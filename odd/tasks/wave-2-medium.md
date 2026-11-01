@@ -177,6 +177,73 @@ scheduler precedent exists and, since `bcf4c67`, the worker actually boots.
 
 ---
 
+### S10 — T24 · Expenses write API (B, pulled forward from wave 3, depends on T14, T22)
+
+Pulled into this wave because **T19 (front, in this wave) is blocked on it**: the
+detail screen cannot be built against an API that does not exist. Delivered as B
+`7975695` (repository + DTOs) and B `0aa8742` (service + controller + module).
+
+Seven routes, all behind `JwtAuthGuard`:
+
+| Route | PRD |
+|---|---|
+| `POST /expenses/:bondId` | §5.3 · create, born `pending` |
+| `GET /expenses/:id` | detail + the policy decision for the viewer |
+| `PATCH /expenses/:id` | FR-11 · edit |
+| `DELETE /expenses/:id` | FR-11 · cancel (`deleted_at`, no purge) |
+| `POST /expenses/:id/approve` | FR-10 |
+| `POST /expenses/:id/reject` | FR-10, optional reason |
+| `POST /expenses/:id/pay` | FR-10 |
+
+**Decision — the response carries the decision, not just the data.** The DTO includes
+`canEdit`, `canCancel`, `canApprove`, `canReject`, `canMarkPaid` and `isTerminal`
+computed for the caller. The UI has to know which buttons to show without reimplementing
+FR-11 in the client, and without learning the rules by hitting a 403. The rules live in
+the server; the client consumes them as data.
+
+**Decision — a transition's order is what makes it correct.** Decide with
+`ExpensePolicyService`, write with compare-and-swap using the status the policy just
+approved, and audit **inside the same transaction**; only then re-read. If somebody moved
+the expense in between, the `UPDATE` affects 0 rows and the client gets 409 instead of an
+invented status. The audit shares the `EntityManager` so a rolled-back transition never
+leaves a lying audit row.
+
+**Decision — concurrency without a new column.** `UPDATE ... WHERE id AND status =
+:expectedFrom AND deleted_at IS NULL`, keyed off `affected`. No `version` column, no
+schema change: reading and then writing would leave the window open.
+
+**Decision — a non-member gets 404, not 403.** It does not confirm the expense exists
+(same rule as `activityNotFound()`). A member who is not the right party does get 403.
+
+**Decision — plain Nest exceptions, not `CodedException`.** `ACTIVITY_ERROR_CODES` is a
+closed union owned by the activities swipe contract and is not polluted with another
+domain. Expense clients do not need to guess from a code: the response already tells them
+what they may do.
+
+**Decision — the split accepts only the requester's share.** The other party's share is
+always the complement, `round((100 - payer) * 100) / 100`. Two independent numbers would
+let 60/60 through.
+
+**Decision — `childId` and `activityId` are not accepted on create.** Neither is in the
+§5.3 form, and `activity_id` comes from an attachment conversion (R6) that lands with T27
+and must verify the activity belongs to the same bond. Accepting it now would let a
+client point an expense at another bond's activity with nothing checked.
+
+An empty `PATCH` is 400, not a silent no-op. `2026-02-31` passes the regex and blows up in
+Postgres, so the date is re-validated against the calendar in the service.
+
+**`markDeleted`, not `softDelete`** — `Repository.softDelete` already exists in TypeORM
+with a different signature.
+
+Tests: 43 specs, written first (RED: module missing), with the **real** policy and only
+persistence mocked. Full suite 74 / 850 green, build and eslint clean. Verified on real
+Postgres (dev, 14 migrations) with 47 checks: `numeric` arrives from the driver as a
+STRING and the mapper converts it; a lost CAS affects 0 rows and does not overwrite; the
+`deleted_at` filter hides a cancelled expense without deleting it; and a failed audit
+rolls the expense back instead of leaving it orphaned.
+
+---
+
 ## Tasks
 
 | ID | Task | Side | Specs | Route | Status | Commit |
@@ -188,11 +255,12 @@ scheduler precedent exists and, since `bcf4c67`, the worker actually boots.
 | T17 | Notification delete UI: acción por fila + "borrar todas" (bandeja de no leídas) | F | S5 | inline | done | F `e52cc7e` |
 | T35 | Compliance formula: exclude `cancelled`, period copy | B+F | S6 | — | pending | — |
 | T18 | Verify window in the front | F | S7 | — | blocked on T25 | — |
-| T19 | Expense detail + approve/reject/pay | F | S7 | — | blocked on T24 | — |
+| T19 | Expense detail + approve/reject/pay | F | S7 | — | pending (T24 done) | — |
 | T20 | Home metric cards | F | S7 | — | blocked on T28 | — |
 | T21 | Status-aware action matrix | F | S7 | — | blocked on T18, T25 | — |
 | T22 | Expense policy + audit | B | S8 | inline | done | B `f2d190b` |
 | T23 | Expense notifications + 7-day reminder | B | S9 | — | pending (after T14, T22) | — |
+| T24 | Expenses write API: create, detail, edit, cancel, approve/reject/pay | B | S10 | inline | done | B `7975695` + `0aa8742` |
 
 Unblocked right now with **no dependency at all**: T14, T15, T16, T35, T17.
 T13 needs no backend work at all (see S1): both endpoints it needs already exist.
@@ -320,8 +388,35 @@ T23 depends on this.
   migration files, two migration specs, `activity-notification.map.ts`, its spec). No
   substantive change. Left out of every commit; not mine to decide.
 
-- **2026-11-01 · next.** `T14 → T22` is closed on the critical path, so **T24** (the
-  expenses API: approve / reject / pay transitions) is the next unblocked backend task
-  (`T24 → T28 → T29/T27 → T19/T20`). T23 also unblocked (depends on T14, T22). T25
-  (verify state) remains the bottleneck for T18/T21. Prod Supabase still one migration
-  behind and needs explicit approval to run `1792819200000`.
+- **2026-11-01 · T24 delivered as B `7975695` + `0aa8742`, pulled forward from wave 3.**
+  T19 is in this wave and was blocked on it, so the backend had to come first. Split into
+  two reviewable units — data access + contract, then behavior — instead of one 1.5k-line
+  commit. 43 specs written first (RED: module missing), with the real policy and only
+  persistence mocked. Full suite 74 / 850 green, build and eslint clean.
+
+  Chose compare-and-swap over a `version` column: `UPDATE ... WHERE id AND status =
+  :expectedFrom AND deleted_at IS NULL` with `affected` as the answer. No schema change,
+  and reading before writing would have left the window open. Chose to return the policy
+  decision in the response so T19 renders buttons from data instead of reimplementing
+  FR-11 in Kotlin.
+
+  Verified against real Postgres (dev, 14 migrations), not just mocks — 47 checks. The
+  ones that mattered: `numeric` really does come back from `pg` as a STRING and the mapper
+  converts it (`amount!` typed as `number` in the entity is a lie at runtime); a stale CAS
+  affects 0 rows and leaves the row untouched; `deleted_at` removes the expense from reads
+  while the row survives with its status intact; and a throwing audit rolls the expense
+  back, so no orphan row.
+
+  Deliberately **not** included: `childId`/`activityId` on create (neither is in the §5.3
+  form; `activity_id` belongs to T27's attachment conversion, which must verify the bond).
+  A PATCH that could null the category (the column is nullable only for historical rows).
+
+- **2026-11-01 · dev DB was gone.** The `parental-coordination-postgres` container did not
+  exist (a leftover `pc-postgres` from another project held port 5432). Brought it back
+  with `docker compose up -d postgres`; the named volume still had both databases at 14
+  migrations, so no data was lost.
+
+- **2026-11-01 · next.** Critical path moved one step: **T28** (expense list, filters,
+  balance) is now the unblocked backend bottleneck for T20/T29, and **T19** (front) is
+  unblocked. T23 is also free (T14 + T22 done). T25 (verify state) still blocks T18/T21.
+  Prod Supabase still one migration behind (`1792819200000`) and needs explicit approval.
