@@ -139,8 +139,36 @@ but no path enters or leaves it; the engine goes `in_progress → done` directly
 
 ### S8 — T22 · Expense policy + audit (B, depends on T14)
 
-PRD `PRD_expense` FR-10, FR-11. The `audit_log` table and the `audit` module exist;
-mirror `activity-policy.service.ts`.
+PRD `PRD_expense` FR-10, FR-11. Delivered as B `f2d190b`. The policy is pure, like
+`ActivityPolicyService`: takes a structural subject, returns the whole decision, and
+throws nothing — the calling service turns a `false` into the 403 and resolves
+`counterpartId` from the bond, because an expense stores who asked, not who the other
+party is.
+
+The rules, as the PRD states them:
+
+- FR-11 — edit and cancel: requester only, and only in `pending`.
+- §5.4 — approve and reject: counterpart only, and only in `pending`. A requester does
+  not approve their own expense; a third party can do nothing at all.
+- §5.4 — mark paid: from `approved`, either party (the payer marks it paid, the payee
+  confirms receipt).
+- `paid` and `rejected` are terminal: no transition leaves them.
+
+**Decision — `counterpartId` can be `null`.** While the bond has one member there is no
+counterpart, so nobody can approve. That is deliberate: the alternative is letting a
+requester approve alone because there is nobody to disagree, which makes the status
+meaningless.
+
+**Decision — the audit action is derived, not passed in.** `recordStatusChange` maps the
+`from:to` pair to `expense_approve` / `expense_reject` / `expense_pay`, with
+`expense_status_change` as the fallback. Letting the caller name the action lets the
+audit trail lie about which transition happened.
+
+`ExpensesAuditRepository` reuses `audit_log` with `entity_type = 'expense'` and no DDL:
+the status pair goes in `old_value`/`new_value`, the readable reason in `detail`, and
+FR-10's user and timestamp in their own columns. The optional `EntityManager` exists
+because a transition must write expense + audit + notification in one transaction — a
+rollback must not leave an audit claiming something that did not happen.
 
 ### S9 — T23 · Expense notifications via outbox fan-out + 7-day stale reminder (B, depends on T14, T22)
 
@@ -163,7 +191,7 @@ scheduler precedent exists and, since `bcf4c67`, the worker actually boots.
 | T19 | Expense detail + approve/reject/pay | F | S7 | — | blocked on T24 | — |
 | T20 | Home metric cards | F | S7 | — | blocked on T28 | — |
 | T21 | Status-aware action matrix | F | S7 | — | blocked on T18, T25 | — |
-| T22 | Expense policy + audit | B | S8 | — | pending (after T14) | — |
+| T22 | Expense policy + audit | B | S8 | inline | done | B `f2d190b` |
 | T23 | Expense notifications + 7-day reminder | B | S9 | — | pending (after T14, T22) | — |
 
 Unblocked right now with **no dependency at all**: T14, T15, T16, T35, T17.
@@ -280,6 +308,20 @@ T23 depends on this.
   -d src/database/data-source.ts migration:run` with the prod env is a remote write and
   needs explicit approval.
 
-- **2026-11-01 · next.** `T14 → T22` is the critical path (`T14 → T22 → T24 → T28 →
-  T29/T27 → T19/T20`). T22 is the expense policy + audit service, the first *behavior*
-  on top of these columns.
+- **2026-11-01 · T22 delivered as B `f2d190b`.** 20 policy specs + 11 audit specs,
+  written first (RED: module missing). Full suite 73 / 807 green, build and eslint
+  clean. Caught a hole in my own spec before implementing: the subject started out as
+  `{ status, requestedBy }`, which makes a counterpart and a stranger indistinguishable —
+  both are "not the requester". Added `counterpartId` and a test for the bond with a
+  single member.
+
+- **2026-11-01 · tree noise.** The back worktree carries cosmetic prettier reformatting
+  of 10 files I did not author (`activities.module.ts`, the two attachment files, two
+  migration files, two migration specs, `activity-notification.map.ts`, its spec). No
+  substantive change. Left out of every commit; not mine to decide.
+
+- **2026-11-01 · next.** `T14 → T22` is closed on the critical path, so **T24** (the
+  expenses API: approve / reject / pay transitions) is the next unblocked backend task
+  (`T24 → T28 → T29/T27 → T19/T20`). T23 also unblocked (depends on T14, T22). T25
+  (verify state) remains the bottleneck for T18/T21. Prod Supabase still one migration
+  behind and needs explicit approval to run `1792819200000`.
