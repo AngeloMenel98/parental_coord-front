@@ -26,7 +26,6 @@ import com.parental.shared.core.ui.components.TagDot
 import com.parental.shared.core.ui.components.categoryTagTriple
 import com.parental.shared.core.ui.theme.AgendaGeometry
 import com.parental.shared.core.ui.theme.Spacing
-import com.parental.shared.feature.activities.domain.model.canConfirm
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 
@@ -80,7 +79,6 @@ internal fun AgendaTimelineRow(
     onSelectActividad: (String) -> Unit,
     onConfirm: (String) -> Unit,
     isConfirming: Boolean,
-    currentUserId: String,
     focusRequesters: MutableMap<String, FocusRequester>,
     swipe: @Composable (content: @Composable () -> Unit) -> Unit,
 ) {
@@ -91,7 +89,9 @@ internal fun AgendaTimelineRow(
 
     val info = resolve(row.actividad.categoryId)
     val categoryColor = categoryTagTriple(info)?.dot ?: MaterialTheme.colorScheme.outline
-    val canConfirm = row.actividad.canConfirm(currentUserId)
+    // S3/T18 · El permiso viene del SERVIDOR (`canConfirm`, S2) y viaja con la fila; la
+    // regla local `canConfirm(currentUserId)` se retiró porque ignoraba el estado.
+    val canConfirm = row.actividad.canConfirm
     val semanticLabel = activitySemanticLabel(row, info, zone)
 
     Row(

@@ -27,7 +27,6 @@ import com.parental.shared.core.ui.components.BottomNavBar
 import com.parental.shared.core.ui.components.CategoryInfo
 import com.parental.shared.core.ui.theme.MotionTokens
 import com.parental.shared.core.ui.theme.Spacing
-import com.parental.shared.feature.activities.domain.model.canConfirm
 import com.parental.shared.feature.activities.ui.detail.ActividadDetailSheet
 import com.parental.shared.feature.activities.ui.create.CreateActivitySheet
 import com.parental.shared.feature.activities.ui.openedId
@@ -167,7 +166,6 @@ fun ActividadesScreen(
             isConfirming = uiState.isConfirming,
             onOpenCreate = viewModel::openCreate,
             onSwipeAction = viewModel::startSwipeAction,
-            currentUserId = viewModel.currentUserId,
             timelineMode = timelineMode,
             onTimelineModeChange = { timelineMode = it },
             weekStartIso = weekStartIso,
@@ -199,7 +197,6 @@ fun ActividadesScreen(
                 // asignación está confirmada, así que esta acción vive aquí (abajo se
                 // abre el diálogo de motivo obligatorio, el mismo que usa el swipe).
                 onDecline = { id -> viewModel.startSwipeAction(id, SwipeAction.DECLINE) },
-                currentUserId = viewModel.currentUserId,
                 attachments = viewModel.attachments.collectAsState().value,
                 attachmentsLoading = viewModel.attachmentsLoading.collectAsState().value,
                 onLoadAttachments = viewModel::loadAttachments,
@@ -282,7 +279,6 @@ private fun ActividadesListScreen(
      * la firma de `TimelineView` cambiaría cada vez que se añadiera una acción.
      */
     onSwipeAction: (String, SwipeAction) -> Unit,
-    currentUserId: String,
     timelineMode: TimelineMode,
     onTimelineModeChange: (TimelineMode) -> Unit,
     weekStartIso: String,
@@ -549,7 +545,6 @@ private fun ActividadesListScreen(
                         onSelectActividad = onSelectActividad,
                         onConfirm = onConfirm,
                         isConfirming = isConfirming,
-                        currentUserId = currentUserId,
                         memberNames = uiState.memberNames,
                         children = uiState.children,
                         onSwipeAction = onSwipeAction,
@@ -631,7 +626,6 @@ private fun TimelineContent(
     onSelectActividad: (String) -> Unit,
     onConfirm: (String) -> Unit,
     isConfirming: Boolean,
-    currentUserId: String,
     memberNames: Map<String, String>,
     children: List<VinculoChild>,
     onSwipeAction: (String, SwipeAction) -> Unit,
@@ -662,7 +656,6 @@ private fun TimelineContent(
                 onSelectActividad = onSelectActividad,
                 onConfirm = onConfirm,
                 isConfirming = isConfirming,
-                currentUserId = currentUserId,
                 memberNames = memberNames,
                 children = children,
                 // R2-T2-7 · La LISTA es la superficie principal de la acción y hasta ahora
@@ -684,7 +677,6 @@ private fun TimelineContent(
                 onSelectActividad = onSelectActividad,
                 onConfirm = onConfirm,
                 isConfirming = isConfirming,
-                currentUserId = currentUserId,
                 onSwipeAction = onSwipeAction,
                 onSelectDate = onSelectDate,
                 onPreviousWeek = onPreviousWeek,

@@ -19,7 +19,6 @@ import com.parental.shared.core.ui.theme.ParentalShapes
 import com.parental.shared.core.ui.theme.ProgressStroke
 import com.parental.shared.core.ui.theme.Spacing
 import com.parental.shared.core.ui.theme.TypeTokens
-import com.parental.shared.feature.activities.domain.model.canConfirm
 import com.parental.shared.feature.activities.ui.swipe.ActivitySwipeBox
 import com.parental.shared.feature.activities.ui.swipe.SwipeAction
 import kotlinx.datetime.LocalDate
@@ -57,7 +56,6 @@ internal fun WeekTimeline(
     onSelectActividad: (String) -> Unit,
     onConfirm: (String) -> Unit,
     isConfirming: Boolean,
-    currentUserId: String,
     /**
      * R2-T2-7 · ÚNICO punto por el que una agenda dispara una acción de swipe.
      *
@@ -162,12 +160,10 @@ internal fun WeekTimeline(
                                         // emite riel, para que no cuelgue una cola bajo el
                                         // último nodo.
                                         showConnector = index < slot.rows.lastIndex,
-                                        // R2-T2-8 · `canConfirm` se EVALÚA AQUÍ, con el
-                                        // `currentUserId` de la pantalla, y se PASA como dato.
-                                        // F7 no lo recalcula ni lo adivina: si mañana la regla
-                                        // de asignación cambia, este es el único sitio que
-                                        // hay que tocar, y la fila no puede discrepar de él.
-                                        canConfirm = row.actividad.canConfirm(currentUserId),
+                                        // S3/T18 · `canConfirm` YA VIENE DEL SERVIDOR en el
+                                        // DTO. F7 no lo recalcula: la regla de asignación vive
+                                        // en `ActivityPolicyService.evaluate`.
+                                        canConfirm = row.actividad.canConfirm,
                                         onSelectActividad = onSelectActividad,
                                         onConfirm = onConfirm,
                                         isConfirming = isConfirming,
@@ -203,7 +199,6 @@ internal fun WeekTimeline(
                         onSelectActividad = onSelectActividad,
                         onConfirm = onConfirm,
                         isConfirming = isConfirming,
-                        currentUserId = currentUserId,
                         // R2-T2-7 · Misma regla que en `AgendaList`: el hueco no tiene
                         // valor por defecto, así que esta llamada NO COMPILARÍA sin él. Una
                         // fila sin fecha dentro de un mismo día deslizable era exactamente

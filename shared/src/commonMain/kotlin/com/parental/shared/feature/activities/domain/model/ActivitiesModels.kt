@@ -24,15 +24,19 @@ data class Actividad(
     val completedAt: String? = null,   // ISO-8601 (D14)
     /** T03 · ids de los hijos vinculados a la actividad (backend: `ActivitySummaryDto.childrenIds`). */
     val childrenIds: List<String> = emptyList(),
-    // 🔴 R1 · Los TRES flags los calcula el SERVIDOR para el usuario que pregunta
-    // (`ActivityPolicyService.evaluate`). El cliente NO los recalcula — a diferencia
-    // de `canConfirm` más abajo, que sí es una regla local. Si el cliente los
-    // derivara, habría dos copias de la política y divergirían en cuanto cambiara
-    // una; con `false` por defecto, un servidor viejo degrada a "sin acciones" en
-    // vez de a "acciones que van a fallar".
+    // 🔴 R1/S2 · TODOS los flags los calcula el SERVIDOR para el usuario que pregunta
+    // (`ActivityPolicyService.evaluate`). El cliente NO recalcula NINGUNO: la antigua
+    // regla local `canConfirmAssignment` se retiró con T18 precisamente porque ignoraba
+    // el estado y pintaba "Confirmar" donde el servidor respondía 409. Si el cliente
+    // derivara un flag, habría dos copias de la política y divergirían en cuanto
+    // cambiara una; con `false` por defecto, un servidor viejo degrada a "sin acciones"
+    // en vez de a "acciones que van a fallar".
     val canDelete: Boolean = false,
     val canCancel: Boolean = false,
+    val canConfirm: Boolean = false,
     val canDecline: Boolean = false,
+    /** `in_progress` **y** `verify` (R3): es el gate real del CTA "Finalizar". */
+    val canComplete: Boolean = false,
 )
 
 @Serializable
@@ -55,7 +59,10 @@ data class ActividadDetalle(
     val completedAt: String? = null,   // ISO-8601 (D14)
     val canDelete: Boolean = false,
     val canCancel: Boolean = false,
+    val canConfirm: Boolean = false,
     val canDecline: Boolean = false,
+    /** `in_progress` **y** `verify` (R3): es el gate real del CTA "Finalizar". */
+    val canComplete: Boolean = false,
     /** `now >= coalesce(scheduledEnd, scheduledStart)` — sólo lo manda el detalle. */
     val isPast: Boolean = false,
     /**
@@ -108,22 +115,13 @@ data class ConfirmAssignmentResponse(
     val confirmedAt: String? = null,
 )
 
-/**
- * Regla de visibilidad EXACTA (R10): el affordance de confirmar se muestra
- * IFF assignedTo == currentUserId && !assignedConfirmed. Un único lugar
- * para la regla — usada por Actividad y ActividadDetalle.
- */
-internal fun canConfirmAssignment(
-    assignedTo: String?,
-    assignedConfirmed: Boolean,
-    currentUserId: String?,
-): Boolean = assignedTo == currentUserId && !assignedConfirmed
-
-fun Actividad.canConfirm(currentUserId: String?) =
-    canConfirmAssignment(assignedTo, assignedConfirmed, currentUserId)
-
-fun ActividadDetalle.canConfirm(currentUserId: String?) =
-    canConfirmAssignment(assignedTo, assignedConfirmed, currentUserId)
+// 🔴 S3/T18 · AQUÍ VIVÍA `canConfirmAssignment(assignedTo, assignedConfirmed, currentUserId)`
+// y sus dos extensiones `Actividad.canConfirm(...)` / `ActividadDetalle.canConfirm(...)`.
+// Se retiraron: la regla local IGNORABA EL ESTADO (ofrecía "Confirmar" en `done`, en
+// `cancelled`, en `verify`…) y el servidor respondía 409. El permiso ahora llega en el
+// DTO (`canConfirm`), calculado por `ActivityPolicyService.evaluate` con el origen del
+// `overdue` incluido. No la reintroduzcas "por comodidad": sería una segunda copia de la
+// política, y la copia del cliente es justo la que se equivoca.
 
 @Serializable
 data class CreateActividadRequest(

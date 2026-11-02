@@ -1,6 +1,7 @@
 package com.parental.shared.feature.activities.ui.create
 
 import com.parental.shared.feature.activities.ui.create.NoPastDatesFrom
+import com.parental.shared.feature.activities.ui.create.earliestStartUtcMillis
 import com.parental.shared.feature.activities.ui.create.formatDdMmAaaa
 import com.parental.shared.feature.activities.ui.create.pickerMillisToDate
 import com.parental.shared.feature.activities.ui.create.toIsoWithOffset
@@ -87,6 +88,48 @@ class CreateDateConversionTest {
         assertTrue(!selectable.isSelectableDate(today - 86_400_000L), "ayer no debe ser seleccionable")
         assertTrue(selectable.isSelectableYear(pickerMillisToDate(today).year))
         assertTrue(!selectable.isSelectableYear(pickerMillisToDate(today).year - 1))
+    }
+
+    // ── piso del alta: 48 h de antelación (S3/T18) ───────────────────────
+
+    @Test
+    fun `earliestStartUtcMillis es la medianoche UTC del dia que cumple las 48 horas`() {
+        // 10:00Z + 48h = 03/10 10:00Z ⇒ el piso es la medianoche de ESE día.
+        val millis = earliestStartUtcMillis(Instant.parse("2026-10-01T10:00:00Z"))
+
+        assertEquals(LocalDate(2026, 10, 3), pickerMillisToDate(millis))
+        assertEquals("2026-10-03T00:00:00Z", Instant.fromEpochMilliseconds(millis).toString())
+    }
+
+    @Test
+    fun `el piso del alta esta dos dias por delante de hoy con el mismo reloj`() {
+        val now = Instant.parse("2026-10-01T10:00:00Z")
+        val todayFromSameClock = now.toLocalDateTime(TimeZone.UTC).date.toPickerMillis()
+
+        assertEquals(todayFromSameClock + 2 * 86_400_000L, earliestStartUtcMillis(now))
+    }
+
+    @Test
+    fun `con el piso del alta hoy NO es seleccionable`() {
+        val now = Instant.parse("2026-10-01T10:00:00Z")
+        val today = now.toLocalDateTime(TimeZone.UTC).date.toPickerMillis()
+        val selectable = NoPastDatesFrom(earliestStartUtcMillis(now))
+
+        assertTrue(!selectable.isSelectableDate(today), "el alta no puede programarse para hoy")
+        assertTrue(selectable.isSelectableDate(earliestStartUtcMillis(now)))
+    }
+
+    @Test
+    fun `el piso es el DIA, no la hora, y el dia limite se ofrece entero`() {
+        // ⚠ TRADE-OFF CONSCIENTE: el `DatePicker` sólo elige fechas, así que no puede decir
+        //   "a partir de las 23:30 del día límite". Ese día se ofrece entero; las horas que
+        //   no llegan a las 48h las corta `validateCreateForm` con el mensaje del servidor.
+        //   Sobre-restringir (bloquear el día entero) costaría un día de margen al usuario;
+        //   sub-restringir (dejar elegir) sólo cuesta un error en línea, que es el mal menor.
+        val millis = earliestStartUtcMillis(Instant.parse("2026-10-01T23:30:00Z"))
+
+        assertEquals(LocalDate(2026, 10, 3), pickerMillisToDate(millis))
+        assertTrue(!NoPastDatesFrom(millis).isSelectableDate(millis - 86_400_000L))
     }
 
     @Test

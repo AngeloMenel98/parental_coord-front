@@ -24,7 +24,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import com.parental.shared.core.ui.components.CategoryInfo
 import com.parental.shared.core.ui.theme.Spacing
-import com.parental.shared.feature.activities.domain.model.canConfirm
 import com.parental.shared.feature.activities.ui.swipe.ActivitySwipeBox
 import com.parental.shared.feature.bonds.domain.model.VinculoChild
 import com.parental.shared.feature.activities.ui.swipe.SWIPE_HINT
@@ -59,7 +58,6 @@ internal fun AgendaTimeline(
     onSelectActividad: (String) -> Unit,
     onConfirm: (String) -> Unit,
     isConfirming: Boolean,
-    currentUserId: String,
     memberNames: Map<String, String>,
     children: List<VinculoChild>,
     /**
@@ -113,7 +111,9 @@ internal fun AgendaTimeline(
                                     memberNames = memberNames,
                                     children = children,
                                 ),
-                                canConfirm = row.actividad.canConfirm(currentUserId),
+                                // S3/T18 · El permiso llega DEL SERVIDOR en el DTO; no se
+                                // recalcula aquí. Antes era `canConfirm(currentUserId)`.
+                                canConfirm = row.actividad.canConfirm,
                                 isConfirming = isConfirming,
                                 focusRequesters = focusRequesters,
                                 memberNames = memberNames,

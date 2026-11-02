@@ -34,12 +34,14 @@ import com.parental.shared.core.ui.theme.ProgressStroke
 import com.parental.shared.core.ui.theme.SheetGeometry
 import com.parental.shared.core.ui.theme.Spacing
 import com.parental.shared.feature.activities.domain.model.ActividadDetalle
-import com.parental.shared.feature.activities.domain.model.canConfirm
 import com.parental.shared.feature.activities.domain.model.resolveChildNames
 import com.parental.shared.feature.activities.domain.model.visibleDeclinedReason
 import com.parental.shared.feature.activities.ui.*
 import com.parental.shared.feature.bonds.domain.model.VinculoChild
 import kotlinx.coroutines.launch
+import kotlinx.datetime.Instant
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 
 /*
  * Hoja de detalle — `activity-detail-modal`, T2-1. Sustituye a `ActividadDetailScreen` (T3-1).
@@ -89,7 +91,6 @@ internal fun ActividadDetailSheet(
     onComplete: (String) -> Unit,
     isCompleting: Boolean,
     onDecline: (String) -> Unit = {},
-    currentUserId: String,
     attachments: List<ActivityAttachmentDto> = emptyList(),
     attachmentsLoading: Boolean = false,
     onLoadAttachments: (String) -> Unit = {},
@@ -191,7 +192,6 @@ internal fun ActividadDetailSheet(
                         onComplete = onComplete,
                         isCompleting = isCompleting,
                         onDecline = onDecline,
-                        currentUserId = currentUserId,
                         // Sin este cable el CTA caía en el lambda por defecto
                         // (no-op) y el botón no hacía NADA aunque el picker
                         // devolviera un archivo.
@@ -264,6 +264,15 @@ private fun DetailContent(
             Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                 StatusTag(status = a.status)
                 CategoryBadge(categoryId = a.categoryId, resolve = resolve)
+            }
+        }
+        // S3/T18 · LA VENTANA DE VERIFICACIÓN. Es la MISMA fuente que la tarjeta —`deadline`,
+        // que el servidor reancla a `now + 36 h` al entrar en `verify` (R14)—, no un segundo
+        // reloj: el cliente no calcula cuándo vence, sólo lee cuándo vence. Si el backend no
+        // manda `deadline`, la tarjeta no se pinta en vez de inventar un vencimiento.
+        if (a.status.equals("verify", ignoreCase = true)) {
+            parseInstant(a.deadline)?.let { windowEnd ->
+                item { VerifyWindowCard(deadline = windowEnd) }
             }
         }
         if (a.description.isNotBlank()) item { DetailCard(title = "Descripción", body = a.description) }
@@ -356,6 +365,22 @@ private fun DetailContent(
     }
 }
 
+/**
+ * S3/T18 · La ventana de verificación, con el formato de fecha que ya usan la tarjeta y el
+ * bloque de datos ([formatDeadline]). El texto dice QUÉ pasa si el plazo vence — el estado
+ * `overdue` — porque un vencimiento sin consecuencia es sólo una fecha.
+ */
+@Composable
+private fun VerifyWindowCard(deadline: Instant) {
+    val zone = remember { TimeZone.currentSystemDefault() }
+    val local = deadline.toLocalDateTime(zone)
+    DetailCard(
+        title = "Por verificar",
+        body = "Finaliza antes del ${formatDeadline(deadline, zone)} a las " +
+            "${formatTime(local.hour, local.minute)}. Si no, la actividad pasa a vencida.",
+    )
+}
+
 /** Pie FIJO, fuera del scroll (FR-9): el CTA de comprobante no baja con el contenido. */
 @Composable
 private fun DetailFooter(
@@ -366,17 +391,19 @@ private fun DetailFooter(
     onComplete: (String) -> Unit,
     isCompleting: Boolean,
     onDecline: (String) -> Unit,
-    currentUserId: String,
     onAddAttachment: (String, String, String, ByteArray) -> Unit,
     picker: FilePicker,
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
-        // AL-4 · "Finalizar" POR ENCIMA del bloque de acciones: es la transición que cierra el
-        // ciclo de vida (spec `activity-lifecycle`) y desaparece en cuanto `status == "done"`.
+        // S3/T18 · "Finalizar" se pinta SOLO cuando el SERVIDOR dice que esta transición
+        // existe para este usuario: `canComplete` es `in_progress` **y** `verify` (R3).
+        // Antes el gate era `status != "done"`, así que el botón aparecía en `created`,
+        // `assigned`, `overdue`… y el POST respondía 409. El label sigue siendo "Finalizar"
+        // (el wording del usuario); la matriz lo llama "Completado".
         // ⚠ `isCompleting` es un FLAG PROPIO del ViewModel, no un estado de la hoja: la hoja NO
         //   se desmonta al finalizar, así que un `Loading(id)` la vaciaría y el usuario perdería
         //   el contexto justo tras completar.
-        if (actividad.status != "done") {
+        if (actividad.canComplete) {
             OutlinedButton(
                 onClick = { onComplete(actividad.id) },
                 enabled = !isCompleting,
@@ -393,7 +420,9 @@ private fun DetailFooter(
                 }
             }
         }
-        // Estados 2/1/0: confirmado → chip inerte; asignable → botón; no asignado → nada.
+        // Estados 2/1/0: confirmado → chip inerte; el servidor autoriza confirmar → botón;
+        // ninguno → nada. El chip de `assignedConfirmed` se queda (R4): es el sitio donde el
+        // dato sí significa algo aunque la tarjeta ya no lo pinte.
         when {
             actividad.assignedConfirmed -> AssistChip(
                 onClick = {},
@@ -401,7 +430,7 @@ private fun DetailFooter(
                 modifier = Modifier.fillMaxWidth()
                     .padding(start = Spacing.lg, end = Spacing.lg, bottom = Spacing.sm),
             )
-            actividad.canConfirm(currentUserId) -> Button(
+            actividad.canConfirm -> Button(
                 onClick = { onConfirm(actividad.id) },
                 enabled = !isConfirming,
                 modifier = Modifier.fillMaxWidth()

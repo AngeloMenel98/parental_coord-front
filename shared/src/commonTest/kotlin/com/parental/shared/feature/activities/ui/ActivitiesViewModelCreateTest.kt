@@ -19,7 +19,12 @@ import com.parental.shared.feature.bonds.domain.model.VinculoMemberUser
 import io.ktor.client.HttpClient
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.datetime.Clock
+import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.LocalDate
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.plus
+import kotlinx.datetime.toLocalDateTime
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -166,12 +171,25 @@ class ActivitiesViewModelCreateTest {
         viewModels.clear()
     }
 
+    /**
+     * S3/T18 · El alta exige 48 horas de antelación, así que la fecha del formulario NO puede
+     * ser una constante: `LocalDate(2026, 10, 5)` era válida sólo mientras el reloj iba por
+     * detrás, y el guard `validateCreateForm` la rechazaría sin que el test lo pretendiera.
+     * Se calcula a +7 días LOCALES en cada ejecución: margen de sobra sobre las 48h y sobre
+     * cualquier huso horario.
+     */
+    private val futureDate: LocalDate =
+        Clock.System.now()
+            .toLocalDateTime(TimeZone.currentSystemDefault())
+            .date
+            .plus(7, DateTimeUnit.DAY)
+
     private fun validForm(children: Set<String>) = CreateForm(
         title = "Ir al médico",
         description = "Revisión",
         categoryId = "cat-salud",
         childrenIds = children,
-        startDate = LocalDate(2026, 10, 5),
+        startDate = futureDate,
         startTime = TimeOfDay(10, 0),
     )
 
@@ -246,7 +264,7 @@ class ActivitiesViewModelCreateTest {
         vm.setCreateTitle("Ir al médico")
         vm.setCreateDescription("Revisión")
         vm.setCreateCategory("cat-salud")
-        vm.setCreateDate(LocalDate(2026, 10, 5))
+        vm.setCreateDate(futureDate)
         vm.setCreateTime(TimeOfDay(10, 0))
 
         vm.submitCreate()
@@ -265,7 +283,7 @@ class ActivitiesViewModelCreateTest {
         vm.openCreate()
         vm.setCreateTitle("Ir al médico")
         vm.setCreateCategory("cat-salud")
-        vm.setCreateDate(LocalDate(2026, 10, 5))
+        vm.setCreateDate(futureDate)
 
         vm.submitCreate()
 
@@ -284,7 +302,7 @@ class ActivitiesViewModelCreateTest {
         vm.setCreateTitle("Ir al médico")
         vm.setCreateDescription("Revisión")
         vm.setCreateCategory("cat-salud")
-        vm.setCreateDate(LocalDate(2026, 10, 5))
+        vm.setCreateDate(futureDate)
         val before = vm.uiState.value.createForm
 
         vm.submitCreate()
@@ -302,7 +320,7 @@ class ActivitiesViewModelCreateTest {
         vm.openCreate()
         vm.setCreateTitle("Ir al médico")
         vm.setCreateCategory("cat-salud") // Salud ⇒ critical en el servidor
-        vm.setCreateDate(LocalDate(2026, 10, 5))
+        vm.setCreateDate(futureDate)
 
         vm.submitCreate()
 
@@ -321,7 +339,7 @@ class ActivitiesViewModelCreateTest {
         vm.openCreate()
         vm.setCreateTitle("Ir al médico")
         vm.setCreateCategory("cat-salud")
-        vm.setCreateDate(LocalDate(2026, 10, 5))
+        vm.setCreateDate(futureDate)
         val gate = CompletableDeferred<Unit>()
         api.createGate = gate
 

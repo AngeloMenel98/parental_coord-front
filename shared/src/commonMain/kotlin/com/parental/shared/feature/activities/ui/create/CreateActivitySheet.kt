@@ -117,9 +117,9 @@ import kotlinx.datetime.LocalDate
  *   🔴 NO "arreglar" con `skipPartiallyExpanded = false` — da el 50 % por cero líneas y rompe el
  *   pie fijo. La explicación larga está en el token.
  *
- * ⚠ `todayUtcMillis()` se calcula UNA vez por vida de la hoja, NUNCA dentro de `isSelectableDate`:
- *   el picker consulta esa lambda por celda y por frame, así que un "hoy" recalculado en cada
- *   llamada movería la frontera DENTRO del mismo frame.
+ * ⚠ `earliestStartUtcMillis()` se calcula UNA vez por vida de la hoja, NUNCA dentro de
+ *   `isSelectableDate`: el picker consulta esa lambda por celda y por frame, así que un piso
+ *   recalculado en cada llamada movería la frontera DENTRO del mismo frame.
  *
  * ⚠ La semántica de interruptor de los chips sale GRATIS: `FilterChip` → `SelectableChip` aplica
  *   `Modifier.semantics { role = Role.Checkbox }` en AMBAS versiones (`Chip.kt:2017` en 1.3.1). El
@@ -172,8 +172,11 @@ internal fun CreateActivitySheet(
     fun showError(field: CreateField) =
         if (field in touched) errorFor(field) else null
 
-    // ⚠ "Hoy" se congela al abrir la hoja: ver la nota del pie del `NoPastDatesFrom`.
-    val selectableDates = remember { NoPastDatesFrom(todayUtcMillis()) }
+    // ⚠ El piso se congela al abrir la hoja: ver la nota del pie del `NoPastDatesFrom`.
+    //   S3/T18 · Es el día en que se cumplen las 48h, no "hoy": una fecha que el validador
+    //   rechazaría no debe poder elegirse. Las horas del propio día límite que aún no llegan
+    //   a las 48h las caza `validateCreateForm` con el mensaje del servidor.
+    val selectableDates = remember { NoPastDatesFrom(earliestStartUtcMillis()) }
 
     var showDatePicker by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
@@ -403,7 +406,7 @@ internal fun CreateActivitySheet(
 
     if (showDatePicker) {
         val pickerState = rememberDatePickerState(
-            initialSelectedDateMillis = form.startDate?.toPickerMillis() ?: todayUtcMillis(),
+            initialSelectedDateMillis = form.startDate?.toPickerMillis() ?: earliestStartUtcMillis(),
             selectableDates = selectableDates,
         )
         DatePickerDialog(
@@ -457,7 +460,7 @@ internal fun CreateActivitySheet(
         val pickerState = rememberDatePickerState(
             initialSelectedDateMillis = form.endDate?.toPickerMillis()
                 ?: form.startDate?.toPickerMillis()
-                ?: todayUtcMillis(),
+                ?: earliestStartUtcMillis(),
             selectableDates = selectableDates,
         )
         DatePickerDialog(

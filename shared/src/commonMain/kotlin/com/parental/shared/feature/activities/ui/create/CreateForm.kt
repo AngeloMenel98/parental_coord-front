@@ -1,10 +1,13 @@
 package com.parental.shared.feature.activities.ui.create
 
+import kotlinx.datetime.Clock
+import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.LocalTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toInstant
+import kotlin.time.Duration.Companion.hours
 
 /*
  * Estado del formulario de alta — `create-activity`, T-FE-06.
@@ -46,10 +49,27 @@ enum class CreateField {
 data class CreateFormError(val field: CreateField, val message: String)
 
 /**
+ * Antelación mínima del alta — regla del SERVIDOR (`ActivityPolicyService`). El front la
+ * duplica para no dejar pulsar "Crear" y comerse un 400: por eso el mensaje es el MISMO
+ * literal, palabra por palabra, y no una paráfrasis.
+ */
+internal const val MIN_LEAD_TIME_HOURS = 48
+
+/** Literal EXACTO del backend. No reescribir: una prueba lo fija y el servidor lo compara. */
+internal const val MIN_LEAD_TIME_MESSAGE =
+    "La actividad debe programarse con al menos 48 horas de anticipación"
+
+/**
  * Valida el formulario. Una lista VACÍA significa formulario válido.
  * Esta es la ÚNICA fuente de verdad del botón "Crear".
+ *
+ * [now] es inyectable para que las pruebas fijen el reloj: la regla de las
+ * [MIN_LEAD_TIME_HOURS] horas es relativa al instante de validación.
  */
-fun validateCreateForm(form: CreateForm): List<CreateFormError> = buildList {
+fun validateCreateForm(
+    form: CreateForm,
+    now: Instant = Clock.System.now(),
+): List<CreateFormError> = buildList {
     val trimmedTitle = form.title.trim()
     if (trimmedTitle.length < 3) {
         add(CreateFormError(CreateField.TITLE, "Mínimo 3 caracteres"))
@@ -66,14 +86,19 @@ fun validateCreateForm(form: CreateForm): List<CreateFormError> = buildList {
     if (form.childrenIds.isEmpty()) {
         add(CreateFormError(CreateField.CHILDREN, "Elige al menos un hijo"))
     }
-    if (form.startDate == null) {
+    val zone = TimeZone.currentSystemDefault()
+    val start = form.startDate?.let { date ->
+        LocalDateTime(date, LocalTime(form.startTime.hour, form.startTime.minute)).toInstant(zone)
+    }
+    if (start == null) {
         add(CreateFormError(CreateField.DATE, "Elige una fecha"))
+    } else if (start < now + MIN_LEAD_TIME_HOURS.hours) {
+        // ⚠ El límite es INCLUSIVO: exactamente 48h es válido. El servidor usa `<`, igual
+        // que esta comparación; si aquí fuera `<=` rechazaríamos lo que el back acepta.
+        add(CreateFormError(CreateField.DATE, MIN_LEAD_TIME_MESSAGE))
     }
     val endDate = form.endDate
-    if (endDate != null && form.startDate != null) {
-        val zone = TimeZone.currentSystemDefault()
-        val start = LocalDateTime(form.startDate, LocalTime(form.startTime.hour, form.startTime.minute))
-            .toInstant(zone)
+    if (endDate != null && start != null) {
         val end = LocalDateTime(endDate, LocalTime(form.endTime.hour, form.endTime.minute))
             .toInstant(zone)
         if (end <= start) {

@@ -12,6 +12,7 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.atStartOfDayIn
 import kotlinx.datetime.toInstant
 import kotlinx.datetime.toLocalDateTime
+import kotlin.time.Duration.Companion.hours
 
 /*
  * Conversión fecha↔instante del modal de alta — `create-activity`, T-FE-04.
@@ -39,9 +40,26 @@ internal fun LocalDate.toPickerMillis(): Long = atStartOfDayIn(TimeZone.UTC).toE
 internal fun pickerMillisToDate(millis: Long): LocalDate =
     Instant.fromEpochMilliseconds(millis).toLocalDateTime(TimeZone.UTC).date
 
-/** Medianoche UTC de hoy — el piso del [NoPastDatesFrom]. */
+/**
+ * Medianoche UTC de hoy. Lo usa el picker de GASTOS, donde una fecha pasada es válida
+ * (un gasto se registra después de pagarlo). El alta de ACTIVIDADES ya no lo usa: su piso
+ * es [earliestStartUtcMillis], porque exige antelación mínima.
+ */
 internal fun todayUtcMillis(): Long =
     Clock.System.now().toLocalDateTime(TimeZone.UTC).date.toPickerMillis()
+
+/**
+ * Piso del [NoPastDatesFrom] cuando el alta exige antelación mínima: medianoche UTC del día en
+ * que se cumplen las [MIN_LEAD_TIME_HOURS] horas.
+ *
+ * ⚠ LA GRANULARIDAD ES EL DÍA, no la hora: el [androidx.compose.material3.DatePicker] sólo
+ *   elige fechas, así que el piso no puede expresar "a las 10:00 de pasado mañana". Ese mismo
+ *   día queda seleccionable aunque sus primeras horas no lleguen al mínimo; quien las rechaza
+ *   es `validateCreateForm`, con el mensaje EXACTO del servidor.
+ * ⚠ Igual que [todayUtcMillis], se calcula UNA vez por vida de la hoja.
+ */
+internal fun earliestStartUtcMillis(now: Instant = Clock.System.now()): Long =
+    (now + MIN_LEAD_TIME_HOURS.hours).toLocalDateTime(TimeZone.UTC).date.toPickerMillis()
 
 /** Wall-clock del usuario → ISO-8601 con offset explícito (`…Z`), exigido por el backend. */
 internal fun toIsoWithOffset(date: LocalDate, time: TimeOfDay, zone: TimeZone): String =
@@ -59,7 +77,7 @@ internal fun formatDdMmAaaa(date: LocalDate): String =
  * Fechas no pasadas para el [androidx.compose.material3.DatePicker].
  *
  * ⚠ [isSelectableDate] usa `>=` y NUNCA `>`: con `>` el propio día de hoy quedaría bloqueado.
- * ⚠ [todayMillis] se calcula UNA vez por vida de la hoja (`remember { NoPastDatesFrom(todayUtcMillis()) }`),
+ * ⚠ [todayMillis] se calcula UNA vez por vida de la hoja (`remember { NoPastDatesFrom(...) }`),
  *   nunca dentro del predicado: el picker consulta esa lambda por celda y por frame, así que
  *   un "hoy" recalculado en cada llamada movería la frontera DENTRO del mismo frame.
  */

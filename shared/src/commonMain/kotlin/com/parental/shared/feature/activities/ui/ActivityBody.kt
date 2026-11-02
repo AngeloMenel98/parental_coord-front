@@ -45,7 +45,6 @@ import com.parental.shared.core.ui.theme.AgendaGeometry
 import com.parental.shared.core.ui.theme.ParentalShapes
 import com.parental.shared.core.ui.theme.Spacing
 import com.parental.shared.core.ui.theme.TypeTokens
-import com.parental.shared.feature.activities.domain.model.canConfirm
 import kotlinx.datetime.TimeZone
 
 /*
