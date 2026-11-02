@@ -2,6 +2,7 @@ package com.parental.shared.feature.expenses.data.remote
 
 import com.parental.shared.core.error.ApiResult
 import com.parental.shared.feature.activities.data.remote.ApiErrorBody
+import com.parental.shared.feature.expenses.domain.model.CreateExpenseRequest
 import com.parental.shared.feature.expenses.domain.model.ExpenseActionResponse
 import com.parental.shared.feature.expenses.domain.model.ExpenseResponseDto
 import com.parental.shared.feature.expenses.domain.model.ExpenseStatus
@@ -51,6 +52,23 @@ internal fun ExpenseUpdateRequest.toPatchBody(): JsonObject = buildJsonObject {
     expenseDate?.let { put("expenseDate", it) }
     description?.let { put("description", it) }
     splitRatioPayer?.let { put("splitRatioPayer", it) }
+}
+
+/**
+ * El cuerpo del POST de alta, CAMPO POR CAMPO (S6/T27).
+ *
+ * Igual razón que [toPatchBody]: `explicitNulls` activo + `forbidNonWhitelisted`
+ * en el backend. Se envía `splitRatioPayer` sólo cuando difiere del default del
+ * servidor (50); `description` sólo cuando tiene valor. No se envía la
+ * contraparte del reparto ni identificadores ajenos al DTO del backend.
+ */
+internal fun CreateExpenseRequest.toCreateBody(): JsonObject = buildJsonObject {
+    put("concept", concept)
+    put("amount", amount)
+    put("categoryId", categoryId)
+    put("expenseDate", expenseDate)
+    description?.takeIf { it.isNotBlank() }?.let { put("description", it) }
+    if (splitRatioPayer != 50) put("splitRatioPayer", splitRatioPayer)
 }
 
 /**
@@ -167,6 +185,31 @@ open class ExpensesApi(
             }
         } catch (e: Exception) {
             ApiResult.Error(0, "PATCH $baseUrl/expenses/$id failed: ${e.message}")
+        }
+    }
+
+    /**
+     * POST /expenses/{bondId} — alta de un gasto (S6/T27).
+     */
+    open suspend fun createExpense(
+        token: String,
+        bondId: String,
+        request: CreateExpenseRequest,
+    ): ApiResult<ExpenseResponseDto> {
+        return try {
+            val body = request.toCreateBody()
+            val response = client.post("$baseUrl/expenses/$bondId") {
+                header("Authorization", "Bearer $token")
+                contentType(ContentType.Application.Json)
+                setBody(body)
+            }
+            if (response.status.isSuccess()) {
+                ApiResult.Success(response.body())
+            } else {
+                response.toApiError()
+            }
+        } catch (e: Exception) {
+            ApiResult.Error(0, "POST $baseUrl/expenses/$bondId failed: ${e.message}")
         }
     }
 

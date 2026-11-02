@@ -1,7 +1,11 @@
 package com.parental.shared.feature.expenses.ui
 
 import com.parental.shared.core.error.ApiResult
+import com.parental.shared.core.network.CategoriesApi
+import com.parental.shared.core.ui.components.CategoryInfo
+import com.parental.shared.core.ui.components.CategoryResolver
 import com.parental.shared.feature.expenses.data.remote.ExpensesApi
+import com.parental.shared.feature.expenses.domain.model.CreateExpenseRequest
 import com.parental.shared.feature.expenses.domain.model.ExpenseResponseDto
 import com.parental.shared.feature.expenses.domain.model.ExpenseStatus
 import com.parental.shared.feature.expenses.domain.model.ExpenseSummaryDto
@@ -29,6 +33,9 @@ data class ExpensesUiState(
     val offset: Int = 0,
     val selectedStatus: ExpenseStatus? = null,
     val detail: DetailUiState = DetailUiState.Closed,
+    val isCreateSheetOpen: Boolean = false,
+    val isCreateSheetLoading: Boolean = false,
+    val categories: Map<String, CategoryInfo> = emptyMap(),
     val snackbarMessage: String? = null,
 ) {
     /** `total` es el total del backend, no el tamaño de [items] (S4). */
@@ -53,6 +60,7 @@ class ExpensesViewModel(
     private val token: String,
     private val bondId: String,
     private val dispatcher: CoroutineDispatcher = Dispatchers.Main,
+    private val categoriesApi: CategoriesApi = com.parental.shared.core.network.ApiClient.categoriesApi(),
 ) {
     private val scope = CoroutineScope(SupervisorJob() + dispatcher)
 
@@ -61,6 +69,19 @@ class ExpensesViewModel(
 
     init {
         loadExpenses()
+        loadCategories()
+    }
+
+    /** Carga las categorías activas para el selector del alta (S6/T27). */
+    private fun loadCategories() {
+        scope.launch {
+            when (val result = categoriesApi.getCategories()) {
+                is ApiResult.Success -> _uiState.update {
+                    it.copy(categories = CategoryResolver.build(result.data))
+                }
+                is ApiResult.Error -> Unit // degrade silencioso: el picker queda vacío
+            }
+        }
     }
 
     /**
@@ -201,6 +222,40 @@ class ExpensesViewModel(
                 }
                 is ApiResult.Error -> _uiState.update {
                     it.copy(snackbarMessage = result.message)
+                }
+            }
+        }
+    }
+
+    /** Abre la hoja de alta de gastos. */
+    fun openCreateSheet() {
+        _uiState.update { it.copy(isCreateSheetOpen = true) }
+    }
+
+    /** Cierra la hoja de alta. */
+    fun closeCreateSheet() {
+        _uiState.update { it.copy(isCreateSheetOpen = false) }
+    }
+
+    /** Crea un gasto y refresca la lista y el resumen (S6/T27). */
+    fun submitCreateExpense(request: CreateExpenseRequest) {
+        scope.launch {
+            _uiState.update { it.copy(isCreateSheetLoading = true) }
+            when (val result = api.createExpense(token, bondId, request)) {
+                is ApiResult.Success -> {
+                    _uiState.update {
+                        it.copy(
+                            isCreateSheetOpen = false,
+                            isCreateSheetLoading = false,
+                            // Mismo copy que el alta de actividades: el gasto quedó
+                            // pedido y el listado se refresca debajo.
+                            snackbarMessage = "Gasto creado",
+                        )
+                    }
+                    loadExpenses()
+                }
+                is ApiResult.Error -> _uiState.update {
+                    it.copy(isCreateSheetLoading = false, snackbarMessage = result.message)
                 }
             }
         }

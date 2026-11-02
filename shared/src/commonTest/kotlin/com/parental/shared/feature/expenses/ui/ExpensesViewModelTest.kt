@@ -2,6 +2,7 @@ package com.parental.shared.feature.expenses.ui
 
 import com.parental.shared.core.error.ApiResult
 import com.parental.shared.feature.expenses.data.remote.ExpensesApi
+import com.parental.shared.feature.expenses.domain.model.CreateExpenseRequest
 import com.parental.shared.feature.expenses.domain.model.ExpenseActionResponse
 import com.parental.shared.feature.expenses.domain.model.ExpenseResponseDto
 import com.parental.shared.feature.expenses.domain.model.ExpenseStatus
@@ -42,8 +43,10 @@ class ExpensesViewModelTest {
         var payCalls = 0
         var cancelCalls = 0
         var updateCalls = 0
+        var createCalls = 0
 
         val requestedStatuses = mutableListOf<ExpenseStatus?>()
+        val createRequests = mutableListOf<CreateExpenseRequest>()
         val requestedOffsets = mutableListOf<Int>()
         val rejectedReasons = mutableListOf<String?>()
         val updatedRequests = mutableListOf<ExpenseUpdateRequest>()
@@ -105,6 +108,12 @@ class ExpensesViewModelTest {
         override suspend fun updateExpense(token: String, id: String, request: ExpenseUpdateRequest): ApiResult<ExpenseResponseDto> {
             updateCalls++
             updatedRequests += request
+            return updateResult
+        }
+
+        override suspend fun createExpense(token: String, bondId: String, request: CreateExpenseRequest): ApiResult<ExpenseResponseDto> {
+            createCalls++
+            createRequests += request
             return updateResult
         }
 
@@ -383,5 +392,56 @@ class ExpensesViewModelTest {
         assertEquals(1, api.updateCalls)
         assertEquals("Nuevo concepto", api.updatedRequests.single().concept)
         assertEquals(2000.0, api.updatedRequests.single().amount)
+    }
+
+    // ── S6 · alta de gasto ────────────────────────────────────────────────
+
+    @Test
+    fun `crear un gasto cierra la hoja y refresca la lista y el resumen`() {
+        val api = FakeExpensesApi().apply {
+            updateResult = ApiResult.Success(FakeExpensesApi.expense("exp-new"))
+        }
+        val vm = build(api)
+        api.summaryCalls = 0
+        api.listCalls = 0
+
+        vm.openCreateSheet()
+        assertEquals(true, vm.uiState.value.isCreateSheetOpen)
+
+        vm.submitCreateExpense(
+            CreateExpenseRequest(
+                concept = "Cuota",
+                amount = 1500.0,
+                categoryId = "cat-1",
+                expenseDate = "2026-04-01",
+            ),
+        )
+
+        assertEquals(1, api.createCalls)
+        assertEquals("Cuota", api.createRequests.single().concept)
+        assertEquals(false, vm.uiState.value.isCreateSheetOpen)
+        assertEquals(1, api.summaryCalls)
+        assertEquals(1, api.listCalls) // refresco tras crear
+    }
+
+    @Test
+    fun `error al crear un gasto deja la hoja abierta y muestra snackbar`() {
+        val api = FakeExpensesApi().apply {
+            updateResult = ApiResult.Error(400, "Concepto requerido")
+        }
+        val vm = build(api)
+
+        vm.openCreateSheet()
+        vm.submitCreateExpense(
+            CreateExpenseRequest(
+                concept = "Cuota",
+                amount = 1500.0,
+                categoryId = "cat-1",
+                expenseDate = "2026-04-01",
+            ),
+        )
+
+        assertEquals(true, vm.uiState.value.isCreateSheetOpen)
+        assertEquals("Concepto requerido", vm.uiState.value.snackbarMessage)
     }
 }

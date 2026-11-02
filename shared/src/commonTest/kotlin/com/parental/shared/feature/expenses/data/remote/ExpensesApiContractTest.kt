@@ -1,5 +1,6 @@
 package com.parental.shared.feature.expenses.data.remote
 
+import com.parental.shared.feature.expenses.domain.model.CreateExpenseRequest
 import com.parental.shared.feature.expenses.domain.model.ExpenseStatus
 import com.parental.shared.feature.expenses.domain.model.ExpenseUpdateRequest
 import com.parental.shared.feature.expenses.domain.model.RejectExpenseRequest
@@ -99,6 +100,124 @@ class ExpensesApiContractTest {
         assertEquals("approved", ExpenseStatus.APPROVED.queryValue())
         assertEquals("rejected", ExpenseStatus.REJECTED.queryValue())
         assertEquals("paid", ExpenseStatus.PAID.queryValue())
+    }
+
+    // ── S6 · cuerpo de POST /expenses/{bondId} ─────────────────────────────
+
+    @Test
+    fun `el cuerpo del POST lleva los campos obligatorios`() {
+        val request = CreateExpenseRequest(
+            concept = "Cuota",
+            amount = 1500.0,
+            categoryId = "cat-2",
+            expenseDate = "2026-04-01",
+        )
+
+        val body = request.toCreateBody()
+
+        assertEquals(
+            """
+                {"concept":"Cuota","amount":1500.0,"categoryId":"cat-2","expenseDate":"2026-04-01"}
+            """.trimIndent().filter { !it.isWhitespace() },
+            body.toString().filter { !it.isWhitespace() },
+        )
+    }
+
+    @Test
+    fun `el cuerpo del POST omite la descripcion cuando esta vacia`() {
+        val request = CreateExpenseRequest(
+            concept = "Cuota",
+            amount = 1500.0,
+            categoryId = "cat-2",
+            expenseDate = "2026-04-01",
+            description = "  ",
+        )
+
+        val body = request.toCreateBody()
+
+        assertTrue(
+            "description" !in body,
+            "🔴 El POST manda `description` vacía: el backend acepta null, pero no hay " +
+                "razón para enviar un campo que el usuario no completó.",
+        )
+    }
+
+    @Test
+    fun `el cuerpo del POST incluye la descripcion cuando tiene valor`() {
+        val request = CreateExpenseRequest(
+            concept = "Cuota",
+            amount = 1500.0,
+            categoryId = "cat-2",
+            expenseDate = "2026-04-01",
+            description = "Marzo",
+        )
+
+        val body = request.toCreateBody()
+
+        assertEquals("\"Marzo\"", body["description"].toString())
+    }
+
+    @Test
+    fun `el split por omision no viaja porque el servidor defaultea a 50`() {
+        val request = CreateExpenseRequest(
+            concept = "Cuota",
+            amount = 1500.0,
+            categoryId = "cat-2",
+            expenseDate = "2026-04-01",
+        )
+
+        val body = request.toCreateBody()
+
+        assertTrue(
+            "splitRatioPayer" !in body,
+            "🔴 El POST manda `splitRatioPayer` igual al default del servidor. Como el " +
+                "backend defaultea a 50, no hace falta enviarlo y así se reduce la superficie de error.",
+        )
+    }
+
+    @Test
+    fun `el cuerpo del POST incluye splitRatioPayer cuando difiere del default`() {
+        val request = CreateExpenseRequest(
+            concept = "Cuota",
+            amount = 1500.0,
+            categoryId = "cat-2",
+            expenseDate = "2026-04-01",
+            splitRatioPayer = 70,
+        )
+
+        val body = request.toCreateBody()
+
+        assertEquals("70", body["splitRatioPayer"].toString())
+    }
+
+    @Test
+    fun `el cuerpo del POST no manda la contraparte del reparto`() {
+        val body = CreateExpenseRequest(
+            concept = "Cuota",
+            amount = 1500.0,
+            categoryId = "cat-2",
+            expenseDate = "2026-04-01",
+            splitRatioPayer = 60,
+        ).toCreateBody()
+
+        assertTrue(
+            "splitRatioOther" !in body,
+            "🔴 El POST manda `splitRatioOther`: el backend lo deriva y rechaza la " +
+                "propiedad con 400, así que la creación fallaría siempre.",
+        )
+    }
+
+    @Test
+    fun `el cuerpo del POST no inventa childId ni activityId`() {
+        val body = CreateExpenseRequest(
+            concept = "Cuota",
+            amount = 1500.0,
+            categoryId = "cat-2",
+            expenseDate = "2026-04-01",
+        ).toCreateBody()
+
+        assertTrue("childId" !in body, "🔴 El POST manda `childId`, que el backend no conoce.")
+        assertTrue("activityId" !in body, "🔴 El POST manda `activityId`, que el backend no conoce.")
     }
 }
 

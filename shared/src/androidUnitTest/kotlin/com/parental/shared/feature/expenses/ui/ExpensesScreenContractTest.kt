@@ -199,4 +199,90 @@ class ExpensesScreenContractTest {
                 "la deriva el servidor y mandarla es un 400.",
         )
     }
+
+    // ── 5 · Alta de gasto: affordance, campos y advertencia sin documento ───────────
+
+    @Test
+    fun `la pantalla tiene un affordance para abrir el formulario de alta`() {
+        val screen = source("ExpensesScreen.kt")
+
+        assertTrue(
+            "CreateExpenseSheet(" in screen,
+            "🔴 La pantalla no compone `CreateExpenseSheet`: el formulario de alta no está " +
+                "en la superficie.",
+        )
+        assertTrue(
+            "openCreateSheet" in screen,
+            "🔴 La pantalla no llama al método que abre la hoja de alta.",
+        )
+    }
+
+    @Test
+    fun `el formulario de alta incluye los campos del PRD`() {
+        val sheet = source("CreateExpenseSheet.kt")
+
+        for (label in listOf("Concepto", "Monto", "Categoría", "Fecha del gasto", "Notas")) {
+            assertTrue(
+                "\"$label\"" in sheet,
+                "🔴 Falta el campo \"$label\" del PRD_expense §5.3.",
+            )
+        }
+    }
+
+    @Test
+    fun `el formulario de alta muestra la division del gasto`() {
+        val sheet = source("CreateExpenseSheet.kt")
+
+        assertTrue(
+            "splitRatioPayer" in sheet,
+            "🔴 El formulario no expone la división del gasto (`splitRatioPayer`).",
+        )
+        assertTrue(
+            "splitRatioOther" !in sheet,
+            "🔴 El formulario no debe enviar la contraparte: el backend la deriva.",
+        )
+    }
+
+    @Test
+    fun `el formulario advierte que el gasto se creara sin documento`() {
+        val sheet = source("CreateExpenseSheet.kt")
+
+        assertTrue(
+            "sin documento" in sheet || "sin doc" in sheet,
+            "🔴 El formulario no advierte que el gasto se creará sin documento de respaldo " +
+                "(FR-9).",
+        )
+    }
+
+    @Test
+    fun `el formulario de alta no inventa un campo de subida de archivo`() {
+        val sheet = source("CreateExpenseSheet.kt")
+
+        assertTrue(
+            "presign" !in sheet && "attachment" !in sheet.lowercase() && "upload" !in sheet.lowercase(),
+            "🔴 T27 no incluye la subida de documentos: no existe endpoint todavía " +
+                "(`expense_attachment` es sólo una tabla). El formulario no debe fingir un " +
+                "campo de archivo.",
+        )
+    }
+
+    @Test
+    fun `el POST de alta se arma campo por campo`() {
+        val api = moduleFile("feature/expenses/data/remote/ExpensesApi.kt")
+
+        assertTrue(
+            "CreateExpenseRequest" in api && "toCreateBody" in api,
+            "🔴 El POST de alta debe armar su cuerpo campo por campo, igual que el PATCH.",
+        )
+        assertTrue(
+            "childId" !in api,
+            "🔴 El POST de alta no debe mandar `childId`: el backend rechaza propiedades " +
+                "desconocidas con 400.",
+        )
+        assertTrue(
+            "activityId" !in api,
+            "🔴 El POST de alta no debe mandar `activityId`: el backend rechaza propiedades " +
+                "desconocidas con 400.",
+        )
+    }
 }

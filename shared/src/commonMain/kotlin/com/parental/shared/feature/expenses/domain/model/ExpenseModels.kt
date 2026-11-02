@@ -118,6 +118,22 @@ data class ExpenseUpdateRequest(
 )
 
 /**
+ * Cuerpo de POST /expenses/{bondId} (S6/T27).
+ *
+ * NO se serializa directamente: el cliente Ktor tiene `explicitNulls` activo y
+ * el backend rechaza con 400 cualquier propiedad que no exista en su DTO. El
+ * cuerpo se arma campo por campo en [ExpensesApi.createExpense].
+ */
+data class CreateExpenseRequest(
+    val concept: String,
+    val amount: Double,
+    val categoryId: String,
+    val expenseDate: String,
+    val description: String? = null,
+    val splitRatioPayer: Int = 50,
+)
+
+/**
  * Cuerpo opcional de POST /expenses/:id/reject.
  */
 @Serializable
