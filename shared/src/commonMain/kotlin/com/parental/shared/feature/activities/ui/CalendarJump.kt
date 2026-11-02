@@ -81,7 +81,10 @@ internal fun buildDayDots(
     val byDate = rows
         .filter { it.localStart != null }
         .groupBy { it.localStart!!.date }
-    return byDate.toSortedMap().mapValues { (_, dayRows) ->
+    // `toSortedMap()` no está disponible en el stdlib common de esta
+    // configuración (la compilación de metadata lo rechaza): el mismo orden se
+    // obtiene con `sortedBy` sobre las entradas.
+    return byDate.toList().sortedBy { it.first }.toMap().mapValues { (_, dayRows) ->
         dayRows
             .sortedWith(::compareTimedRows)
             .map { it.actividad.categoryId }

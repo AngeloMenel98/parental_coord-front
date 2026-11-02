@@ -343,6 +343,7 @@ private fun GreetingSection(
         kotlinx.datetime.DayOfWeek.FRIDAY -> "Viernes"
         kotlinx.datetime.DayOfWeek.SATURDAY -> "Sábado"
         kotlinx.datetime.DayOfWeek.SUNDAY -> "Domingo"
+        else -> ""
     }
     val monthNames = listOf(
         "ene",
