@@ -424,12 +424,12 @@ PRD `prd_improvement` H-2, H-3, PRD_expense FR-7.
 |---|---|---|---|---|---|---|
 | T28 | Expenses read API: list + filters + summary/balance | B | S1 | delegated (writer, `src/expenses/**`) | done | B `b894206` |
 | T25 | Verify window, `created` timeout, server flags, 48 h lead time | B | S2 | delegated in two work units: **T25a** state machine + `verify_at` + the origin guard, then **T25b** the server flags + the 48 h lead time + the notification copy | done | B `45bc9b8` + `5a61c16` + `4a43bc3` |
-| T18 | Verify window in the front + the 48 h picker | F | S3 | — | pending | — |
+| T18 | Verify window in the front + the 48 h picker | F | S3 | inline (no subagent runtime in this session) | done | F `8a43020` |
 | T29 | Gastos front: summary cards + list + filters | F | S4 | delegated together with T19 (one front writer: the read surface) | done | F `0e30788` |
 | T19 | Gastos front: the expense detail + approve / reject / pay | F | S5 | delegated together with T29 | done | F `0e30788` |
 | T27 | Gastos front: "+ Solicitar" form + `sin doc.` warning | F | S6 | delegated (front writer) | done | F `8cdc674` |
-| T30 | Attachment → expense flow (+ the expense attachment API) | F+B | S7 | — | pending | — |
-| T26 | Realtime: `expense.changed` + the live refresh | F+B | S8 | — | pending | — |
+| T30 | Attachment → expense flow (+ the expense attachment API) | F+B | S7 | B delegated (writer, `src/expenses/**`); F pending | B done · F pending | B `1cefa36` |
+| T26 | Realtime: `expense.changed` + the live refresh | F+B | S8 | B delegated (writer, `src/realtime/**` + relay); F pending | B done · F pending | B `31ccdc3` |
 | T31 | Design-system pass | F | S9 | — | pending | — |
 
 Delivery order: **T28 → T25 → {T29, T19, T27} → T18 → T30 → T26 → T31**. The front Gastos
@@ -694,3 +694,85 @@ them.
   tag in the list is the server's derived flag, never a stored boolean.
   The review found no defect in the delivery; the only change was the success snackbar
   ("Gasto creado"), which the activities form already had and this one did not.
+
+- **L16 (T30, back half, 2026-11-02) — `B 1cefa36`.** The three expense attachment routes
+  the "¿Es un gasto?" flow needs: `presign` (key namespaced
+  `expenses/{bondId}/{expenseId}/{uuid}.{ext}`, same response shape as the activity
+  cycle), `confirm` (creates the row for an object already in storage, rejecting a path
+  outside the expense prefix) and `convert` (R6: a **second** row pointing at the SAME
+  storage object as an activity attachment, setting `expense.activity_id`).
+  Authorization follows the module contract and S7 says it explicitly: a **non-member**
+  gets 404 — the expense does not exist for them — and a member who is **not the
+  requester** gets 403. `hasDocument` stays derived from the row, never stored.
+  Two structural decisions worth keeping: the service does **not** import
+  `@nestjs/typeorm`/`typeorm` (the lookup lives in
+  `ExpenseAttachmentsRepository.findActivityAttachment`), so the "third copy of the
+  authorization rule" never appears; and `convert` refuses across bonds — an activity
+  and an expense from different bonds share no storage namespace to point at.
+  19 tests across service and repository, including the requester rule and the
+  cross-bond refusal.
+
+- **L17 (T26, back half, 2026-11-02) — `B 31ccdc3`.** The expense outbox row now becomes
+  an `expense.changed` frame on the **same** socket that already carries
+  `activity.changed` and `notification.created`. `eventId` comes from the row id,
+  `expenseId` from `aggregateId`, `bondId`/`status`/`actor` from the payload and
+  `occurredAt` from `createdAt` — the expense payload carries no timestamp, so a new one
+  is not invented. Payload extras are denylisted against the reserved keys so a producer
+  cannot clobber the contract by adding a field with the same name.
+  `parseRealtimeFrame` accepts the new type and **drops** a frame without `bondId` or
+  `expenseId`, like the other two; the gateway delivers it to the bond audience through
+  the existing path; the relay publishes it **only** for `aggregateType === 'expense'`,
+  so an expense event still never turns into an activity frame.
+  Tests cover the mapping, the parse guards, the publisher (one frame, disabled no-op,
+  swallowed Redis failure), the gateway audience and the relay split.
+
+- **L18 (T18 — the verify window in the front + the 48 h picker, 2026-11-02) —
+  `F 8a43020`.** Front suite green: **371 tests, 0 failures** (22 in
+  `CreateFormValidationTest`, 12 in `CreateDateConversionTest`, 7 new in
+  `VerifyWindowContractTest`).
+  - **"Finalizar" now reads `canComplete`.** The gate was `status != "done"`, so the
+    button was painted in `created`, `assigned`, `overdue`… and the POST answered 409.
+    The label stays **"Finalizar"** (the user's wording; the matrix calls it
+    "Completado") and `isCompleting` stays a ViewModel flag, not a sheet state: the sheet
+    does not unmount on completion, so a `Loading(id)` would wipe the context the user
+    just acted in.
+  - **"Confirmar" now reads `canConfirm` from the DTO** and the local rule is gone:
+    `canConfirmAssignment(assignedTo, assignedConfirmed, currentUserId)` and its two
+    extensions were deleted from `ActivitiesModels.kt`, with a "do not reintroduce" note
+    in their place — it was a second copy of the policy, and the copy that ignored the
+    status is the one that 409s. That also removed the now-dead `currentUserId`
+    pass-through from `ActividadDetailSheet`, `DetailFooter`, `AgendaTimelineRow`,
+    `AgendaTimeline`, `WeekTimeline`, `ActividadesListScreen` and `TimelineView`.
+    `ActivitiesViewModel.currentUserId` **stays** (its constructor is shared by `App.kt`
+    and ~7 tests; deleting it is churn with no behavioural value once nothing reads it
+    there — T21 can take it out with the assignment routes).
+  - **The verify window is a card in the detail body**, titled "Por verificar", shown
+    when `status == "verify"`, built from `parseInstant(deadline)` + `formatDeadline` +
+    `formatTime` — the SAME server instant the card renders, never a second clock: if
+    the backend does not send `deadline`, the card is not painted instead of inventing a
+    due date. The existing "Límite evidencia" pair in `DetailPairsTest` was left alone
+    (it is pinned and it answers a different question).
+  - **The 48 h rule lands in `validateCreateForm(form, now = Clock.System.now())`**, the
+    same function `submitCreate` re-runs, so UI and ViewModel cannot diverge. The message
+    is the server's, verbatim, in ONE constant (`MIN_LEAD_TIME_MESSAGE`), pinned by a
+    test that compares it against the literal. The boundary is **inclusive** (47 h
+    invalid, 48 h and 49 h valid) — the backend compares with `<`, and a `<=` here would
+    make the front more restrictive than the server.
+  - **The picker floor is day-grained on purpose.** `earliestStartUtcMillis()` returns the
+    UTC midnight of the day that completes the 48 h, because the Material3 `DatePicker`
+    only picks dates and cannot express "from 23:30 on the boundary day". So the boundary
+    day is fully selectable and its early hours are rejected by `validateCreateForm` with
+    the same message. Trade-off, consciously chosen: over-restricting (blocking the whole
+    day) costs the user a full day of margin; under-restricting costs one inline error,
+    which is the lesser evil. `todayUtcMillis()` stays — the **expense** date picker uses
+    it, where a past date is valid.
+  - **`canAssign` / `canReassign` / `canDecline` are NOT consumed yet.** The back exposes
+    all three, but the front has no assign/reassign route (that is T21) and "no asiste"
+    is still a swipe whose actions are derived client-side; wiring a flag with no surface
+    would be dead data. Recorded here so the deferral is a decision, not an oversight.
+  - **Two existing contracts were kept on purpose**, both now pinned by tests: the
+    `assignedConfirmed` + "Asignación confirmada" branch in the detail sheet
+    (`ActivityCardConfirmedChipTest` requires it — the detail is where the per-person
+    datum still means something, R4), and the `sin fin programado` /
+    `fin anterior al inicio` validations, untouched by the new date rule.
+
