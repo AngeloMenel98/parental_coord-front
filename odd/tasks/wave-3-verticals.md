@@ -129,8 +129,18 @@ lead time) plus the three rulings the user made when this wave was started.
 | `T13` | `verify` → `done` | bond member | set `completedAt`, clear `deadline`, clear `verifyAt` | `activity.done` |
 | `T14` | `verify` → `overdue` | system | clear `deadline` | `activity.verify_expired` |
 | `T16` (new id) | `created` → `overdue` | system | clear `deadline` | `activity.created_overdue` |
+| `T11` (KEPT) | `in_progress` → `done` | bond member | set `completedAt` | `activity.done` |
 | `T7` (existing) | `assigned` → `overdue` | system | — | `activity.overdue` |
 | `T8` (existing) | `overdue` → `assisting` / `not_assisting` | assignee | see the origin rule | `activity.assisting` / `activity.not_assisting` |
+
+**T11 stays.** The `END` timer no longer closes the activity (it moves it to `verify`), but
+the **member** keeps the ability to close it early — before its scheduled end. That
+capability exists today (`T11`, actors `system` + `bond_member`) and nothing in the user's
+ruling removes it: L5 adds the verification window, it does not take the early close away.
+`T11` therefore survives with the **system actor dropped** (the system no longer closes
+from `in_progress`; the timer goes to `verify`) and the **bond member kept**. Without this,
+an activity that finished at 10:00 with a 15:00 end time could not be closed until 15:00 —
+a silent loss of a capability that nobody asked to lose.
 
 **The three anchors (R14 + the user's first decision).** `RESPONSE_TIMEOUT_HOURS` (36) is
 the only constant; `deadline` means "the expiry of the window the activity is waiting in":
@@ -167,16 +177,24 @@ The origin is derived from data, not from a new status:
 
 | Origin | Signal | `T8` allowed |
 |---|---|---|
-| from `created` | `assigned_at IS NULL` | no |
-| from `verify` | `verify_at IS NOT NULL` | no |
-| from `assigned` | `assigned_at IS NOT NULL AND verify_at IS NULL` | yes |
+| from `created` | `assigned_to IS NULL` (nobody was ever assigned) | no |
+| from `verify` | `verify_at IS NOT NULL` (it entered the verification window) | no |
+| from `assigned` | `assigned_to IS NOT NULL AND verify_at IS NULL` | yes |
 
 `verify_at` does not exist yet — it is a **new nullable timestamp column** on `activity`,
 set when the activity enters `verify` and cleared when it leaves. This is the one schema
 change in this task and it is deliberate: the alternative (inferring the origin from
 `deadline` arithmetic) is a guess. Migration + entity + a structural migration spec, the
 same shape as `1792819200000-AddExpenseModelFields`; the timestamp must be **after**
-`1793491200000` (the last migration in the repo).
+`1793491200000` (the last migration in the repo) — `1793577600000-AddActivityVerifyAt`.
+
+> **Correction (found while implementing).** The first draft of this spec read
+> "`assigned_at IS NULL`". The `activity` table has **no `assigned_at` column** — it has
+> `assigned_to` (the uuid) and, separately, `confirmed_at` / `declined_at` /
+> `completed_at` / `cancelled_at`. The signal is therefore `assigned_to IS NULL`, which
+> classifies the three origins exactly the same way: nobody was ever assigned vs. the
+> activity went through the verification window vs. it timed out waiting for an
+> acceptance.
 
 **The server flags.** The matrix's decision table arrives as data, in the activity DTOs
 (the front stops deriving permissions client-side — today it renders "Finalizar" in every
@@ -389,8 +407,8 @@ PRD `prd_improvement` H-2, H-3, PRD_expense FR-7.
 
 | ID | Task | Side | Specs | Route | Status | Commit |
 |---|---|---|---|---|---|---|
-| T28 | Expenses read API: list + filters + summary/balance | B | S1 | delegated (writer, `src/expenses/**`) | in flight | — |
-| T25 | Verify window, `created` timeout, server flags, 48 h lead time | B | S2 | delegated in two work units: **T25a** state machine + `verify_at` + the origin guard, then **T25b** the server flags + the 48 h lead time + the notification copy | in flight (T25a) | — |
+| T28 | Expenses read API: list + filters + summary/balance | B | S1 | delegated (writer, `src/expenses/**`) | done | B `b894206` |
+| T25 | Verify window, `created` timeout, server flags, 48 h lead time | B | S2 | delegated in two work units: **T25a** state machine + `verify_at` + the origin guard, then **T25b** the server flags + the 48 h lead time + the notification copy | T25a done, T25b pending | B `45bc9b8` |
 | T18 | Verify window in the front + the 48 h picker | F | S3 | — | pending | — |
 | T29 | Gastos front: summary cards + list + filters | F | S4 | delegated together with T19 (one front writer: the read surface) | in flight | — |
 | T19 | Gastos front: the expense detail + approve / reject / pay | F | S5 | delegated together with T29 | in flight | — |
@@ -412,10 +430,10 @@ them.
 
 ## Open items
 
-1. **Prod (Supabase) is two migrations behind** — `1792819200000` (the expense model
-   fields) and `1793491200000` (the outbox aggregate type) were never applied there, and
-   this wave adds at least one more (`verify_at`). Applying a migration to prod is a
-   remote write and needs the user's explicit approval.
+1. **Prod (Supabase) is three migrations behind** — `1792819200000` (the expense model
+   fields), `1793491200000` (the outbox aggregate type) and `1793577600000`
+   (`activity.verify_at`) were never applied there. Applying a migration to prod is a
+   remote write and needs the user's explicit approval. Dev and test are at 16.
 2. **The back worktree carries pre-existing prettier noise** in 9 files (43 insertions,
    36 deletions — formatting only, not authored by this wave). It stays out of every
    commit except where a file this wave must touch (T25 touches
@@ -514,3 +532,51 @@ them.
   The two backend writers share the jest suite and the type check, so both were told to
   label the foreign failures instead of chasing them — a shared suite is a shared
   failure surface.
+
+- **L10 (the review of the delegated work, 2026-11-02) — three findings, all fixed
+  before the commits.**
+  1. **T28 had two N+1s.** The page asked for the documents of every row with one
+     `existsBy` per row (up to 100 round trips per request) and resolved the bond members
+     once per row as well. Both are now ONE query per page: the attachments come with an
+     `IN` and a `Set`, the member list is resolved once and the counterpart of each row
+     comes from it. The worker's own spec had pinned the N+1 (it asserted one `existsBy`
+     per expense id), so that spec was rewritten to pin the batched query instead.
+  2. **T25a had replaced `T11` instead of adding `T13` next to it.** The effect was that
+     the member could no longer close an activity **before** its scheduled end — a
+     capability that exists today and that nobody asked to lose. `T11` is back with the
+     **system actor dropped** (the `END` timer now goes to `verify`) and the **bond member
+     kept**; the spec that asserted "409 from in_progress" now asserts the early close.
+     The rule table in S2 was corrected to match.
+  3. **My own spec was wrong about a column.** S2 read "`assigned_at IS NULL`" to detect
+     the `created` origin, but `activity` has no `assigned_at` column — the signal is
+     `assigned_to IS NULL`, which classifies the three origins identically. The spec now
+     says so, with the correction noted.
+
+  What the review confirmed as correct: the balance formula (`split_ratio_payer` is the
+  **requester's** share, per the create DTO's own wording, so the sign of `saldo` follows
+  the viewer's role), the `numeric`-as-STRING conversion in both the mapper and the
+  aggregate, the `404`-for-a-non-member contract, `deleted_at IS NULL` everywhere, the
+  static-route ordering, the three-anchor deadline, the `VERIFY_TIMEOUT` timer, the
+  sweep's five swept states, and `activity.unassigned` surviving as a catalogued-but-not-
+  emitted constant instead of being deleted from the public webhook contract.
+
+- **L11 (T25a verified against real Postgres, 2026-11-02).** The assess for the range
+  `6c04ed3..45bc9b8` came back **high** risk with an independent verifier added (the
+  escalation names item 1: a migration plus a new state), and `reviewDue: false`
+  (under budget), so no native review ceremony was started for this candidate.
+
+  The migration `1793577600000-AddActivityVerifyAt` was executed on **test** (15 → 16),
+  **reverted** (the column was gone: `information_schema` says 0) and **re-applied**
+  (16 again) — so it is idempotent and its `down()` is clean. The data probe inside a
+  rolled-back transaction on test: 15 activities, all `assisting`, **0 with `verify_at`**
+  (the no-backfill claim holds), 0 unassigned, 0 with a deadline (consistent with T5
+  clearing it). Then it was applied to **dev** (16 migrations, the column present) — the
+  repository now reads and writes `verify_at`, so a dev database without the column
+  would break every activity read, exactly as T13 did in wave 2. **Prod (Supabase) was
+  not touched**: it is three migrations behind and a prod migration is a remote write
+  that needs the user's word.
+
+  Full back suite after the fix: **80 suites / 946 tests green**, type check clean,
+  eslint clean on every file this work unit owns (the five errors in
+  `activity-attachments.service.ts` are **pre-existing at HEAD** — they are part of the
+  tree noise and were left alone).
