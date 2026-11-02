@@ -315,6 +315,7 @@ private fun AppContent(
                                 api = ApiClient.expensesApi(),
                                 token = token,
                                 bondId = bondId,
+                                realtime = realtimeManager,
                             )
                         }
                         DisposableEffect(currentUserId) {

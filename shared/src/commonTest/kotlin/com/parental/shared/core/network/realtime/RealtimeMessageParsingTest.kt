@@ -26,6 +26,13 @@ class RealtimeMessageParsingTest {
          "refEntityId":"a1","occurredAt":"2026-10-26T10:00:00.000Z"}
     """.trimIndent().replace("\n", "")
 
+    /** Frame de S8/T26, con el `actor` que el backend siempre manda (acá no se lee). */
+    private val expenseJson = """
+        {"v":1,"type":"expense.changed","eventId":"ev-9","expenseId":"exp-1","bondId":"b1",
+         "status":"approved","actor":{"type":"user","id":"u1","role":"member"},
+         "occurredAt":"2026-11-02T12:00:00.000Z"}
+    """.trimIndent().replace("\n", "")
+
     @Test
     fun `parses an activity frame`() {
         val message = parseRealtimeMessage(activityJson)
@@ -77,5 +84,37 @@ class RealtimeMessageParsingTest {
     @Test
     fun `drops an unknown extra type without breaking the caller`() {
         assertNull(parseRealtimeMessage("""{"v":1,"type":"activity.teleported","bondId":"b1"}"""))
+    }
+
+    // ── S8/T26 · expense.changed ──────────────────────────────────────────
+
+    @Test
+    fun `parses an expense frame`() {
+        val message = parseRealtimeMessage(expenseJson)
+
+        val expense = assertIs<ExpenseChangedMessage>(message)
+        assertEquals("exp-1", expense.expenseId)
+        assertEquals("b1", expense.bondId)
+        assertEquals("approved", expense.status)
+        assertEquals("ev-9", expense.eventId)
+    }
+
+    @Test
+    fun `drops an expense frame without expenseId`() {
+        assertNull(parseRealtimeMessage(expenseJson.replace("\"expenseId\":\"exp-1\",", "")))
+    }
+
+    @Test
+    fun `drops an expense frame without bondId`() {
+        assertNull(parseRealtimeMessage(expenseJson.replace("\"bondId\":\"b1\",", "")))
+    }
+
+    @Test
+    fun `an expense frame with an unknown status still parses`() {
+        // El cliente no ramifica por el payload: un status nuevo del backend no
+        // debe romper el parseo ni dejar de refrescar.
+        val message = parseRealtimeMessage(expenseJson.replace("\"approved\"", "\"in_review\""))
+
+        assertEquals("in_review", assertIs<ExpenseChangedMessage>(message).status)
     }
 }

@@ -38,6 +38,7 @@ open class RealtimeConnectionManager(
     private val client = RealtimeClient(http, url)
     private val activityCoalescer = RealtimeCoalescer(windowMs = 500L)
     private val notificationCoalescer = RealtimeCoalescer(windowMs = 500L)
+    private val expenseCoalescer = RealtimeCoalescer(windowMs = 500L)
 
     private val _state = MutableStateFlow(RealtimeState.DISCONNECTED)
     val state: StateFlow<RealtimeState> = _state.asStateFlow()
@@ -86,6 +87,7 @@ open class RealtimeConnectionManager(
                                 when (message) {
                                     is ActivityChangedMessage -> activityCoalescer.offer()
                                     is NotificationCreatedMessage -> notificationCoalescer.offer()
+                                    is ExpenseChangedMessage -> expenseCoalescer.offer()
                                 }
                             },
                             onClosed = { _ ->
@@ -167,4 +169,15 @@ open class RealtimeConnectionManager(
      * recargar la lista de actividades, ni al revés.
      */
     open val notificationSignals: Flow<Unit> = notificationCoalescer.signals
+
+    /**
+     * Señal coalescida de "cambió un gasto" (`expense.changed`, S8/T26).
+     *
+     * Tercera señal por la misma razón que la de notificaciones: un gasto que
+     * cambia de estado refresca el resumen y la lista de Gastos, y no debe
+     * arrastrar un `loadAll()` de actividades ni un GET de notificaciones.
+     * Sólo se alimenta con frames: a diferencia de actividades, reconectar no
+     * dispara un refetch acá (la pantalla recarga al abrirse y no hay poll).
+     */
+    open val expenseSignals: Flow<Unit> = expenseCoalescer.signals
 }

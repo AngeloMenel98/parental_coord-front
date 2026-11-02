@@ -1,6 +1,7 @@
 package com.parental.shared.feature.expenses.ui
 
 import com.parental.shared.core.error.ApiResult
+import com.parental.shared.core.network.realtime.RealtimeConnectionManager
 import com.parental.shared.feature.expenses.data.remote.ExpensesApi
 import com.parental.shared.feature.expenses.domain.model.CreateExpenseRequest
 import com.parental.shared.feature.expenses.domain.model.ExpenseActionResponse
@@ -11,6 +12,9 @@ import com.parental.shared.feature.expenses.domain.model.ExpenseSummaryDto
 import com.parental.shared.feature.expenses.domain.model.ExpenseUpdateRequest
 import com.parental.shared.feature.expenses.domain.model.PaginatedExpensesDto
 import io.ktor.client.HttpClient
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlin.test.AfterTest
 import kotlin.test.Test
@@ -34,6 +38,16 @@ class ExpensesViewModelTest {
     private val bondId = "bond-1"
     private val viewModels = mutableListOf<ExpensesViewModel>()
 
+    /** Manager sin red: el socket no arranca, sólo se emiten las señales. */
+    private class FakeRealtime : RealtimeConnectionManager(
+        http = UNUSED_CLIENT,
+        url = "ws://unused",
+        tokenProvider = { null },
+    ) {
+        val expenses = MutableSharedFlow<Unit>(extraBufferCapacity = 8)
+        override val expenseSignals: Flow<Unit> = expenses
+    }
+
     private class FakeExpensesApi : ExpensesApi(UNUSED_CLIENT, "http://unused") {
         var listCalls = 0
         var summaryCalls = 0
@@ -44,6 +58,9 @@ class ExpensesViewModelTest {
         var cancelCalls = 0
         var updateCalls = 0
         var createCalls = 0
+
+        /** Si está seteado, `listExpenses` espera acá (test del trailing-edge). */
+        var listGate: CompletableDeferred<Unit>? = null
 
         val requestedStatuses = mutableListOf<ExpenseStatus?>()
         val createRequests = mutableListOf<CreateExpenseRequest>()
@@ -71,6 +88,7 @@ class ExpensesViewModelTest {
             listCalls++
             requestedStatuses += status
             requestedOffsets += offset
+            listGate?.await()
             return listResult
         }
 
@@ -150,12 +168,13 @@ class ExpensesViewModelTest {
         viewModels.clear()
     }
 
-    private fun build(api: FakeExpensesApi): ExpensesViewModel {
+    private fun build(api: FakeExpensesApi, realtime: RealtimeConnectionManager? = null): ExpensesViewModel {
         val vm = ExpensesViewModel(
             api = api,
             token = token,
             bondId = bondId,
             dispatcher = UnconfinedTestDispatcher(),
+            realtime = realtime,
         )
         viewModels += vm
         return vm
@@ -443,5 +462,64 @@ class ExpensesViewModelTest {
 
         assertEquals(true, vm.uiState.value.isCreateSheetOpen)
         assertEquals("Concepto requerido", vm.uiState.value.snackbarMessage)
+    }
+
+    // ── S8 · refresco en vivo por `expense.changed` ───────────────────────
+
+    @Test
+    fun `un expense changed refresca el resumen y la lista`() {
+        val api = FakeExpensesApi()
+        val realtime = FakeRealtime()
+        val vm = build(api, realtime)
+
+        api.listResult = ApiResult.Success(PaginatedExpensesDto(
+            items = listOf(FakeExpensesApi.expense("exp-2", ExpenseStatus.APPROVED)),
+            total = 1,
+            limit = 20,
+            offset = 0,
+        ))
+        api.summaryCalls = 0
+        api.listCalls = 0
+
+        realtime.expenses.tryEmit(Unit)
+
+        assertEquals(1, api.summaryCalls)
+        assertEquals(1, api.listCalls)
+        assertEquals(listOf("exp-2"), vm.uiState.value.items.map { it.id })
+    }
+
+    @Test
+    fun `el refresco del socket respeta el filtro activo`() {
+        val api = FakeExpensesApi()
+        val realtime = FakeRealtime()
+        val vm = build(api, realtime)
+
+        vm.selectStatusFilter(ExpenseStatus.PENDING)
+        api.requestedStatuses.clear()
+
+        realtime.expenses.tryEmit(Unit)
+
+        assertEquals(listOf<ExpenseStatus?>(ExpenseStatus.PENDING), api.requestedStatuses)
+        assertEquals(ExpenseStatus.PENDING, vm.uiState.value.selectedStatus)
+    }
+
+    @Test
+    fun `una recarga pedida durante otra en vuelo se ejecuta una sola vez al terminar`() {
+        val api = FakeExpensesApi()
+        val gate = CompletableDeferred<Unit>()
+        api.listGate = gate
+        val vm = build(api)
+
+        api.summaryCalls = 0
+        api.listCalls = 0
+        vm.loadExpenses()
+        vm.loadExpenses()
+        vm.loadExpenses()
+        assertEquals(0, api.listCalls, "la carga en vuelo sigue esperando; las otras quedaron pendientes")
+
+        gate.complete(Unit)
+
+        assertEquals(1, api.summaryCalls, "las tres señales se colapsan en UNA recarga")
+        assertEquals(1, api.listCalls)
     }
 }

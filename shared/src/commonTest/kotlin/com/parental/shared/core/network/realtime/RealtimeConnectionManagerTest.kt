@@ -200,7 +200,8 @@ class RealtimeConnectionManagerTest {
     /**
      * S6: cada tipo de frame alimenta SÓLO la señal de su dominio. Una
      * notificación nueva no debe recargar actividades (el bug que esta slice
-     * cierra), y un cambio de actividad no debe refrescar notificaciones.
+     * cierra), un cambio de actividad no debe refrescar notificaciones, y un
+     * `expense.changed` (S8/T26) no debe tocar ninguna de las otras dos.
      */
     @Test
     fun `frames feed only the signal of their own domain`() = runTest {
@@ -226,11 +227,15 @@ class RealtimeConnectionManagerTest {
 
         val activitySignals = mutableListOf<Unit>()
         val notificationSignals = mutableListOf<Unit>()
+        val expenseSignals = mutableListOf<Unit>()
         backgroundScope.launch {
             manager.resyncSignals.collect { activitySignals += Unit }
         }
         backgroundScope.launch {
             manager.notificationSignals.collect { notificationSignals += Unit }
+        }
+        backgroundScope.launch {
+            manager.expenseSignals.collect { expenseSignals += Unit }
         }
 
         manager.start()
@@ -240,6 +245,7 @@ class RealtimeConnectionManagerTest {
         runCurrent()
         activitySignals.clear()
         notificationSignals.clear()
+        expenseSignals.clear()
 
         sink!!.invoke(
             NotificationCreatedMessage(
@@ -256,6 +262,7 @@ class RealtimeConnectionManagerTest {
 
         assertEquals(0, activitySignals.size, "una notificación no debe recargar actividades")
         assertEquals(1, notificationSignals.size)
+        assertEquals(0, expenseSignals.size, "una notificación no debe recargar gastos")
 
         sink!!.invoke(
             ActivityChangedMessage(
@@ -271,6 +278,24 @@ class RealtimeConnectionManagerTest {
 
         assertEquals(1, activitySignals.size)
         assertEquals(1, notificationSignals.size, "un cambio de actividad no refresca notificaciones")
+        assertEquals(0, expenseSignals.size, "un cambio de actividad no refresca gastos")
+
+        sink!!.invoke(
+            ExpenseChangedMessage(
+                v = 1,
+                type = "expense.changed",
+                eventId = "ev-9",
+                expenseId = "exp-1",
+                bondId = "b1",
+                status = "approved",
+            ),
+        )
+        advanceTimeBy(1_000)
+        runCurrent()
+
+        assertEquals(1, expenseSignals.size)
+        assertEquals(1, activitySignals.size, "un gasto no debe recargar actividades")
+        assertEquals(1, notificationSignals.size, "un gasto no refresca notificaciones")
 
         manager.stop()
     }

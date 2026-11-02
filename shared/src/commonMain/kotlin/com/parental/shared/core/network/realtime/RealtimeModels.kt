@@ -9,6 +9,7 @@ const val REALTIME_PROTOCOL_VERSION: Int = 1
 
 private const val TYPE_ACTIVITY_CHANGED = "activity.changed"
 private const val TYPE_NOTIFICATION_CREATED = "notification.created"
+private const val TYPE_EXPENSE_CHANGED = "expense.changed"
 
 /**
  * Todo frame que puede llegar por el canal de realtime.
@@ -51,6 +52,27 @@ data class NotificationCreatedMessage(
     @SerialName("occurredAt") val occurredAt: String? = null,
 ) : RealtimeMessage
 
+/**
+ * Frame `expense.changed` (S8/T26).
+ *
+ * Señal de refetch y NADA MÁS: el cliente no ramifica por el payload, sólo usa
+ * `v`/`type` para aceptarlo y después relee por REST, que es la fuente de verdad
+ * (el resumen y la lista se refrescan enteros). `expenseId` y `bondId` son
+ * obligatorios a propósito: un frame sin ellos no identifica nada y se descarta,
+ * igual que en el backend. El `actor` del contrato no se declara porque nadie lo
+ * lee y `ignoreUnknownKeys` lo descarta.
+ */
+@Serializable
+data class ExpenseChangedMessage(
+    @SerialName("v") override val v: Int,
+    @SerialName("type") override val type: String,
+    @SerialName("eventId") val eventId: String? = null,
+    @SerialName("expenseId") val expenseId: String,
+    @SerialName("bondId") val bondId: String,
+    @SerialName("status") val status: String? = null,
+    @SerialName("occurredAt") val occurredAt: String? = null,
+) : RealtimeMessage
+
 private val realtimeJson = Json {
     ignoreUnknownKeys = true
     isLenient = true
@@ -79,6 +101,7 @@ fun parseRealtimeMessage(text: String): RealtimeMessage? {
         when (envelope.type) {
             TYPE_ACTIVITY_CHANGED -> realtimeJson.decodeFromString<ActivityChangedMessage>(text)
             TYPE_NOTIFICATION_CREATED -> realtimeJson.decodeFromString<NotificationCreatedMessage>(text)
+            TYPE_EXPENSE_CHANGED -> realtimeJson.decodeFromString<ExpenseChangedMessage>(text)
             else -> null
         }
     }.getOrNull()

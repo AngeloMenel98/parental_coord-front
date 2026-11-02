@@ -2,6 +2,7 @@ package com.parental.shared.feature.expenses.ui
 
 import com.parental.shared.core.error.ApiResult
 import com.parental.shared.core.network.CategoriesApi
+import com.parental.shared.core.network.realtime.RealtimeConnectionManager
 import com.parental.shared.core.ui.components.CategoryInfo
 import com.parental.shared.core.ui.components.CategoryResolver
 import com.parental.shared.feature.expenses.data.remote.ExpensesApi
@@ -14,6 +15,7 @@ import com.parental.shared.feature.expenses.domain.model.PaginatedExpensesDto
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -61,15 +63,33 @@ class ExpensesViewModel(
     private val bondId: String,
     private val dispatcher: CoroutineDispatcher = Dispatchers.Main,
     private val categoriesApi: CategoriesApi = com.parental.shared.core.network.ApiClient.categoriesApi(),
+    private val realtime: RealtimeConnectionManager? = null,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + dispatcher)
 
     private val _uiState = MutableStateFlow(ExpensesUiState())
     val uiState: StateFlow<ExpensesUiState> = _uiState.asStateFlow()
 
+    private var loadJob: Job? = null
+
+    /**
+     * Señal de recarga recibida mientras otra carga está en vuelo (mismo patrón
+     * trailing-edge que `ActividadesViewModel`): en lugar de descartarla, se
+     * rearma UNA recarga al terminar la que corre. El coalescer del realtime ya
+     * acota la ráfaga, y esto evita dos cargas concurrentes pisándose.
+     */
+    private var pendingReload = false
+
     init {
         loadExpenses()
         loadCategories()
+        // S8/T26: un `expense.changed` refresca resumen + lista por REST. El frame
+        // es sólo una señal; la base sigue siendo la fuente de verdad.
+        scope.launch {
+            realtime?.expenseSignals?.collect {
+                loadExpenses()
+            }
+        }
     }
 
     /** Carga las categorías activas para el selector del alta (S6/T27). */
@@ -86,35 +106,49 @@ class ExpensesViewModel(
 
     /**
      * Carga resumen + primera página de la lista. Un fallo conserva lo ya cargado.
+     *
+     * Nunca dos cargas concurrentes: una señal (o un toque de filtro) que llega
+     * con una carga en vuelo deja anotada exactamente una recarga pendiente.
      */
     fun loadExpenses() {
-        scope.launch {
-            _uiState.update { it.copy(isLoading = it.items.isEmpty(), error = null) }
+        if (loadJob?.isActive == true) {
+            pendingReload = true
+            return
+        }
+        loadJob = scope.launch {
+            do {
+                pendingReload = false
+                performLoad()
+            } while (pendingReload)
+        }
+    }
 
-            val summary = api.getSummary(token, bondId)
-            val page = api.listExpenses(
-                token = token,
-                bondId = bondId,
-                limit = _uiState.value.limit,
-                offset = 0,
-                status = _uiState.value.selectedStatus,
+    private suspend fun performLoad() {
+        _uiState.update { it.copy(isLoading = it.items.isEmpty(), error = null) }
+
+        val summary = api.getSummary(token, bondId)
+        val page = api.listExpenses(
+            token = token,
+            bondId = bondId,
+            limit = _uiState.value.limit,
+            offset = 0,
+            status = _uiState.value.selectedStatus,
+        )
+
+        val error = listOfNotNull(
+            (summary as? ApiResult.Error)?.message,
+            (page as? ApiResult.Error)?.message,
+        ).firstOrNull()
+
+        _uiState.update { state ->
+            state.copy(
+                isLoading = false,
+                error = error,
+                summary = if (summary is ApiResult.Success) summary.data else state.summary,
+                items = if (page is ApiResult.Success) page.data.items else state.items,
+                total = if (page is ApiResult.Success) page.data.total else state.total,
+                offset = if (page is ApiResult.Success) page.data.offset else state.offset,
             )
-
-            val error = listOfNotNull(
-                (summary as? ApiResult.Error)?.message,
-                (page as? ApiResult.Error)?.message,
-            ).firstOrNull()
-
-            _uiState.update { state ->
-                state.copy(
-                    isLoading = false,
-                    error = error,
-                    summary = if (summary is ApiResult.Success) summary.data else state.summary,
-                    items = if (page is ApiResult.Success) page.data.items else state.items,
-                    total = if (page is ApiResult.Success) page.data.total else state.total,
-                    offset = if (page is ApiResult.Success) page.data.offset else state.offset,
-                )
-            }
         }
     }
 
