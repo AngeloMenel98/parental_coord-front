@@ -201,14 +201,23 @@ same shape as `1792819200000-AddExpenseModelFields`; the timestamp must be **aft
 status except `done` and derives "Confirmar" from a rule that ignores the status; both
 produce 409s):
 
-| Flag | True in |
-|---|---|
-| `canAssign` | `created` (any bond member) |
-| `canConfirm`, `canDecline` | `assigned`, and `overdue` **when the origin is `assigned`** (the assignee only) |
-| `canReassign` | `not_assisting` (any bond member) |
-| `canComplete` | `in_progress`, `verify` (any bond member) |
-| `canUnassign` | **gone** — T4 is removed, the flag never existed and must not appear |
-| `canDelete`, `canCancel` | unchanged (creator && !isPast) |
+| Flag | True in | Route that backs it |
+|---|---|---|
+| `canConfirm`, `canDecline` | `assigned`, and `overdue` **when the origin is `assigned`** (the assignee only) | `POST /activities/:id/confirm`, `POST /activities/:id/decline` |
+| `canComplete` | `in_progress`, `verify` (any bond member) | `POST /activities/:id/complete` |
+| `canDelete`, `canCancel` | unchanged (creator && !isPast) | `DELETE /activities/:id`, `POST /activities/:id/cancel` |
+| `canAssign` | `created` (any bond member) | **none** — T3 has no route (see below) |
+| `canReassign` | `not_assigning` (any bond member) | **none** — T9 has no route (see below) |
+| `canUnassign` | **gone** — T4 is removed, the flag never existed and must not appear | — |
+
+> **Why `canAssign` and `canReassign` are NOT exposed in this wave.** The matrix says the
+> buttons exist, but the engine has **no route** for either transition: the activities
+> controller exposes create / confirm / decline / delete / cancel / list / detail /
+> compliance / complete — and **no assign, no reassign**. A flag whose action has no
+> endpoint is a promise the server cannot keep (the front would render a button that
+> 404s), and `assigned_to` is only ever written at create. Those two flags (and the two
+> routes they need) belong with **T21**, the status-aware action matrix, which is where
+> the matrix becomes a button. The flags that DO have a route ship now.
 
 `canComplete` covers `in_progress` **and** `verify` (R3: "D-7 queda superado"). The existing
 `POST /activities/:id/complete` route must accept **both** sources: the transition catalog
@@ -223,6 +232,12 @@ not change.
   "La actividad debe programarse con al menos 48 horas de anticipación".
 - **On edit** (the user's decision, verbatim "Also on edit"): the same validation runs
   whenever an edit changes `scheduledStart`.
+  > **There is no activity edit endpoint today.** The controller has create / confirm /
+  > decline / delete / cancel / list / detail / compliance / complete — and no PATCH.
+  > So the "also on edit" half of the ruling is **armed but parked**: the validation
+  > lives in ONE reusable guard that the create path calls now, and the future edit
+  > route calls the same guard. The alternative — adding an edit endpoint to the wave —
+  > would be API surface nobody asked for.
 - Existing activities are not touched — the rule validates writes, not history.
 
 **The notification copy.** The closed event catalogue grows by three: `activity.verify`
@@ -410,8 +425,8 @@ PRD `prd_improvement` H-2, H-3, PRD_expense FR-7.
 | T28 | Expenses read API: list + filters + summary/balance | B | S1 | delegated (writer, `src/expenses/**`) | done | B `b894206` |
 | T25 | Verify window, `created` timeout, server flags, 48 h lead time | B | S2 | delegated in two work units: **T25a** state machine + `verify_at` + the origin guard, then **T25b** the server flags + the 48 h lead time + the notification copy | T25a done, T25b pending | B `45bc9b8` |
 | T18 | Verify window in the front + the 48 h picker | F | S3 | — | pending | — |
-| T29 | Gastos front: summary cards + list + filters | F | S4 | delegated together with T19 (one front writer: the read surface) | in flight | — |
-| T19 | Gastos front: the expense detail + approve / reject / pay | F | S5 | delegated together with T29 | in flight | — |
+| T29 | Gastos front: summary cards + list + filters | F | S4 | delegated together with T19 (one front writer: the read surface) | done | F `0e30788` |
+| T19 | Gastos front: the expense detail + approve / reject / pay | F | S5 | delegated together with T29 | done | F `0e30788` |
 | T27 | Gastos front: "+ Solicitar" form + `sin doc.` warning | F | S6 | — | pending | — |
 | T30 | Attachment → expense flow (+ the expense attachment API) | F+B | S7 | — | pending | — |
 | T26 | Realtime: `expense.changed` + the live refresh | F+B | S8 | — | pending | — |
@@ -580,3 +595,46 @@ them.
   eslint clean on every file this work unit owns (the five errors in
   `activity-attachments.service.ts` are **pre-existing at HEAD** — they are part of the
   tree noise and were left alone).
+
+- **L12 (the front read surface — delivered and reviewed, 2026-11-02).** `F 0e30788`
+  (the Gastos cards + list + detail) and `F 64f32f3` (the build fix below). The review
+  found **four defects**, all fixed before the commit:
+
+  1. **CRITICAL — the edit would have failed EVERY time.** The PATCH serialized the
+     request data class, and the Ktor client has `explicitNulls` on: every field the
+     user did not touch travelled as `null`, which the backend reads as *"set to null"*
+     (its `buildPatch` checks `!== undefined`), against NOT NULL columns. On top of that
+     the body carried `splitRatioOther`, a property the backend does not have — it
+     derives the counterpart — and `forbidNonWhitelisted` turns that into a **400**. The
+     body is now assembled field by field (`toPatchBody()`, a pure function with its own
+     test), and the model no longer exposes `splitRatioOther`.
+     The delivered spec **pinned the bug**: it asserted the exact broken body — and its
+     name (*"omite campos nulos del cuerpo"*) said the opposite of what it asserted. A
+     test whose name contradicts its expectation is worse than no test.
+  2. **The cards were wrong.** "Por cobrar" was mapped to the `paid` status: tapping
+     *"what I am owed"* showed the **already settled** expenses. And the PRD's third card
+     ("Pagados") was missing. Now there are **four** cards — the PRD's set plus R1's
+     "Por cobrar" — and the two **balance** cards do not filter at all (a balance is not
+     a status; its sign already says who owes whom), while the two **count** cards filter
+     by theirs (FR-2).
+  3. **The edit dialog asked for a raw category UUID** ("ID de categoría"). It now shows
+     the category name; the picker arrives with the create form (T27) and is reused
+     there. Asking someone to type a UUID is not an interface.
+  4. **No source-level UI test** — my brief gave the worker no `androidUnitTest`
+     surface, so the house pattern for UI contracts was missing. There is one now
+     (`ExpensesScreenContractTest`), pinning the four cards, the flags-driven buttons,
+     the `sin doc.` tag and the shape of the PATCH body.
+
+  **The front's metadata build was broken before this wave**: `:shared:build` failed at
+  HEAD (from the wave-1 top bar work) — `toSortedMap()` is not in this common stdlib and
+  the `when` over the expect enum `DayOfWeek` needed an `else`. The Android target
+  compiled, which is why it went unnoticed. Fixed in its own commit (`F 64f32f3`).
+
+  **The independent verification of the backend came back 8/8 PASS** (timer coherence,
+  the sweep's five states, the overdue origin classification — checked with an exhaustive
+  traversal of the rule graph, the deadline, the money, the read API's authorization, the
+  migration). Five advisories, no blockers: three are now fixed (`ROUND(saldo, 2)` — the
+  balance was publishing 20 decimals; `CANCEL_EFFECTS` now clears `verify_at`; the
+  sweep's docstring names five states) and two are recorded instead of "fixed": no
+  deadline backfill for pre-existing `created` rows (**0** of them in dev and test) and
+  the stale deadline T7/T8 leave behind (pre-existing behaviour, pinned by the spec).
