@@ -427,7 +427,7 @@ PRD `prd_improvement` H-2, H-3, PRD_expense FR-7.
 | T18 | Verify window in the front + the 48 h picker | F | S3 | — | pending | — |
 | T29 | Gastos front: summary cards + list + filters | F | S4 | delegated together with T19 (one front writer: the read surface) | done | F `0e30788` |
 | T19 | Gastos front: the expense detail + approve / reject / pay | F | S5 | delegated together with T29 | done | F `0e30788` |
-| T27 | Gastos front: "+ Solicitar" form + `sin doc.` warning | F | S6 | — | pending | — |
+| T27 | Gastos front: "+ Solicitar" form + `sin doc.` warning | F | S6 | delegated (front writer) | done | F `8cdc674` |
 | T30 | Attachment → expense flow (+ the expense attachment API) | F+B | S7 | — | pending | — |
 | T26 | Realtime: `expense.changed` + the live refresh | F+B | S8 | — | pending | — |
 | T31 | Design-system pass | F | S9 | — | pending | — |
@@ -679,3 +679,18 @@ them.
   One thing the status restriction fixed for free: the old `canDecline` had no status
   check, so the app offered "No asiste" on an activity that was already running — a
   transition the map does not have (409).
+
+- **L15 (T27 — the "+ Solicitar" form, 2026-11-02) — `F 8cdc674`.** The PRD §5.3 form
+  (concepto, monto, categoría, fecha, notas, división 50/50), validated before it lets
+  the user submit, posting to `POST /expenses/:bondId` with the body assembled **field by
+  field** (the same lesson as the PATCH: the Ktor client encodes nulls and the backend
+  rejects unknown properties, so the body carries exactly the fields the form filled —
+  never `splitRatioOther`, never `childId`/`activityId`).
+  The category is picked **by name** from the existing `category` table (R2) through the
+  categories API the activities feature already uses.
+  **There is no upload field, and that is deliberate**: the expense attachment API does
+  not exist yet (T30), so the form says the document is missing and the expense goes in
+  without it — which is exactly what FR-9 asks (a non-blocking warning). The "sin doc."
+  tag in the list is the server's derived flag, never a stored boolean.
+  The review found no defect in the delivery; the only change was the success snackbar
+  ("Gasto creado"), which the activities form already had and this one did not.
