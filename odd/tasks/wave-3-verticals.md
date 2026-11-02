@@ -638,3 +638,19 @@ them.
   sweep's docstring names five states) and two are recorded instead of "fixed": no
   deadline backfill for pre-existing `created` rows (**0** of them in dev and test) and
   the stale deadline T7/T8 leave behind (pre-existing behaviour, pinned by the spec).
+
+- **L13 (the copy for the three new events, 2026-11-02) — `B 4a43bc3`, and a style commit
+  before it.** T25a started emitting `activity.verify`, `activity.verify_expired` and
+  `activity.created_overdue`, and the notification catalogue had **no rule** for them:
+  `resolveNotificationRule` returned null and the events were silently skipped. Each one
+  now has its own Spanish title (≤ 40 chars, the compile-time check covers them) and a
+  body that differs from it (N-2). The recipients follow the meaning of each event: the
+  verify notice goes to the assignee and the creator (either can confirm), the expiry
+  notice also reaches the coordinator (like the generic overdue), and the "never assigned"
+  notice goes to the creator and the coordinator — there is no assignee to tell.
+
+  Before that, `B 2348933` normalized the formatter on
+  `activity-notification.map.ts`: the file had carried uncommitted prettier drift since
+  before the wave, and the committed version **failed lint**. Normalizing it in its own
+  commit is what keeps this change to the same file reviewable on its own. The other
+  eight files with the same drift were left alone: they are not this wave's business.
