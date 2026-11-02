@@ -423,7 +423,7 @@ PRD `prd_improvement` H-2, H-3, PRD_expense FR-7.
 | ID | Task | Side | Specs | Route | Status | Commit |
 |---|---|---|---|---|---|---|
 | T28 | Expenses read API: list + filters + summary/balance | B | S1 | delegated (writer, `src/expenses/**`) | done | B `b894206` |
-| T25 | Verify window, `created` timeout, server flags, 48 h lead time | B | S2 | delegated in two work units: **T25a** state machine + `verify_at` + the origin guard, then **T25b** the server flags + the 48 h lead time + the notification copy | T25a done, T25b pending | B `45bc9b8` |
+| T25 | Verify window, `created` timeout, server flags, 48 h lead time | B | S2 | delegated in two work units: **T25a** state machine + `verify_at` + the origin guard, then **T25b** the server flags + the 48 h lead time + the notification copy | done | B `45bc9b8` + `5a61c16` + `4a43bc3` |
 | T18 | Verify window in the front + the 48 h picker | F | S3 | — | pending | — |
 | T29 | Gastos front: summary cards + list + filters | F | S4 | delegated together with T19 (one front writer: the read surface) | done | F `0e30788` |
 | T19 | Gastos front: the expense detail + approve / reject / pay | F | S5 | delegated together with T29 | done | F `0e30788` |
@@ -654,3 +654,28 @@ them.
   before the wave, and the committed version **failed lint**. Normalizing it in its own
   commit is what keeps this change to the same file reviewable on its own. The other
   eight files with the same drift were left alone: they are not this wave's business.
+
+- **L14 (T25b — the flags and the 48 h rule, 2026-11-02) — `B 5a61c16`, with two fixes
+  to the delivered work.**
+  - **`canConfirm` must NOT carry `isPast`.** The delivered version derived it from the
+    same `canRespond` as `canDecline`, which included `!isPast`. That would have hidden
+    the "Confirmar" button **exactly in the late acceptance** — a late acceptance is
+    precisely the case of an activity that already ended, and the activity is usually
+    past by then. The app already allowed confirming a past activity (its client rule
+    never looked at the clock), so this would also have been a silent loss. `canConfirm`
+    is now free of `isPast`; `canDecline` keeps it (saying "I won't go" about an
+    activity that already happened means nothing, and that was the flag's existing rule).
+  - **The origin rule was written TWICE** — once in the policy, once in the service's
+    transition guard. It is now ONE exported function, `overdueOrigin()`, used by both.
+    Two copies of a rule that decides who may accept late is a guaranteed drift.
+
+  What the review confirmed: the policy is still PURE (a structural subject, no
+  TypeORM), the list query selects every column (so `status` and `verify_at` reach the
+  policy in the list as well as in the detail), the 48 h boundary is **inclusive**
+  (exactly 48 h is allowed, which is what "al menos 48 horas" means), the guard lives in
+  ONE reusable place for the future edit route, and the seed script creates no
+  activities (so the new rule does not break it).
+
+  One thing the status restriction fixed for free: the old `canDecline` had no status
+  check, so the app offered "No asiste" on an activity that was already running — a
+  transition the map does not have (409).
