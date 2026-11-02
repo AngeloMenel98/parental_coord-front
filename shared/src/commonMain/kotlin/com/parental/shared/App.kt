@@ -22,6 +22,8 @@ import com.parental.shared.core.ui.components.BottomNavBar
 import com.parental.shared.core.ui.theme.ParentalCoordinationTheme
 import com.parental.shared.feature.activities.ui.ActividadesScreen
 import com.parental.shared.feature.activities.ui.ActividadesViewModel
+import com.parental.shared.feature.expenses.ui.ExpensesScreen
+import com.parental.shared.feature.expenses.ui.ExpensesViewModel
 import com.parental.shared.feature.auth.data.repository.AuthRepository
 import com.parental.shared.feature.auth.ui.LoginScreen
 import com.parental.shared.feature.auth.ui.LoginViewModel
@@ -178,10 +180,10 @@ private fun AppContent(
                 return
             }
 
-            // Gastos/Terceros son placeholders inertes: solo Inicio/Actividades navegan.
+            // Terceros sigue siendo placeholder; Gastos ya navega (T29/T19).
             val onNavigateBottom: (String) -> Unit = { route ->
                 when (route) {
-                    "home", "activities" -> bottomRoute = route
+                    "home", "activities", "expenses" -> bottomRoute = route
                     else -> Unit
                 }
             }
@@ -301,6 +303,29 @@ private fun AppContent(
                             unreadCount = unreadCount,
                             onOpenNotifications = { showNotifications = true },
                             onLogout = logout,
+                        )
+                    }
+                }
+            } else if (bottomRoute == "expenses") {
+                when {
+                    bondId == null -> SinVinculoScreen(onGoHome = { bottomRoute = "home" })
+                    else -> {
+                        val expensesViewModel = remember(currentUserId) {
+                            ExpensesViewModel(
+                                api = ApiClient.expensesApi(),
+                                token = token,
+                                bondId = bondId,
+                            )
+                        }
+                        DisposableEffect(currentUserId) {
+                            onDispose { expensesViewModel.destroy() }
+                        }
+                        ExpensesScreen(
+                            viewModel = expensesViewModel,
+                            onLogout = logout,
+                            onNavigateBottom = onNavigateBottom,
+                            unreadCount = unreadCount,
+                            onOpenNotifications = { showNotifications = true },
                         )
                     }
                 }

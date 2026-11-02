@@ -6,6 +6,7 @@ import com.parental.shared.feature.auth.data.remote.AuthApi
 import com.parental.shared.feature.home.data.remote.HomeApi
 import com.parental.shared.feature.admin.data.remote.AdminApi
 import com.parental.shared.feature.bonds.data.remote.BondsApi
+import com.parental.shared.feature.expenses.data.remote.ExpensesApi
 import com.parental.shared.feature.notifications.data.remote.NotificationsApi
 
 object ApiClient {
@@ -24,6 +25,8 @@ object ApiClient {
     fun categoriesApi(): CategoriesApi = CategoriesApi(httpClient, baseUrl)
 
     fun activitiesApi(): ActivitiesApi = ActivitiesApi(httpClient, baseUrl)
+
+    fun expensesApi(): ExpensesApi = ExpensesApi(httpClient, baseUrl)
 
     fun notificationsApi(): NotificationsApi = NotificationsApi(httpClient, baseUrl)
 }
