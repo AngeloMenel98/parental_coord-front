@@ -144,6 +144,31 @@ class ExpensesScreenContractTest {
     }
 
     @Test
+    fun `el detalle muestra los NOMBRES de las personas, no sus ids`() {
+        val detail = source("ExpenseDetailScreen.kt")
+
+        // Un UUID en pantalla no le dice nada a nadie: el nombre viene del servidor
+        // (que ya resuelve el de la categoría) y el id es sólo el plan B.
+        assertTrue(
+            "expense.requestedByName" in detail,
+            "El detalle tiene que pintar el NOMBRE de quien pidió el gasto, con el id " +
+                "como plan B cuando no hay perfil.",
+        )
+        assertTrue(
+            "expense.counterpartName" in detail,
+            "El detalle tiene que pintar el NOMBRE de la contraparte.",
+        )
+        assertTrue(
+            "expense.approvedByName" in detail,
+            "El detalle tiene que pintar el NOMBRE de quien aprobó.",
+        )
+        assertTrue(
+            "expense.requestedBy\n" !in detail && "value = expense.requestedBy)" !in detail,
+            "El detalle NO puede pintar el id crudo como si fuera un nombre.",
+        )
+    }
+
+    @Test
     fun `la fila avisa cuando el gasto no tiene documento`() {
         val row = source("ExpenseRow.kt")
 

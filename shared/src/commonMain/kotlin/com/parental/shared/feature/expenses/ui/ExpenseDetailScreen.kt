@@ -239,9 +239,17 @@ private fun DetailInfo(expense: ExpenseResponseDto) {
         DetailInfoRow(label = "Fecha", value = formatShortDateString(expense.expenseDate))
         DetailInfoRow(label = "Descripción", value = expense.description?.takeIf { it.isNotBlank() } ?: "—")
         DetailInfoRow(label = "División", value = "Pagador ${expense.splitRatioPayer}% / Otro ${expense.splitRatioOther}%")
-        DetailInfoRow(label = "Solicitado por", value = expense.requestedBy)
-        DetailInfoRow(label = "Contraparte", value = expense.counterpartId)
-        expense.approvedBy?.let { DetailInfoRow(label = "Aprobado por", value = it) }
+        // Los NOMBRES, no los ids: un UUID en pantalla no le dice nada a nadie. El
+        // nombre viene del servidor (que ya resuelve el de la categoría); si no hay
+        // perfil, se cae al id — mejor un UUID que un hueco sin explicación.
+        DetailInfoRow(label = "Solicitado por", value = expense.requestedByName ?: expense.requestedBy)
+        DetailInfoRow(
+            label = "Contraparte",
+            value = expense.counterpartName ?: expense.counterpartId ?: "Sin contraparte",
+        )
+        expense.approvedBy?.let {
+            DetailInfoRow(label = "Aprobado por", value = expense.approvedByName ?: it)
+        }
         expense.approvedAt?.let { DetailInfoRow(label = "Aprobado el", value = it) }
         expense.paidAt?.let { DetailInfoRow(label = "Pagado el", value = it) }
         if (!expense.hasDocument) {

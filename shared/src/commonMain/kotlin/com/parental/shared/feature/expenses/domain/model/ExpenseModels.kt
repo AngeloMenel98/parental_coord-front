@@ -42,8 +42,14 @@ data class ExpenseResponseDto(
     val splitRatioOther: Int,
     val status: ExpenseStatus,
     val requestedBy: String,
+    /** El nombre de quien pidió el gasto. `null` si no hay perfil: se cae al id. */
+    val requestedByName: String? = null,
     val counterpartId: String,
+    /** El nombre de la contraparte. `null` si no hay contraparte o no hay perfil. */
+    val counterpartName: String? = null,
     val approvedBy: String? = null,
+    /** El nombre de quien aprobó. `null` si no hay perfil: se cae al id. */
+    val approvedByName: String? = null,
     val approvedAt: String? = null,
     val paidAt: String? = null,
     val createdAt: String,
