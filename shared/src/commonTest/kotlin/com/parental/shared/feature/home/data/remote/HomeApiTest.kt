@@ -1,10 +1,15 @@
 package com.parental.shared.feature.home.data.remote
 
 import com.parental.shared.core.error.ApiResult
+import com.parental.shared.feature.activities.data.remote.ActivitiesApi
+import com.parental.shared.feature.activities.domain.model.Actividad
 import com.parental.shared.feature.bonds.data.remote.BondsApi
 import com.parental.shared.feature.bonds.domain.model.Vinculo
 import com.parental.shared.feature.bonds.domain.model.VinculoChild
 import com.parental.shared.feature.bonds.domain.model.VinculoMember
+import com.parental.shared.feature.expenses.data.remote.ExpensesApi
+import com.parental.shared.feature.expenses.domain.model.ExpenseSummaryCountsDto
+import com.parental.shared.feature.expenses.domain.model.ExpenseSummaryDto
 import com.parental.shared.feature.home.domain.model.ComplianceMember
 import com.parental.shared.feature.home.domain.model.ComplianceResponse
 import io.ktor.client.HttpClient
@@ -167,5 +172,108 @@ class HomeApiTest {
         assertTrue(result is ApiResult.Success)
         assertNull(result.data.bondId)
         assertNull(result.data.compliance)
+    }
+
+    // ── T20 · Las tres métricas del Home ────────────────────────────────────
+
+    private class FakeActivitiesApi(var result: ApiResult<List<Actividad>>) :
+        ActivitiesApi(UNUSED_CLIENT, "http://unused") {
+        var calls = 0
+        override suspend fun listActividades(token: String, bondId: String): ApiResult<List<Actividad>> {
+            calls++
+            return result
+        }
+    }
+
+    private class FakeExpensesApi(var result: ApiResult<ExpenseSummaryDto>) :
+        ExpensesApi(UNUSED_CLIENT, "http://unused") {
+        var calls = 0
+        override suspend fun getSummary(token: String, bondId: String): ApiResult<ExpenseSummaryDto> {
+            calls++
+            return result
+        }
+    }
+
+    private fun activity(status: String, assignedTo: String? = "u1") = Actividad(
+        id = "a-$status-$assignedTo",
+        title = "Actividad",
+        type = "event",
+        status = status,
+        categoryId = "cat-1",
+        criticality = "medium",
+        assignedTo = assignedTo,
+    )
+
+    private fun expenseSummary(saldo: Double) = ExpenseSummaryDto(
+        saldo = saldo,
+        porPagar = 0.0,
+        porCobrar = 0.0,
+        counts = ExpenseSummaryCountsDto(pendientes = 0, aprobados = 0, pagados = 0, rechazados = 0),
+    )
+
+    @Test
+    fun `los conteos y el saldo llegan al resumen`() = runTest {
+        val activitiesApi = FakeActivitiesApi(
+            ApiResult.Success(
+                listOf(
+                    activity("assigned"),
+                    activity("overdue"),
+                    activity("done"),
+                )
+            )
+        )
+        val expensesApi = FakeExpensesApi(ApiResult.Success(expenseSummary(saldo = -120.5)))
+        val homeApi = HomeApi(UNUSED_CLIENT, "http://unused", FakeBondsApi(ApiResult.Success(listOf(bond()))), activitiesApi, expensesApi)
+
+        val result = homeApi.getHomeSummary("t-1", currentUserId = "u1")
+
+        assertTrue(result is ApiResult.Success)
+        assertEquals(2, result.data.metrics.assignedToMe)
+        assertEquals(1, result.data.metrics.overdue)
+        assertEquals(-120.5, result.data.metrics.balance)
+        assertEquals(1, activitiesApi.calls)
+        assertEquals(1, expensesApi.calls)
+    }
+
+    @Test
+    fun `si la lista falla los conteos quedan sin dato y el saldo sigue`() = runTest {
+        val activitiesApi = FakeActivitiesApi(ApiResult.Error(500, "activities down"))
+        val expensesApi = FakeExpensesApi(ApiResult.Success(expenseSummary(saldo = 30.0)))
+        val homeApi = HomeApi(UNUSED_CLIENT, "http://unused", FakeBondsApi(ApiResult.Success(listOf(bond()))), activitiesApi, expensesApi)
+
+        val result = homeApi.getHomeSummary("t-1", currentUserId = "u1")
+
+        assertTrue(result is ApiResult.Success)
+        assertNull(result.data.metrics.assignedToMe)
+        assertNull(result.data.metrics.overdue)
+        assertEquals(30.0, result.data.metrics.balance)
+    }
+
+    @Test
+    fun `si el resumen de gastos falla el saldo queda sin dato y los conteos siguen`() = runTest {
+        val activitiesApi = FakeActivitiesApi(ApiResult.Success(listOf(activity("assigned"))))
+        val expensesApi = FakeExpensesApi(ApiResult.Error(503, "expenses down"))
+        val homeApi = HomeApi(UNUSED_CLIENT, "http://unused", FakeBondsApi(ApiResult.Success(listOf(bond()))), activitiesApi, expensesApi)
+
+        val result = homeApi.getHomeSummary("t-1", currentUserId = "u1")
+
+        assertTrue(result is ApiResult.Success)
+        assertNull(result.data.metrics.balance)
+        assertEquals(1, result.data.metrics.assignedToMe)
+    }
+
+    @Test
+    fun `sin vinculo no hay metricas y no se llama a la lista ni al resumen`() = runTest {
+        val activitiesApi = FakeActivitiesApi(ApiResult.Success(emptyList()))
+        val expensesApi = FakeExpensesApi(ApiResult.Success(expenseSummary(saldo = 0.0)))
+        val homeApi = HomeApi(UNUSED_CLIENT, "http://unused", FakeBondsApi(ApiResult.Success(emptyList())), activitiesApi, expensesApi)
+
+        val result = homeApi.getHomeSummary("t-1", currentUserId = "u1")
+
+        assertTrue(result is ApiResult.Success)
+        assertEquals(0, activitiesApi.calls)
+        assertEquals(0, expensesApi.calls)
+        assertNull(result.data.metrics.assignedToMe)
+        assertNull(result.data.metrics.balance)
     }
 }

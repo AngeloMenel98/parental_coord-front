@@ -38,7 +38,7 @@ class HomeViewModelTest {
             HomeSummary(children = emptyList())
         )
 
-        override suspend fun getHomeSummary(token: String): ApiResult<HomeSummary> {
+        override suspend fun getHomeSummary(token: String, currentUserId: String?): ApiResult<HomeSummary> {
             calls++
             return result
         }

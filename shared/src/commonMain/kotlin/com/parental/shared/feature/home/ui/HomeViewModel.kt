@@ -27,6 +27,11 @@ class HomeViewModel(
     private val homeApi: HomeApi,
     private val token: String,
     private val userName: String,
+    /**
+     * El usuario que pregunta. Lo necesita la métrica "Asignadas" (T20): sin él no
+     * se puede contar lo que es de uno y la tarjeta queda sin dato, no en cero.
+     */
+    private val currentUserId: String? = null,
     private val dispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + dispatcher)
@@ -42,7 +47,7 @@ class HomeViewModel(
         scope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
 
-            homeApi.getHomeSummary(token)
+            homeApi.getHomeSummary(token, currentUserId)
                 .onSuccess { summary ->
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,

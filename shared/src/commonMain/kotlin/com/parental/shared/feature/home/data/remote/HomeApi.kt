@@ -1,10 +1,15 @@
 package com.parental.shared.feature.home.data.remote
 
 import com.parental.shared.core.error.ApiResult
+import com.parental.shared.feature.activities.data.remote.ActivitiesApi
 import com.parental.shared.feature.bonds.data.remote.BondsApi
 import com.parental.shared.feature.bonds.domain.model.Vinculo
+import com.parental.shared.feature.expenses.data.remote.ExpensesApi
+import com.parental.shared.feature.home.domain.HomeCounts
+import com.parental.shared.feature.home.domain.computeHomeCounts
 import com.parental.shared.feature.home.domain.model.ChildProfile
 import com.parental.shared.feature.home.domain.model.ComplianceResponse
+import com.parental.shared.feature.home.domain.model.HomeMetrics
 import com.parental.shared.feature.home.domain.model.HomeSummary
 import io.ktor.client.call.*
 import io.ktor.client.call.body
@@ -23,9 +28,21 @@ open class HomeApi(
     private val client: io.ktor.client.HttpClient,
     private val baseUrl: String,
     private val bondsApi: BondsApi = BondsApi(client, baseUrl),
+    private val activitiesApi: ActivitiesApi = ActivitiesApi(client, baseUrl),
+    private val expensesApi: ExpensesApi = ExpensesApi(client, baseUrl),
 ) {
 
-    open suspend fun getHomeSummary(token: String): ApiResult<HomeSummary> {
+    /**
+     * El resumen del Home: los vínculos, el cumplimiento y las tres métricas.
+     *
+     * Cada fuente falla por su cuenta y cada una degrada por su cuenta: sin la
+     * lista no hay conteos, sin el resumen de gastos no hay saldo, y sin
+     * cumplimiento no hay tarjeta de cumplimiento. El Home aparece igual.
+     */
+    open suspend fun getHomeSummary(
+        token: String,
+        currentUserId: String? = null,
+    ): ApiResult<HomeSummary> {
         return try {
             when (val bondsResult = bondsApi.getMyBonds(token)) {
                 is ApiResult.Success -> {
@@ -37,7 +54,21 @@ open class HomeApi(
                             is ApiResult.Error -> null
                         }
                     }
-                    ApiResult.Success(buildHomeSummary(bonds, compliance))
+                    // R11: los conteos salen de la lista que ya se carga del vínculo.
+                    val counts = firstBond?.let { bond ->
+                        when (val listResult = activitiesApi.listActividades(token, bond.id)) {
+                            is ApiResult.Success -> computeHomeCounts(listResult.data, currentUserId)
+                            is ApiResult.Error -> computeHomeCounts(null, currentUserId)
+                        }
+                    } ?: computeHomeCounts(null, currentUserId)
+                    // R1: el saldo lo manda el servidor, con signo. El cliente no lo recalcula.
+                    val balance = firstBond?.let { bond ->
+                        when (val summaryResult = expensesApi.getSummary(token, bond.id)) {
+                            is ApiResult.Success -> summaryResult.data.saldo
+                            is ApiResult.Error -> null
+                        }
+                    }
+                    ApiResult.Success(buildHomeSummary(bonds, compliance, counts, balance))
                 }
                 is ApiResult.Error -> bondsResult
             }
@@ -67,7 +98,8 @@ open class HomeApi(
 }
 
 /**
- * Construye un [HomeSummary] a partir de los vínculos y el cumplimiento opcional.
+ * Construye un [HomeSummary] a partir de los vínculos, el cumplimiento y las
+ * métricas opcionales.
  *
  * Función pura y testable; la decisión de llamar a compliance (y de qué hacer con
  * un error) la toma [HomeApi.getHomeSummary].
@@ -75,6 +107,8 @@ open class HomeApi(
 internal fun buildHomeSummary(
     bonds: List<Vinculo>,
     compliance: ComplianceResponse?,
+    counts: HomeCounts = HomeCounts(assignedToMe = null, overdue = null),
+    balance: Double? = null,
 ): HomeSummary {
     val firstBond = bonds.firstOrNull()
     return HomeSummary(
@@ -91,5 +125,10 @@ internal fun buildHomeSummary(
         memberCount = firstBond?.members?.size ?: 0,
         bondId = firstBond?.id,
         compliance = compliance,
+        metrics = HomeMetrics(
+            assignedToMe = counts.assignedToMe,
+            overdue = counts.overdue,
+            balance = balance,
+        ),
     )
 }

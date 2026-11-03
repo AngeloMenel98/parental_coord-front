@@ -131,11 +131,112 @@ activities — the query never filtered `deleted_at IS NULL`. Exclude `cancelled
 the formula next to the endpoint, and replace the raw period string (`"2026-10"`) with
 `"Este mes"` in the card.
 
-### S7 — T18, T21 (F, blocked on T25) · T19 (F, blocked on T24) · T20 (F, blocked on T28)
+### S7 — T21 · The status-aware action matrix on the detail sheet (F+B)
 
-Not startable in this wave: their backend prerequisite is wave 3.
-**T25 is the backend bottleneck** — `verify` is declared in the activity status enum
-but no path enters or leaves it; the engine goes `in_progress → done` directly.
+**The matrix is the spec.** R3, verbatim (the `prd_improvement` five-state matrix is
+discarded, not translated):
+
+| Estado | Quién actúa | Botón | → | Si pasan 36 h sin acción |
+|---|---|---|---|---|
+| `created` | cualquier miembro | **Asignar** | `assigned` | → `overdue` |
+| `assigned` | asignado | Confirmar / No asiste | `assisting` / `not_assisting` | → `overdue` |
+| `assisting` | nadie | ninguno (espera automática) | `in_progress` al `scheduledStart` | |
+| `in_progress` | sistema | | `verify` al fin (`scheduledEnd ?? scheduledStart`) | |
+| `verify` | miembro | **Completado** | `done` | → `overdue` |
+| `overdue` | asignado | Confirmar / No asiste | `assisting` / `not_assisting` (T8, aceptación tardía) | |
+| `not_assisting` | cualquier miembro | **Reasignar** | `assigned` (T9, reinicia la ventana) | |
+| `done` | | ninguno | terminal | |
+| `cancelled` | | ninguno | terminal | |
+
+"The buttons are decided by the SERVER" (R3, verbatim): "Los botones los decide el
+servidor. Hoy el front muestra 'Finalizar' en todos los estados salvo done
+(`ActividadDetailSheet.kt:378`) y deriva 'Confirmar' de una regla local que ignora el
+estado (`canConfirmAssignment`, `ActivitiesModels.kt:105`). Ambos provocan 409. La matriz
+llega como flags del servidor, como ya hacen `canDelete`/`canCancel`/`canDecline`."
+
+| Flag | Vale en |
+|---|---|
+| `canAssign` | `created` |
+| `canConfirm`, `canDecline` | `assigned` y `overdue` (solo el asignado) |
+| `canReassign` | `not_assisting` |
+| `canComplete` | `in_progress` y `verify` |
+| `canUnassign` | eliminado (siempre false un release) |
+
+**The scope correction (L1 of this wave).** The plan filed T21 as front-only. It is
+**not**: the backend exposes `canDelete`, `canCancel`, `canConfirm`, `canDecline` and
+`canComplete` — and **neither `canAssign` nor `canReassign` exists**, and there is **no
+assign or reassign route** (`activities.controller.ts` has `create`, `confirm`, `decline`,
+`DELETE`, `cancel`, `complete`, and the reads). The engine is ready — `T3`
+(`created → assigned`) and `T9` (`not_assisting → assigned`) are in the closed catalog with
+`actors: ['bond_member']` — but nothing can reach them. The product consequence: an
+activity created without an assignee can never be assigned (it only times out to
+`overdue`), and an activity somebody declined is a **dead end**: it can only be cancelled.
+
+So T21 is **F+B**, and the two halves are separated by the contract below.
+
+**The contract (both halves implement THIS; do not invent another spelling).**
+
+- `POST /activities/:id/assign` — body `{ "assignedTo"?: "<userId>" }`. Omitted ⇒ the
+  actor takes it. `assignedTo` given ⇒ that member of the bond takes it.
+- `POST /activities/:id/reassign` — body `{ "assignedTo"?: "<userId>" }`. Same rule.
+- Both routes answer `200` with the updated activity, like `confirm`/`decline` do.
+- Both flags are added to the **activity summary AND the activity detail** DTOs, next to
+  `canComplete`: `canAssign`, `canReassign` (both `boolean`, `@Expose()`).
+- `canAssign` is true **iff** `status === 'created'`. `canReassign` is true **iff**
+  `status === 'not_assisting'`. Neither depends on who asks: any **member of the bond**
+  may act (R3 says "cualquier miembro" for both rows). Membership is the service's job
+  (`assertActivityMember`), never the policy's.
+- Errors, matching the module's conventions: **404** the activity does not exist or the
+  caller is not a member of its bond · **409** the status is not the one the route serves
+  (a stale `created` that already moved to `assigned`) · **404** `assignedTo` is not an
+  active member of the activity's bond (the message must not reveal whether that user
+  exists at all).
+- The transition goes through the **existing chokepoint** `ActivitiesService.transition()`,
+  never a direct write: `to: ActivityStatus.ASSIGNED` with `fields: { assignedTo }`.
+  `T3`/`T9` already carry `deadline: 'set'`, so the 36 h window is re-armed by
+  `wireTimers` exactly like the other window changes.
+- **One change to the catalog:** `T9` gains `declinedAt: false` (and `confirmedAt: false`)
+  in its `sideEffects`. A reassignment must start the new assignee from a clean sheet:
+  the old assignee's `declined_at` would otherwise keep the A3 decline reason on screen
+  for somebody who never declined. `T3` is unchanged (a `created` activity has neither
+  timestamp).
+
+**The front half.** The detail sheet renders the matrix: "Asignar" when `canAssign`,
+"Reasignar" when `canReassign`, each opening a **member picker** over the SAME
+`memberCandidates` list the create form already uses (the bond's members, from
+`GET /bonds` — no new request). The front model gains `canAssign` / `canReassign` with
+`= false` defaults, so an older server degrades to "no buttons" instead of "buttons that
+fail" (the same rule the existing flags follow). The client computes **no** flag: the
+matrix is read, never re-derived.
+
+### S11 — T20 · The Home metric cards (F)
+
+Three cards on the Home screen, verbatim from the wave table: "Home metric cards:
+Asignadas / Saldo gastos / Vencidas".
+
+R1, verbatim: "Home metric card (H-5) | `Saldo gastos` | signed `saldo` | green if > 0,
+red if < 0" and "Rule: a signed number is never rendered under a label that hides its
+sign. `Por pagar` and `Por cobrar` are unsigned magnitudes; `Saldo gastos` is signed and
+labelled as such. The endpoint returns `{ saldo, porPagar, porCobrar, counts: {pendientes,
+aprobados, pagados, rechazados} }` so no client ever recomputes it."
+
+R11, verbatim: "**Ruling.** Both counts are derived **client-side** from the already-loaded
+bond activity list (the list is per-bond and small). Only 'Saldo gastos' needs a server
+endpoint, because [the money is never recomputed in the client]."
+
+- **"Asignadas"** — the count of activities **assigned to the current user** in the loaded
+  bond list. Client-side (R11).
+- **"Vencidas"** — the count of activities in `overdue` in the loaded bond list.
+  Client-side (R11).
+- **"Saldo gastos"** — the signed `saldo` from `GET /expenses/bond/:bondId/summary`
+  (T28's endpoint, already in the front's `ExpensesApi`). Green if `> 0`, red if `< 0`.
+  The client NEVER recomputes the balance (R1).
+- The two counts are **pure functions** over the loaded list, with their own tests (the
+  house pattern: a pure function + a source-level contract test). The balance comes from
+  the server as-is; the front does not read `porPagar`/`porCobrar` for this card.
+- A card that cannot be computed (no bond, no list yet) shows its **loading/unavailable**
+  state — the same one the compliance card uses. It never shows `0` for "not loaded yet",
+  because `0` is a number the user would read as "you have none".
 
 ### S8 — T22 · Expense policy + audit (B, depends on T14)
 
@@ -302,10 +403,10 @@ rolls the expense back instead of leaving it orphaned.
 | T16 | Swipe to change week (pager) | F | S4 | — | pending | — |
 | T17 | Notification delete UI: acción por fila + "borrar todas" (bandeja de no leídas) | F | S5 | inline | done | F `e52cc7e` |
 | T35 | Compliance formula: exclude `cancelled`, period copy | B+F | S6 | — | pending | — |
-| T18 | Verify window in the front | F | S7 | — | blocked on T25 | — |
-| T19 | Expense detail + approve/reject/pay | F | S7 | — | pending (T24 done) | — |
-| T20 | Home metric cards | F | S7 | — | blocked on T28 | — |
-| T21 | Status-aware action matrix | F | S7 | — | blocked on T18, T25 | — |
+| T18 | Verify window in the front | F | S7 | inline (wave 3) | done | F `8a43020` |
+| T19 | Expense detail + approve/reject/pay | F | S7 | delegated (wave 3) | done | F `0e30788` |
+| T20 | Home metric cards | F | S11 | — | pending (T28 done) | — |
+| T21 | Status-aware action matrix | F+B | S7 | — | pending (T18, T25 done) | — |
 | T22 | Expense policy + audit | B | S8 | inline | done | B `f2d190b` |
 | T23 | Expense notifications + 7-day reminder | B | S9 | inline | done | B `6c04ed3` |
 | T24 | Expenses write API: create, detail, edit, cancel, approve/reject/pay | B | S10 | inline | done | B `7975695` + `0aa8742` |

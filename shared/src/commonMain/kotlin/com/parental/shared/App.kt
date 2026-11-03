@@ -341,6 +341,7 @@ private fun AppContent(
                         homeApi = homeApi,
                         token = token,
                         userName = userName,
+                        currentUserId = sessionManager.userId,
                     )
                 }
                 DisposableEffect(Unit) {

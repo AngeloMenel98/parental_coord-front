@@ -1,5 +1,6 @@
 package com.parental.shared.feature.home.ui
 
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -35,6 +36,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -49,9 +51,12 @@ import androidx.compose.ui.unit.dp
 import com.parental.shared.core.ui.components.AppTopBar
 import com.parental.shared.core.ui.components.BottomNavBar
 import com.parental.shared.core.ui.components.ContentListSkeleton
+import com.parental.shared.core.ui.theme.StatusTokens
+import com.parental.shared.core.util.formatMoney
 import com.parental.shared.feature.home.domain.model.ChildProfile
 import com.parental.shared.feature.home.domain.model.ComplianceMember
 import com.parental.shared.feature.home.domain.model.ComplianceResponse
+import com.parental.shared.feature.home.domain.model.HomeMetrics
 import com.parental.shared.feature.home.domain.model.HomeSummary
 import kotlinx.datetime.Clock
 import kotlinx.datetime.TimeZone
@@ -270,6 +275,10 @@ private fun HomeContent(
                 }
             } else {
                 item {
+                    HomeMetricCards(metrics = summary.metrics)
+                }
+
+                item {
                     when {
                         complianceLoading -> ComplianceCardLoading()
                         complianceError != null -> ComplianceCardError(
@@ -299,6 +308,96 @@ private fun HomeContent(
             }
         }
     }
+}
+
+/**
+ * Las tres métricas del Home (T20): "Asignadas", "Saldo gastos" y "Vencidas".
+ *
+ * R11: los dos conteos los calcula el CLIENTE sobre la lista del vínculo.
+ * R1: el saldo lo manda el servidor CON signo — verde si es positivo, rojo si es
+ * negativo. Nunca un número con signo bajo una etiqueta que esconda el signo.
+ */
+@Composable
+private fun HomeMetricCards(
+    metrics: HomeMetrics,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        HomeMetricCard(
+            label = "Asignadas",
+            value = metrics.assignedToMe?.toString() ?: METRIC_UNAVAILABLE,
+            modifier = Modifier.weight(1f),
+        )
+        HomeMetricCard(
+            label = "Vencidas",
+            value = metrics.overdue?.toString() ?: METRIC_UNAVAILABLE,
+            modifier = Modifier.weight(1f),
+        )
+        HomeMetricCard(
+            label = "Saldo gastos",
+            value = metrics.balance?.let { formatMoney(it) } ?: METRIC_UNAVAILABLE,
+            valueColor = balanceValueColor(metrics.balance),
+            modifier = Modifier.weight(1f),
+        )
+    }
+}
+
+/**
+ * Lo que se muestra cuando una métrica no se pudo calcular: un hueco, nunca un `0`.
+ *
+ * Un `0` de mentira ("no tenés ninguna") es peor que un hueco: el usuario lo lee
+ * como un dato. `null` significa que la lista o el resumen no llegaron.
+ */
+private const val METRIC_UNAVAILABLE = "—"
+
+@Composable
+private fun HomeMetricCard(
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier,
+    valueColor: Color = Color.Unspecified,
+) {
+    Card(
+        modifier = modifier.semantics(mergeDescendants = true) { },
+        shape = MaterialTheme.shapes.large,
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        ),
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodySmall,
+                maxLines = 1,
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = value,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = valueColor,
+                maxLines = 1,
+            )
+        }
+    }
+}
+
+/**
+ * El color del saldo: verde si me deben, rojo si debo, neutro si es cero o no llegó.
+ *
+ * Los colores salen de los TOKENS de status (`Ok`/`Ko`), no de un hex suelto: el
+ * semáforo del saldo es el mismo que el de "vínculo activo" en cualquier otra parte
+ * de la app.
+ */
+@Composable
+private fun balanceValueColor(balance: Double?): Color {
+    if (balance == null || balance == 0.0) return Color.Unspecified
+    val status = if (balance > 0) StatusTokens.Status.Ok else StatusTokens.Status.Ko
+    return StatusTokens.triple(status, isSystemInDarkTheme()).content
 }
 
 @Composable
