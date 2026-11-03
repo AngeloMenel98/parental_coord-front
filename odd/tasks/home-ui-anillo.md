@@ -122,3 +122,10 @@ L18 (desvío de polaridad): las tarjetas del Home usan `surfaceVariant` como con
 igual que el resto de la app, en vez de la polaridad invertida del artboard (pantalla
 `surfaceVariant`, tarjeta `surface`). El track del anillo pasa a `outlineVariant` porque
 `surfaceVariant` sobre una tarjeta `surfaceVariant` es invisible.
+
+L19 (verificación en dispositivo): instalado y capturado en un dispositivo real, en claro y en
+oscuro (`cmd uimode night yes`). Dos correcciones salieron de ahí, no del test:
+ · la barra superior del Inicio seguía el `primary` histórico (teal) en vez de la superficie
+   del artboard; ahora usa los mismos colores que la barra de Actividades;
+ · `formatPercentage` imprimía `50.0%` (toString de Double) y el período se mostraba como
+   `2026-11`; ahora es `50%` / `66,7%` y `Noviembre`.

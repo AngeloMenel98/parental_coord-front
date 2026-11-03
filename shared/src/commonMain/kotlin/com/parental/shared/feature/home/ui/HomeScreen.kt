@@ -33,6 +33,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -104,11 +105,20 @@ fun HomeScreen(
             // S12 · G-1…G-5 — la barra global: campana con contador y salir con
             // confirmación. El botón de texto "Cerrar sesión" se fue con ella: el ícono
             // ocupa menos y el diálogo evita el cierre accidental.
+            // La barra del Inicio sigue el mismo idioma que la de Actividades
+            // (superficie + hairline) en vez del `primary` histórico: el artboard
+            // `home-ui/04` la especifica sobre `surface`.
             AppTopBar(
                 title = "Coordinación Parental",
                 unreadCount = unreadCount,
                 onOpenNotifications = onOpenNotifications,
                 onLogout = onLogout,
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    titleContentColor = MaterialTheme.colorScheme.onSurface,
+                    navigationIconContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    actionIconContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                ),
             )
         },
         bottomBar = {
@@ -789,7 +799,7 @@ private fun ComplianceRingCard(
 }
 
 private fun compliancePeriodLabel(period: String, completed: Int?, total: Int?): String {
-    val name = period.trim().ifBlank { "Este mes" }
+    val name = monthNameOf(period) ?: period.trim().ifBlank { "Este mes" }
     return if (completed != null && total != null) {
         "$name · $completed de $total tareas"
     } else {
@@ -1181,6 +1191,21 @@ private fun NoBondState(modifier: Modifier = Modifier) {
 
 // ── helpers ──────────────────────────────────────────────────────────────
 
+private val MONTH_NAMES = listOf(
+    "Enero",
+    "Febrero",
+    "Marzo",
+    "Abril",
+    "Mayo",
+    "Junio",
+    "Julio",
+    "Agosto",
+    "Septiembre",
+    "Octubre",
+    "Noviembre",
+    "Diciembre",
+)
+
 private val MONTH_ABBREVIATIONS = listOf(
     "ene",
     "feb",
@@ -1230,10 +1255,30 @@ private fun normalizedPercentage(value: Double): Float =
         ?.toFloat()
         ?: 0f
 
+/**
+ * Porcentaje en el formato de la app (`es-AR`): coma decimal y sin el `,0` sobrante.
+ *
+ * `toString()` sobre un `Double` da `"50.0%"` — y eso no es lo que dice ninguna otra
+ * parte de la app, ni el artboard (`66,7%`).
+ */
 private fun formatPercentage(value: Double): String {
     val safeValue = value
         .takeIf { it.isFinite() }
         ?.coerceIn(0.0, 100.0)
         ?: 0.0
-    return "${kotlin.math.round(safeValue * 10) / 10.0}%"
+    val rounded = kotlin.math.round(safeValue * 10) / 10.0
+    val whole = rounded.toInt()
+    val tenths = kotlin.math.round((rounded - whole) * 10).toInt()
+    return if (tenths == 0) "$whole%" else "$whole,${tenths}%"
+}
+
+/**
+ * `"2026-11"` → `"Noviembre"`. Cualquier otro formato (o un id raro) devuelve `null` y el
+ * llamador muestra el período tal como llegó: no se inventa un mes.
+ */
+private fun monthNameOf(period: String): String? {
+    val trimmed = period.trim()
+    if (trimmed.length < 7) return null
+    val month = trimmed.substring(5, 7).toIntOrNull() ?: return null
+    return MONTH_NAMES.getOrNull(month - 1)
 }
