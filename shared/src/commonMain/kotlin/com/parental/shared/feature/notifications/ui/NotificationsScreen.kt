@@ -51,6 +51,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.parental.shared.core.ui.components.AppTopBar
+import com.parental.shared.core.ui.components.ContentListSkeleton
+import com.parental.shared.core.ui.components.EmptyContentState
+import com.parental.shared.core.ui.theme.Spacing
 import com.parental.shared.core.util.formatRelativeTime
 import com.parental.shared.feature.notifications.domain.model.NotificationItem
 
@@ -169,27 +172,27 @@ fun NotificationsScreen(
         ) {
             val error = uiState.error
             when {
-                uiState.isLoading -> CircularProgressIndicator(
-                    modifier = Modifier.align(Alignment.Center),
-                )
+                uiState.isLoading -> ContentListSkeleton("Cargando notificaciones")
 
-                error != null && uiState.items.isEmpty() -> NotificationsMessage(
+                error != null && uiState.items.isEmpty() -> EmptyContentState(
                     title = "No pudimos cargar las notificaciones",
-                    body = error,
+                    message = error,
+                    modifier = Modifier.fillMaxSize(),
                     actionLabel = "Reintentar",
                     onAction = { viewModel.refresh() },
                 )
 
-                uiState.items.isEmpty() -> NotificationsMessage(
+                uiState.items.isEmpty() -> EmptyContentState(
                     title = "No tenés notificaciones nuevas",
-                    body = "Cuando haya novedades en tu coordinación van a aparecer acá. " +
+                    message = "Cuando haya novedades en tu coordinación van a aparecer acá. " +
                         "Las que ya leíste no se vuelven a mostrar.",
+                    modifier = Modifier.fillMaxSize(),
                 )
 
                 else -> LazyColumn(
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    contentPadding = PaddingValues(Spacing.lg),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.sm),
                 ) {
                     items(uiState.items, key = { it.id }) { item ->
                         NotificationRow(
@@ -233,30 +236,30 @@ private fun NotificationRow(
         color = MaterialTheme.colorScheme.surfaceVariant,
         shape = MaterialTheme.shapes.medium,
     ) {
-        Row(modifier = Modifier.padding(12.dp)) {
+        Row(modifier = Modifier.padding(Spacing.md)) {
             UnreadDot(isUnread = true)
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(Spacing.md))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = item.title,
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
                 )
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(Spacing.xs))
                 Text(
                     text = item.body,
                     style = MaterialTheme.typography.bodyMedium,
                     maxLines = 3,
                     overflow = TextOverflow.Ellipsis,
                 )
-                Spacer(modifier = Modifier.height(6.dp))
+                Spacer(modifier = Modifier.height(Spacing.xxs))
                 Text(
                     text = formatRelativeTime(item.createdAt),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            Spacer(modifier = Modifier.width(8.dp))
+            Spacer(modifier = Modifier.width(Spacing.sm))
             IconButton(onClick = onDelete, enabled = !isMarking) {
                 Icon(
                     imageVector = Icons.Default.Delete,
@@ -283,7 +286,6 @@ private fun UnreadDot(isUnread: Boolean) {
             ),
     )
 }
-
 @Composable
 private fun LoadMoreRow(
     isLoading: Boolean,
@@ -298,42 +300,6 @@ private fun LoadMoreRow(
         } else {
             Button(onClick = onLoadMore) {
                 Text("Cargar más")
-            }
-        }
-    }
-}
-
-@Composable
-private fun NotificationsMessage(
-    title: String,
-    body: String,
-    actionLabel: String? = null,
-    onAction: (() -> Unit)? = null,
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(32.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            textAlign = TextAlign.Center,
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = body,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-        )
-        if (actionLabel != null && onAction != null) {
-            Spacer(modifier = Modifier.height(16.dp))
-            Button(onClick = onAction) {
-                Text(actionLabel)
             }
         }
     }

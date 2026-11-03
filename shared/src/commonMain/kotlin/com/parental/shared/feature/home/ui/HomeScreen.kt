@@ -48,6 +48,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.parental.shared.core.ui.components.AppTopBar
 import com.parental.shared.core.ui.components.BottomNavBar
+import com.parental.shared.core.ui.components.ContentListSkeleton
 import com.parental.shared.feature.home.domain.model.ChildProfile
 import com.parental.shared.feature.home.domain.model.ComplianceMember
 import com.parental.shared.feature.home.domain.model.ComplianceResponse
@@ -117,38 +118,11 @@ fun HomeScreen(
 
 @Composable
 private fun HomeLoadingState(modifier: Modifier = Modifier) {
-    CenteredHomeState(modifier = modifier) {
-        Surface(
-            modifier = Modifier
-                .widthIn(max = 720.dp)
-                .fillMaxWidth()
-                .clearAndSetSemantics {
-                    liveRegion = LiveRegionMode.Polite
-                    contentDescription = "Cargando el inicio"
-                },
-            color = MaterialTheme.colorScheme.surfaceVariant,
-            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-            shape = MaterialTheme.shapes.large,
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(32.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(32.dp),
-                    color = MaterialTheme.colorScheme.primary,
-                )
-                Spacer(modifier = Modifier.height(12.dp))
-                Text(
-                    text = "Cargando el inicio",
-                    style = MaterialTheme.typography.titleMedium,
-                    textAlign = TextAlign.Center,
-                )
-            }
-        }
-    }
+    ContentListSkeleton(
+        contentDescription = "Cargando el inicio",
+        itemCount = 3,
+        modifier = modifier,
+    )
 }
 
 @Composable

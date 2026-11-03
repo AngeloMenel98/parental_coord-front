@@ -17,6 +17,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.parental.shared.core.ui.components.AppTopBar
+import com.parental.shared.core.ui.theme.Spacing
 import com.parental.shared.core.ui.theme.StatusTokens
 import com.parental.shared.feature.admin.domain.model.AdminBond
 import com.parental.shared.feature.admin.domain.model.AdminUser
@@ -60,12 +61,12 @@ fun AdminScreen(
             // Error banner
             state.error?.let { error ->
                 Surface(
-                    modifier = Modifier.fillMaxWidth().padding(8.dp),
+                    modifier = Modifier.fillMaxWidth().padding(Spacing.sm),
                     color = MaterialTheme.colorScheme.errorContainer,
-                    shape = RoundedCornerShape(8.dp),
+                    shape = MaterialTheme.shapes.small,
                 ) {
                     Row(
-                        modifier = Modifier.padding(12.dp),
+                        modifier = Modifier.padding(Spacing.md),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(
@@ -93,23 +94,23 @@ fun AdminScreen(
 @Composable
 private fun UsersTab(state: AdminUiState, viewModel: AdminViewModel) {
     LazyColumn(
-        modifier = Modifier.fillMaxSize().padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = Modifier.fillMaxSize().padding(Spacing.lg),
+        verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
         // Create user form
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
+                shape = MaterialTheme.shapes.medium,
                 elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
+                Column(modifier = Modifier.padding(Spacing.lg)) {
                     Text(
                         "Create Progenitor",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                     )
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(Spacing.md))
 
                     OutlinedTextField(
                         value = state.newUserFirstName,
@@ -117,28 +118,28 @@ private fun UsersTab(state: AdminUiState, viewModel: AdminViewModel) {
                         label = { Text("First Name") },
                         modifier = Modifier.fillMaxWidth(),
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(Spacing.sm))
                     OutlinedTextField(
                         value = state.newUserLastName,
                         onValueChange = { viewModel.updateUserLastName(it) },
                         label = { Text("Last Name") },
                         modifier = Modifier.fillMaxWidth(),
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(Spacing.sm))
                     OutlinedTextField(
                         value = state.newUserEmail,
                         onValueChange = { viewModel.updateUserEmail(it) },
                         label = { Text("Email") },
                         modifier = Modifier.fillMaxWidth(),
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(Spacing.sm))
                     OutlinedTextField(
                         value = state.newUserPassword,
                         onValueChange = { viewModel.updateUserPassword(it) },
                         label = { Text("Password") },
                         modifier = Modifier.fillMaxWidth(),
                     )
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(Spacing.md))
 
                     Button(
                         onClick = { viewModel.createUser() },
@@ -165,7 +166,7 @@ private fun UsersTab(state: AdminUiState, viewModel: AdminViewModel) {
                 "Users (${state.users.size})",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(top = 8.dp),
+                modifier = Modifier.padding(top = Spacing.sm),
             )
         }
 
@@ -186,11 +187,11 @@ private fun UserCard(user: AdminUser) {
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(8.dp),
+        shape = MaterialTheme.shapes.small,
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
     ) {
         Row(
-            modifier = Modifier.padding(12.dp),
+            modifier = Modifier.padding(Spacing.md),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             // Avatar circle
@@ -205,11 +206,11 @@ private fun UserCard(user: AdminUser) {
                     text = (user.firstName?.firstOrNull()?.uppercase() ?: user.email.first().uppercase()),
                     color = roleColor,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 18.sp,
+                    style = MaterialTheme.typography.titleMedium,
                 )
             }
 
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(Spacing.md))
 
             Column(modifier = Modifier.weight(1f)) {
                 Text(
@@ -230,12 +231,12 @@ private fun UserCard(user: AdminUser) {
             }
 
             Surface(
-                shape = RoundedCornerShape(12.dp),
+                shape = MaterialTheme.shapes.medium,
                 color = roleColor.copy(alpha = 0.1f),
             ) {
                 Text(
                     text = user.systemRole,
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                    modifier = Modifier.padding(horizontal = Spacing.sm, vertical = Spacing.xs),
                     color = roleColor,
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.Medium,

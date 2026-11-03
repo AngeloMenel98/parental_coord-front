@@ -1,321 +1,73 @@
 # Wave 1 — UX quick wins (T05–T12)
 
-Objective: the second-cheapest wave of the `gastos-and-ux-resolution` program — eight
-"one file, one surface" tasks (3–6 h each). No schema, no new endpoint, no dependency on
-the expenses vertical; **Waves 0 and 1 are free of dependencies and can be delivered
-immediately**.
-Branch: `feat/wave-0-quick-wins` (the wave-0 branch — the program is one branch; wave 0
-is closed at `1f4d357`).
-Two repos: **F** = front `Documentos/parental_coord-front` (Kotlin Multiplatform Compose),
-**B** = back `Documentos/parental_coordination_back` (NestJS + TypeORM + Postgres).
-Delivery: one work-unit commit per task; tests and docs travel with the behavior.
-Test runners: front `./gradlew :shared:testDebugUnitTest`; back `pnpm test` (jest).
-Program source: `odd/tasks/gastos-and-ux-resolution.md` (revision 3) — rulings R1–R15.
+Branch: `feat/wave-0-quick-wins` (one branch for the whole program).
+Repos: **F** = `Documentos/parental_coord-front` (KMP Compose) · **B** = `Documentos/parental_coordination_back` (NestJS).
+Program source: `odd/tasks/gastos-and-ux-resolution.md` (rev 3). PRD refs: `prd_improvement.md`, `PRD_expense.md`.
 
-Scope note: wave 0 (T01–T04) is closed in `odd/tasks/wave-0-quick-wins.md`; this
-document starts where that one stopped, and the spec numbering continues (S5…S12).
+## Commands
 
----
+- Front tests: `./gradlew :shared:testDebugUnitTest -q 2>&1 | tail -30` (focused: `--tests "*Name*"`)
+- Front install: `./gradlew :androidApp:installDebug`
+- Back tests: `corepack pnpm jest <path>`
+- Do not touch the pre-existing back dirt: `src/worker.module.ts`, `.atl/skill-registry.md`, `design/`.
 
-## Specs
+## Status
 
-### S5 — T05 · Locale-aware currency formatter, 2 decimals, everywhere
+| ID  | Task                                               | Repo | PRD           | Status                              |
+| --- | -------------------------------------------------- | ---- | ------------- | ----------------------------------- |
+| T05 | Locale-aware money formatter, 2 decimals           | F    | H-7, FR-6     | done                                |
+| T06 | Localize relative dates, fix truncated dates       | F    | Issues #2, #3 | done                                |
+| T07 | "Asignada a: [name]" on the card                   | F    | A-2           | done                                |
+| T08 | Children on the card                               | F    | A-3           | done                                |
+| T09 | Detail sheet: date range, children, assignee       | F+B  | D-4…D-6       | done (verify front, see Open items) |
+| T10 | Notification copy in Spanish, title ≠ body, capped | B    | N-1…N-4       | done                                |
+| T11 | Children filter in Activities                      | F    | A-5…A-7       | done                                |
+| T12 | Global `AppTopBar`: bell + badge + logout confirm  | F    | G-1…G-5       | **pending**                         |
 
-User, verbatim (wave list):
+## Pending: T12
 
-> "T05 currency formatter"
+Extract ONE `AppTopBar` composable used by every view, replacing the `TopAppBar` that
+each of these screens owns today: `HomeScreen`, `AdminScreen`, `NotificationsScreen`,
+`ActividadDetailSheet`, `ActivitiesScreen`.
 
-Resolution task row, verbatim:
+Acceptance:
 
-> "| T05 | Locale-aware currency formatter, 2 decimals, everywhere | F | H-7, FR-6,
-> Issue #1 | 3h | New: no money formatter exists in the front at all. Add + unit tests. |"
+- Icons only: notifications bell and logout (G-1, G-2).
+- Bell shows an unread badge, capped at `9+` (G-5).
+- Logout asks for confirmation in a dialog before ending the session (G-3).
+- Both icons have a `contentDescription` (Spanish) and a hit area of at least 44×44 dp (G-4).
+- Logout is available on every view, not only Home/Admin.
 
-PRD `prd_improvement` H-7, verbatim:
+Tests: pure function for the badge text (`0` → hidden, `1..9` → number, `10+` → `9+`);
+source-level assertions for `contentDescription` and the 44 dp size, following
+`ActivityCardAccessibilityTest`. No Compose rule exists in this repo.
 
-> "**H-7:** Currency formatting is consistent (`$632,80` everywhere, 2 decimals,
-> locale-aware)."
+Delivery: one commit, `feat(core): add the global top bar with bell and logout confirmation`.
 
-PRD `PRD_expense` FR-6, verbatim:
+## Decisions to keep (do not redo)
 
-> "**FR-6:** Amounts use a single consistent currency format (see Issues)."
+- **R5:** notification copy lives in the backend catalogue (`activity-notification.map.ts`); the front renders `title` / `body` verbatim.
+- **Formatters live in `core/util/`** (`formatMoney`, relative time, `formatShortDate`). Money formatter rejects absurd magnitudes and handles values above `1E7` (no scientific notation).
+- **Absolute short dates are numeric** on purpose: a spelled-out month is what got truncated into "05 dé". The detail date keeps its own format: day, full abbreviated month, year ("5 ago 2026").
+- **Card children** are ONE line: `Para: Ana, Luis` / `Para: Ana, Luis +1`. No chips, no measuring.
+- **Card semantic label** includes "Asignada a: …" and "Para: …" for TalkBack.
+- **Create form:** `endDate` + `endTime` are optional; end must be strictly after start ("El fin programado debe ser posterior al inicio"); no end date means no end time shown.
 
-PRD `PRD_expense` Issue #1, verbatim:
+## Open items
 
-> "**Inconsistent number formatting:** `$16.80` in the summary, `$16,8` in the list. | Use
-> one locale-aware formatter with 2 decimals everywhere. |"
+- **T09 front:** confirm the detail sheet shows the date range and the children (back already exposes `childrenIds`). Check with `git log --oneline -15` and by opening the sheet on the device.
+- **A-17:** the scheduled end is sent but not yet shown everywhere; lands with T09/T15.
+- **Cleanup deferred to T20:** unreachable `complianceLoading → ComplianceCardLoading` branch in `HomeScreen`.
+- **Compliance card period copy** ("Este mes") lands with T35.
 
-Observable outcome: ONE formatter in the front that renders money with two decimals and
-the locale's separators, with unit tests pinning the separators, the decimals and the
-sign. It has no consumer yet — the Gastos screens that will use it are T29/T33.
+## Working rules (to keep token use low)
 
-### S6 — T06 · Localize relative dates and fix truncated dates
+1. One task per session. Commit, then start a fresh session (or `/compact`).
+2. No double review: either work directly and read `git diff` yourself, or delegate and trust green tests, not both.
+3. Run focused tests while working; run the full front suite once before the commit.
+4. Reference exact file paths in the prompt; do not ask the agent to explore.
+5. Update only the Status table when a task closes. No narrative log.
 
-User, verbatim (wave list):
+## Last green baseline
 
-> "T06 localize dates"
-
-Resolution task row, verbatim:
-
-> "| T06 | Localize relative dates ("1d ago") and fix truncated dates ("05 dé") | F | Issues
-> #2, #3 | 3h | Built: `NotificationTimeFormatter.kt`, `TimelineFormatters.kt`. |"
-
-PRD `PRD_expense` Issues #2 and #3, verbatim:
-
-> "**Mixed language:** UI is Spanish but dates read "1d ago", "10 ago", "05 dé". | Fully
-> localize relative and absolute dates. |"
-
-> "**Truncated / malformed date** on the Clases de natación row ("05 dé"). | Fix date
-> formatting and truncation. |"
-
-PRD `PRD_expense` §9, verbatim:
-
-> "Relative dates for recent items ("1d ago") must be localized."
-
-Observable outcome: the front renders relative dates in Spanish ("hace 1 d", "hace 2 h")
-and absolute dates without the truncated month abbreviation that produced "05 dé".
-
-### S7 — T07 · "Asignada a: [name]" on the activity card
-
-User, verbatim (wave list):
-
-> "T07 assignee on card"
-
-Resolution task row, verbatim:
-
-> "| T07 | "Asignada a: [name]" on the activity card | F | A-2 | 3h | Built: `assignedTo`
-> (user UUID) + `memberNames` already in the VM. Resolve name client-side. |"
-
-PRD `prd_improvement` A-2, verbatim:
-
-> "**A-2:** Each card shows **"Asignada a: [name]"**."
-
-Observable outcome: the activity card shows who it is assigned to, resolving the
-`assignedTo` UUID through the `memberNames` map the ViewModel already holds.
-
-### S8 — T08 · Children on the activity card (avatars / `+N` chip)
-
-User, verbatim (wave list):
-
-> "T08 children on card"
-
-Resolution task row, verbatim:
-
-> "| T08 | Children on the activity card (avatars / `+N` chip) | F | A-3 | 3h | Depends on
-> T03. |"
-
-PRD `prd_improvement` A-3, verbatim:
-
-> "**A-3:** Each card shows the **child/children** linked to the activity. If more than
-> one, show avatars or a compact chip list (`+N` if it overflows)."
-
-Observable outcome: the card shows the children of the activity, using the `childrenIds`
-that T03 put on the model and the `resolveChildNames` seam T03 added.
-
-### S9 — T09 · Detail sheet: date + time range, children, assignee
-
-User, verbatim (wave list):
-
-> "T09 detail: date+children+assignee"
-
-Resolution task row, verbatim:
-
-> "| T09 | Detail sheet: date + time range, children, assignee | F+B | D-4…D-6 | 5h |
-> Mostly built; the detail DTO lacks `childrenIds` → +2h on the back. |"
-
-PRD `prd_improvement`, verbatim:
-
-> "**D-4:** **Date includes time** (e.g. `30 oct 2026 · 16:30`). If a scheduled end exists,
-> show the range."
-
-> "**D-5:** Show **children** linked to the activity (names/avatars)."
-
-> "**D-6:** Show "Asignada a"."
-
-Observable outcome: the detail sheet shows when (with the range when there is a scheduled
-end), who it is assigned to, and which children it concerns. The assignee line already
-exists (`ActividadDetailSheet.kt`); the children need `childrenIds` on the back's detail
-DTO first.
-
-### S10 — T10 · Notification copy: Spanish, title ≠ body, length-capped
-
-User, verbatim (wave list):
-
-> "T10 Spanish notification copy"
-
-Resolution task row, verbatim:
-
-> "| T10 | Notification copy: Spanish, title ≠ body, length-capped | B | N-1…N-4 (R5) | 5h |
-> Built: 8 templates in `activity-notification.map.ts`, English, `title === body`. Split the
-> template and rewrite the 6 example rows. Update specs. |"
-
-PRD `prd_improvement` N-1…N-4, verbatim:
-
-> "**N-1:** Rewrite titles and descriptions to be clear, short and actionable, in Spanish."
-> "**N-2:** Pattern: **Title** = what happened (≤ 40 chars). **Description** = who/what/when
-> + next step (≤ 100 chars)."
-> "**N-3:** Include the activity or expense name and the actor where relevant."
-> "**N-4:** Copy lives in a central i18n file to ease future review/translation."
-
-And the six example rows, verbatim:
-
-> "| Activity assigned | Nueva actividad asignada | María G. te asignó "Clases de natación"
-> para el 05/11 a las 17:00. |"
-> "| Activity overdue | Actividad vencida | "Reunión escolar" venció ayer. Reprográmala o
-> márcala como finalizada. |"
-> "| Expense requested | Nuevo gasto por aprobar | Carlos R. solicitó $136,00 por "Excursión
-> escolar". Revísalo. |"
-> "| Expense approved | Gasto aprobado | Tu gasto "Medicamento, antibiótico" fue aprobado. |"
-> "| Expense paid | Gasto pagado | Se registró el pago de $224,00 por "Clases de natación". |"
-> "| Activity completed | Actividad finalizada | Carlos R. finalizó "Entrega de
-> documentos". |"
-
-Ruling R5, verbatim:
-
-> "**Ruling.** The copy catalogue is a **backend** module — a typed map from event type to
-> `{ title, body }` in Spanish — because that is where the text is produced. The front
-> renders `notification.title` / `notification.body` verbatim; it never formats notification
-> copy."
-
-Observable outcome: every activity notification the server produces carries a Spanish
-title (≤ 40 chars) and a Spanish body (≤ 100 chars) that are DIFFERENT strings, and the
-templates live in one typed catalogue.
-
-### S11 — T11 · Children filter in Activities
-
-User, verbatim (wave list):
-
-> "T11 children filter"
-
-Resolution task row, verbatim:
-
-> "| T11 | Children filter in Activities ("Todos" + one per child, multi-select) | F |
-> A-5…A-7 | 5h | Built: `ActivitiesViewModel.children: List<VinculoChild>` already loaded →
-> pure client-side filter. |"
-
-PRD `prd_improvement`, verbatim:
-
-> "**A-5:** A children filter appears **only if the family has more than one child**."
-> "**A-6:** Options: "Todos" (default) + one option per child. Multi-select **[Assumption]**."
-> "**A-7:** The filter persists during the session and combines with other filters."
-
-Observable outcome: with more than one child the Activities screen offers a children
-filter ("Todos" + one chip per child, multi-select); with one child or none it does not
-appear; the selection survives the session and combines with the existing filters.
-
-### S12 — T12 · Global top bar: bell + unread badge + logout with confirmation
-
-User, verbatim (wave list):
-
-> "T12 global top bar + bell + logout"
-
-Resolution task row, verbatim:
-
-> "| T12 | Global `AppTopBar`: bell + unread badge + logout with confirm | F | G-1…G-5 | 6h
-> | Built: each screen owns its `TopAppBar`; logout exists only on Home/Admin. Extract one
-> composable, add 44×44 hit area, `contentDescription`, logout dialog. |"
-
-PRD `prd_improvement` §4, verbatim:
-
-> "**G-1:** The top bar is present in **all views**."
-> "**G-2:** It contains **icons only**: notifications (bell, with unread badge) and log out."
-> "**G-3:** Log out icon asks for a confirmation (dialog) before ending the session."
-> "**G-4:** Both icons have accessible labels (`aria-label` / content description) and a
-> minimum 44×44 pt hit area."
-> "**G-5:** Bell shows an unread count badge (cap at `9+`)."
-
-Observable outcome: ONE top bar composable used by every view, with a bell that carries
-the unread badge (capped at "9+") and a logout icon that asks for confirmation before
-ending the session; both icons are labelled for screen readers and are at least 44×44 dp.
-
----
-
-## Tasks
-
-| ID | Task | Specs | Repo | Route | Status | Commit |
-|---|---|---|---|---|---|---|
-| T05 | Locale-aware currency formatter, 2 decimals | S5 | F | delegated | done | `feat(core): add the shared money and date formatters` |
-| T06 | Localize relative dates, fix truncated dates | S6 | F | delegated | done | `feat(core): add the shared money and date formatters` |
-| T07 | "Asignada a: [name]" on the activity card | S7 | F | delegated | done | `feat(activities): show the assignee and the children on the card` |
-| T08 | Children on the activity card | S8 | F | delegated | done | `feat(activities): show the assignee and the children on the card` |
-| T09 | Detail sheet: date + time range, children, assignee | S9 | F+B | delegated | partial — back done, front pending | `feat(activities): expose the children ids on the activity detail` |
-| T10 | Notification copy: Spanish, title ≠ body, capped | S10 | B | delegated | done | `feat(notifications): rewrite the copy in Spanish with title and body` |
-| T11 | Children filter in Activities | S11 | F | delegated | done | `feat(activities): filter the list by child` |
-| T12 | Global top bar: bell + badge + logout | S12 | F | delegated | pending | — |
-
----
-
-## Log
-
-- **L1 (user request, verbatim):** "start wave 1"
-
-  The wave definition comes from the program document: `odd/tasks/gastos-and-ux-resolution.md`
-  (revision 3), "Wave 1 — S (3–6 h): one file, one surface", rows T05–T12 — the same
-  rows the user pasted in the original request.
-- **L2 — baseline read before the first write:** `memberNames: Map<String, String>` is
-  already in `ActivitiesUiState` (`ActivitiesViewModel.kt:96`) and the detail sheet already
-  prints "Asignado a" (`ActividadDetailSheet.kt:245`); `ActivityFilters.kt` exists;
-  `NotificationTimeFormatter.kt` and `TimelineFormatters.kt` exist; five screens own a
-  `TopAppBar` (`AdminScreen`, `NotificationsScreen`, `HomeScreen`, `ActividadDetailSheet`,
-  `ActivitiesScreen`). On the back: `src/notifications/fan-out/activity-notification.map.ts`
-  holds 8 English templates and `renderNotificationText` returns `title === body` by
-  design; `ActivityDetailDto` has no `childrenIds`.
-- **L3 — back repo baseline:** the back repo is on `ft/supabase-cloud` with **pre-existing
-  uncommitted changes** (`src/worker.module.ts` — `ENV_FILE` + `StorageModule` — and
-  `.atl/skill-registry.md`) plus an untracked `design/`. Those are NOT part of this wave:
-  the wave-1 back commits touch only their own files, and the pre-existing dirty state is
-  left exactly as it was found.
-- **L4 — the two repos never build at the same time in one project:** the front build
-  writes to `shared/build/`, so two front workers running gradle at once would corrupt
-  each other. The front workers therefore run one after another; the back worker runs in
-  parallel with them (different project, different toolchain: jest).
-- **L5 — T05 + T06 evidence:** delegated to `gentle-ai-worker` (bounded surfaces); the
-  parent reviewed the diff line by line and re-ran the suite. RED: the new tests did not
-  compile (`formatMoney` did not exist). GREEN: 29 suites / 247 tests / 0 failures.
-  What the parent changed, and why:
-  - **The money formatter crashed above 1E7.** The worker built it on
-    `Double.toString()`, which switches to scientific notation from `1E7` — and the
-    backend's `numeric(12,2)` goes up to `9.999.999.999,99`, so a real amount would have
-    died with a `NumberFormatException`. The formatter now expands the exponent before
-    parsing it, and rejects absurd magnitudes loudly instead of formatting nonsense.
-  - **The detail date was made worse.** The worker routed `formatDetailDate` through
-    `formatLongDate`, which drops the year for the current year ("Miércoles, 5 De
-    Agosto") — a detail sheet that stops saying WHEN something happened, and a shape
-    that drifts from the PRD's "30 oct 2026 · 16:30". The detail date keeps its own
-    format ("5 ago 2026"): day, WHOLE abbreviated month, year always. The zone became an
-    injectable parameter (default = production) so the test is deterministic.
-  - **The relative-time formatter moved to `core/util/`.** It was correct but lived in
-    the notifications package, so the Gastos list (T29) would have had to import a
-    feature package to say "hace 1 d" — and two formatters would have ended up saying
-    two different things in the same family. `formatShortDate` is now named, and the
-    absolute fallback is numeric on purpose: a month spelled out is what got truncated
-    into "05 dé".
-- **L6 — T07 + T08 evidence:** delegated to `gentle-ai-worker` (bounded surfaces); the
-  parent reviewed the diff and re-ran the suite. RED: the new tests did not compile
-  (`memberNames` / `children` did not exist on the card or on the label). GREEN: 31
-  suites / 260 tests / 0 failures. What the parent changed: the worker had built the
-  children as a row of CHIPS measured with `SubcomposeLayout`, and its degraded case is
-  bad — a long child name makes NINGÚN chip fit and the card ends up showing "+1" with
-  nobody's name on it. It is now ONE line ("Para: Ana, Luis" / "Para: Ana, Luis +1"),
-  which says the same thing, never cuts a name in half and measures nothing. The
-  semantic label (the ONE phrase the card announces) grew with the card: it now says
-  "Asignada a: …" and "Para: …", so TalkBack reads them with the rest and not as loose
-  fragments.
-- **L7 — resumed state, reconciled before writing:** the session resumed with the wave
-  half-landed and uncommitted in both repos. The front working tree carried the whole of
-  T11 (four sources plus two new tests); the back carried the whole of T09-back and T10.
-  The task table above was the authority, not the editor's todo list, which still showed
-  T05–T08 as open after their commits. The pre-existing back dirt (`src/worker.module.ts`,
-  `.atl/skill-registry.md`, `design/`) was left exactly as found and no commit touches it.
-- **L8 — T11 evidence:** the worked tree did NOT compile — the new test file declared
-  `UNUSED_CLIENT` as a class property and used it from `private class` fakes, which cannot
-  see an outer instance, and `FakeBondsApi` read the outer `bondId`. Both now follow the
-  convention the rest of the suite uses: a `private companion object` holding
-  `UNUSED_CLIENT`, and `bondId` passed into the fake. GREEN: 33 suites / 270 tests / 0
-  failures.
-- **L9 — T09-back + T10 evidence:** back focused suite GREEN: 13 suites / 302 tests / 0
-  failures. T10 covers S10 without relying on the reader's eye: the titles are a `const`
-  tuple with a compile-time length assertion, and the spec pins title ≤ 40, body ≤ 100,
-  `title !== body`, and the 80-character-activity-title case. The date rendering pins
-  `America/Argentina/Buenos_Aires` so the server's TZ cannot change the copy. T09 stays
-  PARTIAL on purpose: the back now exposes `childrenIds`, but the front detail sheet still
-  shows only "Asignado a" and neither the time range nor the children.
+Front: 33 suites / 270 tests / 0 failures. Back focused: 13 suites / 302 tests / 0 failures.

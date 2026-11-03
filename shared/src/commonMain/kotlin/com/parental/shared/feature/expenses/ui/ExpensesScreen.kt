@@ -49,6 +49,9 @@ import androidx.compose.ui.unit.dp
 import com.parental.shared.core.network.CategoryDto
 import com.parental.shared.core.ui.components.AppTopBar
 import com.parental.shared.core.ui.components.BottomNavBar
+import com.parental.shared.core.ui.components.ContentListSkeleton
+import com.parental.shared.core.ui.components.EmptyContentState
+import com.parental.shared.core.ui.theme.Spacing
 import com.parental.shared.core.ui.components.CategoryResolver
 import com.parental.shared.core.ui.theme.StatusTokens
 import com.parental.shared.core.util.formatMoney
@@ -192,8 +195,8 @@ private fun ExpensesContent(
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        contentPadding = PaddingValues(Spacing.lg),
+        verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
         if (summary != null) {
             item(key = "summary") {
@@ -207,7 +210,7 @@ private fun ExpensesContent(
 
         if (uiState.items.isEmpty()) {
             item(key = "empty") {
-                ExpensesEmptyState(modifier = Modifier.padding(vertical = 32.dp))
+                ExpensesEmptyState(modifier = Modifier.padding(vertical = Spacing.padded))
             }
         } else {
             items(uiState.items, key = { it.id }) { expense ->
@@ -239,17 +242,13 @@ private fun SummaryCards(
     val inProgressTriple = StatusTokens.triple(StatusTokens.Status.InProgress, isSystemInDarkTheme())
     val doneTriple = StatusTokens.triple(StatusTokens.Status.Done, isSystemInDarkTheme())
 
-    // Cuatro tarjetas: las dos de SALDO y las dos de CONTEO (PRD_expense §5.1 más
-    // "Por cobrar", que R1 agrega). Las de saldo NO son filtros: un saldo no es
-    // un status, y el signo ya dice quién le debe a quién. Las de conteo sí
-    // filtran, porque su status es único (FR-2).
     Column(
         modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
         ) {
             SummaryCard(
                 modifier = Modifier.weight(1f),
@@ -274,7 +273,7 @@ private fun SummaryCards(
         }
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
         ) {
             SummaryCard(
                 modifier = Modifier.weight(1f),
@@ -371,12 +370,7 @@ private fun LoadMoreRow(
 
 @Composable
 private fun ExpensesLoadingState(modifier: Modifier = Modifier) {
-    Box(
-        modifier = modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center,
-    ) {
-        CircularProgressIndicator()
-    }
+    ContentListSkeleton(contentDescription = "Cargando gastos", modifier = modifier)
 }
 
 @Composable
@@ -389,7 +383,7 @@ private fun ExpensesErrorState(
         modifier = modifier
             .widthIn(max = 720.dp)
             .fillMaxWidth()
-            .padding(24.dp),
+            .padding(Spacing.xl),
         color = MaterialTheme.colorScheme.errorContainer,
         contentColor = MaterialTheme.colorScheme.onErrorContainer,
         shape = MaterialTheme.shapes.large,
@@ -397,7 +391,7 @@ private fun ExpensesErrorState(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(24.dp),
+                .padding(Spacing.xl),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text(
@@ -405,7 +399,7 @@ private fun ExpensesErrorState(
                 style = MaterialTheme.typography.bodyLarge,
                 textAlign = TextAlign.Center,
             )
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(Spacing.lg))
             Button(
                 onClick = onRetry,
                 modifier = Modifier.heightIn(min = 48.dp),
@@ -419,24 +413,9 @@ private fun ExpensesErrorState(
 
 @Composable
 private fun ExpensesEmptyState(modifier: Modifier = Modifier) {
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Text(
-            text = "No hay gastos",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            textAlign = TextAlign.Center,
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = "Los gastos que registres o te compartan en este vínculo van a aparecer acá.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-        )
-    }
+    EmptyContentState(
+        title = "No hay gastos",
+        message = "Los gastos que registres o te compartan en este vínculo van a aparecer acá.",
+        modifier = modifier,
+    )
 }

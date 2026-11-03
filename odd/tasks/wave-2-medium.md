@@ -172,8 +172,56 @@ rollback must not leave an audit claiming something that did not happen.
 
 ### S9 — T23 · Expense notifications via outbox fan-out + 7-day stale reminder (B, depends on T14, T22)
 
-Ruling R8: expense notifications ride the existing outbox → fan-out pipeline. The
-scheduler precedent exists and, since `bcf4c67`, the worker actually boots.
+PRD_expense §7 and ruling R8. Five events (§7's four rows plus the reminder):
+
+| Event | Type | Recipient |
+|---|---|---|
+| `expense.created` | `expense_created` | the counterpart (who has to approve) |
+| `expense.approved` | `expense_approved` | the requester |
+| `expense.rejected` | `expense_rejected` | the requester |
+| `expense.paid` | `expense_paid` | the requester |
+| `expense.stale` | `expense_stale` | the counterpart, once, after 7 days pending |
+
+R8 says these ride the **existing** outbox → fan-out → `notification.created` socket, and
+explicitly rules out a second transport. The scheduler precedent is
+`notifications-retention.scheduler.ts` (BullMQ repeatable, no `setInterval`, no cron).
+
+**Blocker found while reading the pipeline — the outbox is activity-shaped.** R8 assumed it
+was generic, but `outbox_event.aggregate_id` carries `FK_outbox_event_activity` referencing
+`activity(id) ON DELETE CASCADE`, the entity has an `activity` relation on it, and
+`WebhookPayloadBuilder` reads `event.aggregateId` as an activity id. An expense event
+literally cannot be inserted. So T23 starts with an infrastructure step that R8 did not
+anticipate:
+
+- add `aggregate_type` (`'activity' | 'expense'`), default `'activity'` so the nine
+  existing rows and every activity producer keep their meaning;
+- **drop** `FK_outbox_event_activity`. A polymorphic aggregate cannot carry a FK to one of
+  its two possible tables. This is the price of reuse, and R8 chose reuse over a second
+  transport. The `bond_id` FK stays, so no event can reference a bond that does not exist;
+- index `(aggregate_type, aggregate_id)`: the reminder's anti-join and any per-aggregate
+  read need it, and PostgreSQL does not index FK columns for you.
+
+**Decision — expense events are notification-only, not webhook events.** The webhook
+contract is activity-shaped (`activity.state_changed`, `data.activity`). R8 asks for
+notifications and R9 puts expense changes on a socket frame, not a subscription. Emitting a
+half-built `data.activity` envelope for an expense would be worse than not emitting it, so
+the relay skips webhook fan-out when `aggregate_type != 'activity'`. The event is still
+marked dispatched, so the notification fan-out runs exactly once.
+
+**Decision — `aggregate_version` for expenses is the lifecycle ordinal.** `expense` has no
+`version` column (T24 deliberately used compare-and-swap instead), and inventing a counter
+would be a lie. `pending → 1`, `approved|rejected → 2`, `paid → 3`: the transition sequence
+is monotonic, so the ordinal is derivable and honest. The CAS is still the lock.
+
+**Decision — the reminder fires once per expense, keyed on the outbox.** `NOT EXISTS
+(select 1 from outbox_event where aggregate_id = e.id and event_type = 'expense.stale')`.
+Keying on the notification row would re-fire whenever fan-out is disabled; keying on the
+outbox row makes "one reminder, ever" the invariant. The actor is `{type:'system'}`.
+
+**Decision — "7 days pending" measures the expense date, not `created_at`.** The expense
+carries the date the money was spent; an expense logged today for a purchase 10 days ago is
+already stale, and the PRD's column is `expense_date`. The reminder window is
+`expense_date <= current_date - 7` with `status = 'pending'` and `deleted_at IS NULL`.
 
 ---
 
@@ -259,7 +307,7 @@ rolls the expense back instead of leaving it orphaned.
 | T20 | Home metric cards | F | S7 | — | blocked on T28 | — |
 | T21 | Status-aware action matrix | F | S7 | — | blocked on T18, T25 | — |
 | T22 | Expense policy + audit | B | S8 | inline | done | B `f2d190b` |
-| T23 | Expense notifications + 7-day reminder | B | S9 | — | pending (after T14, T22) | — |
+| T23 | Expense notifications + 7-day reminder | B | S9 | inline | done | B `6c04ed3` |
 | T24 | Expenses write API: create, detail, edit, cancel, approve/reject/pay | B | S10 | inline | done | B `7975695` + `0aa8742` |
 
 Unblocked right now with **no dependency at all**: T14, T15, T16, T35, T17.
@@ -420,3 +468,9 @@ T23 depends on this.
   balance) is now the unblocked backend bottleneck for T20/T29, and **T19** (front) is
   unblocked. T23 is also free (T14 + T22 done). T25 (verify state) still blocks T18/T21.
   Prod Supabase still one migration behind (`1792819200000`) and needs explicit approval.
+
+
+- **2026-11-01 · T23 implementation complete; review consent pending.** B `6c04ed3` adds transactional expense-created/status events, a daily BullMQ stale reminder using an anti-join and `FOR UPDATE SKIP LOCKED` in one transaction, and activity-only webhook/realtime gates. Verification: 78 suites / 901 tests, build, targeted ESLint/Prettier, and diff check passed. A rolled-back local test-Postgres probe accepted the stale-selection/locking SQL. Independent scratch verification found no candidate-caused blocker (74 focused tests and build passed); it did not run the full suite or a concurrent multi-worker DB probe. Receipt-driven review is enabled; the candidate-specific review consent remains unanswered, so T23 is not marked done.
+
+
+- **2026-11-01 · T23 review acknowledged.** The user granted candidate-specific review consent. The reliability lens returned no findings; exact native acknowledgement succeeded and burned the review authority for this candidate. No correction was required. T23 is complete.
