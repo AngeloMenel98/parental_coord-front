@@ -66,6 +66,8 @@ saldo NO se recalcula. Los estados loading / error / sin vínculo siguen existie
 | T3 | S1,S3,S4,S5 | inline | hecho · `feat(home): redesign Inicio` |
 | T4 | S2,S4,S5,S7 | inline | hecho · en los dos commits anteriores |
 | T5 | S6 | inline | hecho · `eb84c1d` (system.md) |
+| T6 | S1,S4 | inline | hecho · `fix(home)` |
+| T7 | S8 | inline | hecho · `fix(home)` |
 
 Los writers delegados no arrancaron: la sesión padre está en `/home/angelo`, que no es un
 repo git, y el bootstrap del writer exige un project root seguro. El trabajo se hizo
@@ -129,3 +131,23 @@ oscuro (`cmd uimode night yes`). Dos correcciones salieron de ahí, no del test:
    del artboard; ahora usa los mismos colores que la barra de Actividades;
  · `formatPercentage` imprimía `50.0%` (toString de Double) y el período se mostraba como
    `2026-11`; ahora es `50%` / `66,7%` y `Noviembre`.
+
+L20 (verbatim): "vi unos problemas, el toggle switch no se encuentra en ningun lado,  veo en la
+seccion de cumpliemnto que aparece 2 veces 0 de O tareas, deja solo el que esta dentro del
+circulo. Pone a la derecha la fecha y el Hola, Maria  mientras que a la derecha el Vinculo
+Activo. Luego pasemos a hace un design de Gastos view."
+
+S8 (nueva, de L20): el interruptor sol/luna es parte de la APP, no del andamiaje. Vive en la
+barra del Inicio; muestra el tema actual (sol = claro, luna = oscuro), anuncia la acción
+("Activar tema oscuro"/"Activar tema claro") y persiste la elección en `Platform` con la clave
+`ui.theme`. Sin elección explícita manda el sistema.
+
+S1 (reescrita por L20): fecha y `Hola, {nombre}` a la IZQUIERDA; el chip de vínculo a la DERECHA,
+en la misma fila.
+
+S4 (reescrita por L20): el `X de Y` aparece UNA sola vez, dentro del anillo; el encabezado dice
+sólo el período.
+
+L21 (decisión): el título de la barra del Inicio pasa a `Inicio`. Con el interruptor la barra
+lleva tres acciones y "Coordinación Parental" se truncaba a "Coordinación Pare…"; las otras
+pestañas ya usan el nombre de la sección.

@@ -24,10 +24,15 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -95,6 +100,10 @@ fun HomeScreen(
     onNavigateBottom: (String) -> Unit = {},
     unreadCount: Int = 0,
     onOpenNotifications: () -> Unit = {},
+    /** El tema que se está pintando; el interruptor muestra el estado actual. */
+    isDarkTheme: Boolean = false,
+    /** `null` esconde el interruptor (el resto de las pantallas no lo pide). */
+    onToggleTheme: (() -> Unit)? = null,
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val error = uiState.error
@@ -109,7 +118,10 @@ fun HomeScreen(
             // (superficie + hairline) en vez del `primary` histórico: el artboard
             // `home-ui/04` la especifica sobre `surface`.
             AppTopBar(
-                title = "Coordinación Parental",
+                // "Inicio" y no "Coordinación Parental": con el interruptor de tema la
+                // barra lleva tres acciones y el nombre largo se truncaba a "Coordinación
+                // Pare…". Las otras pestañas ya usan el nombre de la sección.
+                title = "Inicio",
                 unreadCount = unreadCount,
                 onOpenNotifications = onOpenNotifications,
                 onLogout = onLogout,
@@ -119,6 +131,14 @@ fun HomeScreen(
                     navigationIconContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
                     actionIconContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
                 ),
+                actions = {
+                    if (onToggleTheme != null) {
+                        ThemeToggleButton(
+                            isDarkTheme = isDarkTheme,
+                            onToggle = onToggleTheme,
+                        )
+                    }
+                },
             )
         },
         bottomBar = {
@@ -371,29 +391,62 @@ private fun GreetingSection(
     val monthName = MONTH_ABBREVIATIONS[localDate.monthNumber - 1]
     val displayName = userName.trim()
 
-    Column(
+    // Saludo a la izquierda, vínculo a la derecha: la fecha y el nombre se leen como
+    // un bloque y el estado de la casa ocupa el extremo que no compite con el texto.
+    Row(
         modifier = modifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            text = "$dayOfWeek, ${localDate.dayOfMonth} $monthName ${localDate.year}",
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-        )
-        Spacer(modifier = Modifier.height(Spacing.xs))
-        Text(
-            text = if (displayName.isBlank()) "Hola" else "Hola, $displayName",
-            style = MaterialTheme.typography.headlineSmall,
-            textAlign = TextAlign.Center,
-        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = "$dayOfWeek, ${localDate.dayOfMonth} $monthName ${localDate.year}",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(modifier = Modifier.height(Spacing.xs))
+            Text(
+                text = if (displayName.isBlank()) "Hola" else "Hola, $displayName",
+                style = MaterialTheme.typography.headlineSmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
         if (showBond) {
-            Spacer(modifier = Modifier.height(Spacing.sm))
+            Spacer(modifier = Modifier.width(Spacing.sm))
             BondStatusPill(
                 label = if (bondActive) "Vínculo activo" else "Vínculo inactivo",
                 active = bondActive,
             )
         }
+    }
+}
+
+/**
+ * Interruptor sol/luna de la barra: la única forma de salir del tema del sistema.
+ *
+ * Muestra el tema ACTUAL (sol = claro, luna = oscuro) y la descripción accesible dice la
+ * acción, no el estado: quien navega con lector de pantalla necesita saber qué va a pasar
+ * al activarlo.
+ */
+@Composable
+private fun ThemeToggleButton(
+    isDarkTheme: Boolean,
+    onToggle: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    IconButton(
+        onClick = onToggle,
+        modifier = modifier.heightIn(min = 48.dp),
+    ) {
+        Icon(
+            imageVector = if (isDarkTheme) Icons.Filled.DarkMode else Icons.Filled.LightMode,
+            contentDescription = if (isDarkTheme) {
+                "Tema oscuro. Activar tema claro"
+            } else {
+                "Tema claro. Activar tema oscuro"
+            },
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
@@ -768,11 +821,7 @@ private fun ComplianceRingCard(
                 )
                 Spacer(modifier = Modifier.width(Spacing.sm))
                 Text(
-                    text = compliancePeriodLabel(
-                        period = compliance.period,
-                        completed = currentMember?.completed,
-                        total = currentMember?.total,
-                    ),
+                    text = compliancePeriodLabel(period = compliance.period),
                     modifier = Modifier.weight(1f),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -798,14 +847,12 @@ private fun ComplianceRingCard(
     }
 }
 
-private fun compliancePeriodLabel(period: String, completed: Int?, total: Int?): String {
-    val name = monthNameOf(period) ?: period.trim().ifBlank { "Este mes" }
-    return if (completed != null && total != null) {
-        "$name · $completed de $total tareas"
-    } else {
-        name
-    }
-}
+/**
+ * S4 · el período dice SÓLO el mes. El conteo `X de Y` vive dentro del anillo, una sola
+ * vez: repetirlo en el encabezado era el mismo dato dos veces en la misma tarjeta.
+ */
+internal fun compliancePeriodLabel(period: String): String =
+    monthNameOf(period) ?: period.trim().ifBlank { "Este mes" }
 
 /**
  * El anillo de 12 segmentos (S4): el color va de rojo a verde con el avance del mes.
@@ -1261,7 +1308,7 @@ private fun normalizedPercentage(value: Double): Float =
  * `toString()` sobre un `Double` da `"50.0%"` — y eso no es lo que dice ninguna otra
  * parte de la app, ni el artboard (`66,7%`).
  */
-private fun formatPercentage(value: Double): String {
+internal fun formatPercentage(value: Double): String {
     val safeValue = value
         .takeIf { it.isFinite() }
         ?.coerceIn(0.0, 100.0)
@@ -1276,7 +1323,7 @@ private fun formatPercentage(value: Double): String {
  * `"2026-11"` → `"Noviembre"`. Cualquier otro formato (o un id raro) devuelve `null` y el
  * llamador muestra el período tal como llegó: no se inventa un mes.
  */
-private fun monthNameOf(period: String): String? {
+internal fun monthNameOf(period: String): String? {
     val trimmed = period.trim()
     if (trimmed.length < 7) return null
     val month = trimmed.substring(5, 7).toIntOrNull() ?: return null

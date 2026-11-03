@@ -114,6 +114,43 @@ class HomeRingAndSectionsContractTest {
     }
 
     @Test
+    fun `el interruptor sol luna vive en la barra del Inicio`() {
+        val screen = source("HomeScreen.kt")
+        val app = File(uiDir, "../../../App.kt").normalize().readText()
+
+        assertTrue(
+            "ThemeToggleButton(" in screen && "Icons.Filled.LightMode" in screen &&
+                "Icons.Filled.DarkMode" in screen,
+            "🔴 S8: la barra del Inicio expone el interruptor sol/luna.",
+        )
+        assertTrue(
+            "onToggleTheme = onToggleTheme" in app && "ThemeController" in app,
+            "🔴 S8: App resuelve el tema elegido y se lo pasa al Inicio.",
+        )
+        assertTrue(
+            "Activar tema oscuro" in screen && "Activar tema claro" in screen,
+            "🔴 S8: el botón anuncia la ACCIÓN, no el estado.",
+        )
+    }
+
+    @Test
+    fun `el encabezado del cumplimiento no repite el conteo del anillo`() {
+        val screen = source("HomeScreen.kt")
+
+        assertTrue(
+            "compliancePeriodLabel(period = compliance.period)" in screen,
+            "🔴 S4: el encabezado recibe sólo el período.",
+        )
+        // El formato que producía el duplicado en el encabezado: `"$name · $completed de
+        // $total tareas"`. La descripción accesible del anillo puede (y debe) decir el
+        // conteo; lo que no vuelve es el texto visible repetido.
+        assertTrue(
+            "\$name · \$completed de \$total tareas" !in screen,
+            "🔴 S4: el conteo aparece una sola vez, dentro del anillo.",
+        )
+    }
+
+    @Test
     fun `la agenda de hoy no pide un request propio`() {
         val api = source("../data/remote/HomeApi.kt")
 
