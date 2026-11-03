@@ -10,6 +10,10 @@ import com.parental.shared.feature.expenses.domain.model.ExpenseSummaryDto
 import com.parental.shared.feature.expenses.domain.model.ExpenseUpdateRequest
 import com.parental.shared.feature.expenses.domain.model.PaginatedExpensesDto
 import com.parental.shared.feature.expenses.domain.model.RejectExpenseRequest
+import com.parental.shared.feature.expenses.domain.model.attachments.ConvertExpenseAttachmentReq
+import com.parental.shared.feature.activities.domain.model.attachments.ConfirmAttachmentReq
+import com.parental.shared.feature.activities.domain.model.attachments.PresignAttachmentReq
+import com.parental.shared.feature.activities.domain.model.attachments.PresignAttachmentRes
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.delete
@@ -210,6 +214,60 @@ open class ExpensesApi(
             }
         } catch (e: Exception) {
             ApiResult.Error(0, "POST $baseUrl/expenses/$bondId failed: ${e.message}")
+        }
+    }
+
+    /** POST /expenses/:id/attachments/presign — URL temporal para el archivo del gasto. */
+    open suspend fun presignExpenseAttachment(
+        token: String,
+        expenseId: String,
+        request: PresignAttachmentReq,
+    ): ApiResult<PresignAttachmentRes> {
+        return try {
+            val response = client.post("$baseUrl/expenses/$expenseId/attachments/presign") {
+                header("Authorization", "Bearer $token")
+                contentType(ContentType.Application.Json)
+                setBody(request)
+            }
+            if (response.status.isSuccess()) ApiResult.Success(response.body()) else response.toApiError()
+        } catch (e: Exception) {
+            ApiResult.Error(0, "POST $baseUrl/expenses/$expenseId/attachments/presign failed: ${e.message}")
+        }
+    }
+
+    /** POST /expenses/:id/attachments/confirm — registra el objeto ya subido. */
+    open suspend fun confirmExpenseAttachment(
+        token: String,
+        expenseId: String,
+        request: ConfirmAttachmentReq,
+    ): ApiResult<Unit> {
+        return try {
+            val response = client.post("$baseUrl/expenses/$expenseId/attachments/confirm") {
+                header("Authorization", "Bearer $token")
+                contentType(ContentType.Application.Json)
+                setBody(request)
+            }
+            if (response.status.isSuccess()) ApiResult.Success(Unit) else response.toApiError()
+        } catch (e: Exception) {
+            ApiResult.Error(0, "POST $baseUrl/expenses/$expenseId/attachments/confirm failed: ${e.message}")
+        }
+    }
+
+    /** POST /expenses/:id/attachments/convert — vincula el objeto ya asociado a la actividad. */
+    open suspend fun convertExpenseAttachment(
+        token: String,
+        expenseId: String,
+        request: ConvertExpenseAttachmentReq,
+    ): ApiResult<Unit> {
+        return try {
+            val response = client.post("$baseUrl/expenses/$expenseId/attachments/convert") {
+                header("Authorization", "Bearer $token")
+                contentType(ContentType.Application.Json)
+                setBody(request)
+            }
+            if (response.status.isSuccess()) ApiResult.Success(Unit) else response.toApiError()
+        } catch (e: Exception) {
+            ApiResult.Error(0, "POST $baseUrl/expenses/$expenseId/attachments/convert failed: ${e.message}")
         }
     }
 

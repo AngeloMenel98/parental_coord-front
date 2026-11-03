@@ -72,9 +72,21 @@ fun ExpensesScreen(
     onNavigateBottom: (String) -> Unit = {},
     unreadCount: Int = 0,
     onOpenNotifications: () -> Unit = {},
+    pendingActivityAttachmentId: String? = null,
+    pendingActivityAttachmentFileName: String? = null,
+    onPendingAttachmentConsumed: () -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(pendingActivityAttachmentId, pendingActivityAttachmentFileName) {
+        val attachmentId = pendingActivityAttachmentId ?: return@LaunchedEffect
+        val concept = pendingActivityAttachmentFileName
+            ?.toExpenseConcept()
+            ?.takeIf(String::isNotEmpty)
+        viewModel.openCreateSheet(initialConcept = concept, activityAttachmentId = attachmentId)
+        onPendingAttachmentConsumed()
+    }
 
     LaunchedEffect(uiState.snackbarMessage) {
         val message = uiState.snackbarMessage
@@ -153,6 +165,8 @@ fun ExpensesScreen(
         CreateExpenseSheet(
             categories = uiState.categories,
             isLoading = uiState.isCreateSheetLoading,
+            initialConcept = uiState.createInitialConcept,
+            hasPendingAttachment = uiState.pendingActivityAttachmentId != null,
             onSubmit = { viewModel.submitCreateExpense(it) },
             onDismiss = { viewModel.closeCreateSheet() },
         )

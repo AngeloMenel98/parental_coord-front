@@ -10,6 +10,7 @@ import com.parental.shared.feature.expenses.domain.model.ExpenseStatus
 import com.parental.shared.feature.expenses.domain.model.ExpenseSummaryCountsDto
 import com.parental.shared.feature.expenses.domain.model.ExpenseSummaryDto
 import com.parental.shared.feature.expenses.domain.model.ExpenseUpdateRequest
+import com.parental.shared.feature.expenses.domain.model.attachments.ConvertExpenseAttachmentReq
 import com.parental.shared.feature.expenses.domain.model.PaginatedExpensesDto
 import io.ktor.client.HttpClient
 import kotlinx.coroutines.CompletableDeferred
@@ -58,6 +59,8 @@ class ExpensesViewModelTest {
         var cancelCalls = 0
         var updateCalls = 0
         var createCalls = 0
+        var convertAttachmentCalls = 0
+        var convertAttachmentResult: ApiResult<Unit> = ApiResult.Success(Unit)
 
         /** Si está seteado, `listExpenses` espera acá (test del trailing-edge). */
         var listGate: CompletableDeferred<Unit>? = null
@@ -67,6 +70,7 @@ class ExpensesViewModelTest {
         val requestedOffsets = mutableListOf<Int>()
         val rejectedReasons = mutableListOf<String?>()
         val updatedRequests = mutableListOf<ExpenseUpdateRequest>()
+        val convertedAttachmentIds = mutableListOf<String>()
 
         var listResult: ApiResult<PaginatedExpensesDto> = ApiResult.Success(PaginatedExpensesDto())
         var summaryResult: ApiResult<ExpenseSummaryDto> = ApiResult.Success(summary())
@@ -133,6 +137,16 @@ class ExpensesViewModelTest {
             createCalls++
             createRequests += request
             return updateResult
+        }
+
+        override suspend fun convertExpenseAttachment(
+            token: String,
+            expenseId: String,
+            request: ConvertExpenseAttachmentReq,
+        ): ApiResult<Unit> {
+            convertAttachmentCalls++
+            convertedAttachmentIds += request.activityAttachmentId
+            return convertAttachmentResult
         }
 
         companion object {
@@ -462,6 +476,62 @@ class ExpensesViewModelTest {
 
         assertEquals(true, vm.uiState.value.isCreateSheetOpen)
         assertEquals("Concepto requerido", vm.uiState.value.snackbarMessage)
+    }
+
+    @Test
+    fun `crear desde un adjunto conserva el prefijo y convierte el mismo adjunto`() {
+        val api = FakeExpensesApi().apply {
+            updateResult = ApiResult.Success(FakeExpensesApi.expense("exp-new"))
+        }
+        val vm = build(api)
+
+        vm.openCreateSheet(initialConcept = "Factura marzo", activityAttachmentId = "act-att-1")
+        assertEquals("Factura marzo", vm.uiState.value.createInitialConcept)
+        vm.submitCreateExpense(
+            CreateExpenseRequest("Factura marzo", 1500.0, "cat-1", "2026-04-01"),
+        )
+
+        assertEquals(1, api.createCalls)
+        assertEquals(1, api.convertAttachmentCalls)
+        assertEquals(listOf("act-att-1"), api.convertedAttachmentIds)
+        assertEquals("Gasto creado", vm.uiState.value.snackbarMessage)
+        assertNull(vm.uiState.value.pendingActivityAttachmentId)
+    }
+
+    @Test
+    fun `cerrar el alta desde adjunto descarta la conversion pendiente`() {
+        val api = FakeExpensesApi()
+        val vm = build(api)
+
+        vm.openCreateSheet(initialConcept = "Factura marzo", activityAttachmentId = "act-att-1")
+        vm.closeCreateSheet()
+
+        assertNull(vm.uiState.value.pendingActivityAttachmentId)
+        assertNull(vm.uiState.value.createInitialConcept)
+        assertEquals(false, vm.uiState.value.isCreateSheetOpen)
+        assertEquals(0, api.convertAttachmentCalls)
+    }
+
+    @Test
+    fun `si falla convertir el gasto se crea y avisa que el archivo sigue en la actividad`() {
+        val api = FakeExpensesApi().apply {
+            updateResult = ApiResult.Success(FakeExpensesApi.expense("exp-new"))
+            convertAttachmentResult = ApiResult.Error(409, "La actividad no pertenece al vínculo")
+        }
+        val vm = build(api)
+        vm.openCreateSheet(activityAttachmentId = "act-att-1")
+
+        vm.submitCreateExpense(
+            CreateExpenseRequest("Cuota", 1500.0, "cat-1", "2026-04-01"),
+        )
+
+        assertEquals(1, api.createCalls)
+        assertEquals(1, api.convertAttachmentCalls)
+        assertEquals(false, vm.uiState.value.isCreateSheetOpen)
+        assertEquals(
+            "Gasto creado, pero no se pudo vincular el comprobante. El archivo sigue en la actividad.",
+            vm.uiState.value.snackbarMessage,
+        )
     }
 
     // ── S8 · refresco en vivo por `expense.changed` ───────────────────────

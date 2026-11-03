@@ -82,6 +82,9 @@ data class CreateExpenseFormError(
     val message: String,
 )
 
+internal fun String.toExpenseConcept(): String =
+    substringBeforeLast('.').trim().ifEmpty { trim() }
+
 private fun today(): LocalDate =
     Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date
 
@@ -139,8 +142,8 @@ fun CreateExpenseForm.toRequest(): CreateExpenseRequest? {
  *
  * - Campos: Concepto, Monto, Categoría, Fecha del gasto, Notas, División.
  * - La división default es 50/50; sólo se envía la parte del solicitante.
- * - No hay campo de documento: T30 traerá la subida. En su lugar se muestra un
- *   aviso no bloqueante de que el gasto se registrará sin documento.
+ * - No abre un selector de documento: T30 convierte un adjunto existente de actividad.
+ *   El alta directa desde Gastos conserva el aviso no bloqueante de documento faltante.
  * - Al crear con éxito se cierra la hoja; el error va al snackbar de la pantalla.
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -148,10 +151,12 @@ fun CreateExpenseForm.toRequest(): CreateExpenseRequest? {
 fun CreateExpenseSheet(
     categories: Map<String, CategoryInfo>,
     isLoading: Boolean,
+    initialConcept: String? = null,
+    hasPendingAttachment: Boolean = false,
     onSubmit: (CreateExpenseRequest) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    var form by remember { mutableStateOf(CreateExpenseForm()) }
+    var form by remember { mutableStateOf(CreateExpenseForm(concept = initialConcept.orEmpty())) }
     val errors = remember(form) { validateCreateExpenseForm(form) }
     var touched by remember { mutableStateOf(emptySet<CreateExpenseField>()) }
     var showDatePicker by remember { mutableStateOf(false) }
@@ -282,7 +287,11 @@ fun CreateExpenseSheet(
                         modifier = Modifier.fillMaxWidth(),
                     )
 
-                    MissingDocumentWarning()
+                    if (hasPendingAttachment) {
+                        PendingActivityAttachmentNotice()
+                    } else {
+                        MissingDocumentWarning()
+                    }
 
                     Spacer(Modifier.height(Spacing.sm))
                 }
@@ -355,8 +364,8 @@ private fun CreateExpenseHeader(onClose: () -> Unit) {
 /**
  * Aviso no bloqueante de documento faltante (FR-9).
  *
- * El formulario no tiene campo de archivo porque el endpoint de subida de gastos
- * no existe todavía (T30); el aviso informa que el gasto se puede completar luego.
+ * El formulario no abre un selector propio: T30 parte del adjunto de una actividad y
+ * lo convierte tras crear el gasto. El aviso cubre el alta iniciada desde Gastos.
  */
 @Composable
 private fun MissingDocumentWarning() {
@@ -381,6 +390,23 @@ private fun MissingDocumentWarning() {
                 style = MaterialTheme.typography.bodyMedium,
             )
         }
+    }
+}
+
+@Composable
+private fun PendingActivityAttachmentNotice() {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+        ),
+    ) {
+        Text(
+            text = "El comprobante seleccionado se vinculará a este gasto al crearlo.",
+            modifier = Modifier.padding(Spacing.lg),
+            style = MaterialTheme.typography.bodyMedium,
+        )
     }
 }
 

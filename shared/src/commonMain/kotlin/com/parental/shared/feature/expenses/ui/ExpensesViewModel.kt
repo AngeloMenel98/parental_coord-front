@@ -12,6 +12,7 @@ import com.parental.shared.feature.expenses.domain.model.ExpenseStatus
 import com.parental.shared.feature.expenses.domain.model.ExpenseSummaryDto
 import com.parental.shared.feature.expenses.domain.model.ExpenseUpdateRequest
 import com.parental.shared.feature.expenses.domain.model.PaginatedExpensesDto
+import com.parental.shared.feature.expenses.domain.model.attachments.ConvertExpenseAttachmentReq
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -37,6 +38,8 @@ data class ExpensesUiState(
     val detail: DetailUiState = DetailUiState.Closed,
     val isCreateSheetOpen: Boolean = false,
     val isCreateSheetLoading: Boolean = false,
+    val createInitialConcept: String? = null,
+    val pendingActivityAttachmentId: String? = null,
     val categories: Map<String, CategoryInfo> = emptyMap(),
     val snackbarMessage: String? = null,
 ) {
@@ -262,28 +265,51 @@ class ExpensesViewModel(
     }
 
     /** Abre la hoja de alta de gastos. */
-    fun openCreateSheet() {
-        _uiState.update { it.copy(isCreateSheetOpen = true) }
+    fun openCreateSheet(initialConcept: String? = null, activityAttachmentId: String? = null) {
+        _uiState.update {
+            it.copy(
+                isCreateSheetOpen = true,
+                createInitialConcept = initialConcept,
+                pendingActivityAttachmentId = activityAttachmentId,
+            )
+        }
     }
 
     /** Cierra la hoja de alta. */
     fun closeCreateSheet() {
-        _uiState.update { it.copy(isCreateSheetOpen = false) }
+        _uiState.update {
+            it.copy(
+                isCreateSheetOpen = false,
+                createInitialConcept = null,
+                pendingActivityAttachmentId = null,
+            )
+        }
     }
 
     /** Crea un gasto y refresca la lista y el resumen (S6/T27). */
     fun submitCreateExpense(request: CreateExpenseRequest) {
         scope.launch {
+            val activityAttachmentId = _uiState.value.pendingActivityAttachmentId
             _uiState.update { it.copy(isCreateSheetLoading = true) }
             when (val result = api.createExpense(token, bondId, request)) {
                 is ApiResult.Success -> {
+                    val conversion = activityAttachmentId?.let {
+                        api.convertExpenseAttachment(
+                            token,
+                            result.data.id,
+                            ConvertExpenseAttachmentReq(activityAttachmentId = it),
+                        )
+                    }
                     _uiState.update {
                         it.copy(
                             isCreateSheetOpen = false,
                             isCreateSheetLoading = false,
-                            // Mismo copy que el alta de actividades: el gasto quedó
-                            // pedido y el listado se refresca debajo.
-                            snackbarMessage = "Gasto creado",
+                            createInitialConcept = null,
+                            pendingActivityAttachmentId = null,
+                            snackbarMessage = when (conversion) {
+                                is ApiResult.Error -> "Gasto creado, pero no se pudo vincular el comprobante. El archivo sigue en la actividad."
+                                else -> "Gasto creado"
+                            },
                         )
                     }
                     loadExpenses()

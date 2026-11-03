@@ -4,6 +4,7 @@ import com.parental.shared.feature.expenses.domain.model.CreateExpenseRequest
 import com.parental.shared.feature.expenses.domain.model.ExpenseStatus
 import com.parental.shared.feature.expenses.domain.model.ExpenseUpdateRequest
 import com.parental.shared.feature.expenses.domain.model.RejectExpenseRequest
+import com.parental.shared.feature.expenses.domain.model.attachments.ConvertExpenseAttachmentReq
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -92,6 +93,16 @@ class ExpensesApiContractTest {
         val encoded = json.encodeToString(RejectExpenseRequest.serializer(), request)
 
         assertEquals("""{"reason":"Falta comprobante"}""", encoded)
+    }
+
+    @Test
+    fun `la conversion de adjunto manda solo el id del adjunto de actividad`() {
+        val request = ConvertExpenseAttachmentReq(activityAttachmentId = "activity-attachment-1")
+
+        assertEquals(
+            """{"activityAttachmentId":"activity-attachment-1"}""",
+            json.encodeToString(ConvertExpenseAttachmentReq.serializer(), request),
+        )
     }
 
     @Test

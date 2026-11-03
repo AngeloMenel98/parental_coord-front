@@ -101,6 +101,11 @@ class CreateExpenseSheetTest {
     }
 
     @Test
+    fun `el nombre del comprobante se prellena sin la extension`() {
+        assertEquals("Factura marzo", "Factura marzo.pdf".toExpenseConcept())
+    }
+
+    @Test
     fun `conversion a request mantiene la fecha ISO`() {
         val request = validForm().toRequest()
 

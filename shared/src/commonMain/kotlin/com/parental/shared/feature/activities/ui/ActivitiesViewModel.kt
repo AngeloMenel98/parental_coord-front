@@ -1080,7 +1080,13 @@ class ActividadesViewModel(
         return false
     }
 
-    fun addAttachment(activityId: String, fileName: String, mimeType: String, bytes: ByteArray) =
+    fun addAttachment(
+        activityId: String,
+        fileName: String,
+        mimeType: String,
+        bytes: ByteArray,
+        onSuccess: (ActivityAttachmentDto) -> Unit = {},
+    ) =
         launchAttachmentOp("No se pudo adjuntar el archivo") {
             val compressed = ImageCompressor().compress(bytes, mimeType)
             val upload = presignForUpload(activityId, fileName, compressed) ?: return@launchAttachmentOp
@@ -1092,7 +1098,10 @@ class ActividadesViewModel(
                     ConfirmAttachmentReq(upload.path, fileName, compressed.mimeType, compressed.bytes.size.toLong()),
                 )
             ) {
-                is ApiResult.Success -> _attachments.value = _attachments.value + confirm.data
+                is ApiResult.Success -> {
+                    _attachments.value = _attachments.value + confirm.data
+                    onSuccess(confirm.data)
+                }
                 is ApiResult.Error -> reportAttachmentFailure(confirm.message)
             }
         }

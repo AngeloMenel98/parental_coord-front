@@ -172,6 +172,7 @@ private fun AppContent(
         Screen.Home -> {
             var bottomRoute by remember { mutableStateOf("home") }
             var showNotifications by remember { mutableStateOf(false) }
+            var expenseAttachmentDraft by remember { mutableStateOf<Pair<String, String>?>(null) }
             val token = sessionManager.token
             val userName = sessionManager.userName.orEmpty()
 
@@ -298,6 +299,10 @@ private fun AppContent(
                         ActividadesScreen(
                             viewModel = activitiesViewModel,
                             onNavigateBottom = onNavigateBottom,
+                            onCreateExpenseFromAttachment = { _, attachmentId, fileName ->
+                                expenseAttachmentDraft = attachmentId to fileName
+                                bottomRoute = "expenses"
+                            },
                             // S12 · la campana de la barra global abre la lista que ya
                             // vive en esta rama de Home; el contador es el mismo.
                             unreadCount = unreadCount,
@@ -327,6 +332,9 @@ private fun AppContent(
                             onNavigateBottom = onNavigateBottom,
                             unreadCount = unreadCount,
                             onOpenNotifications = { showNotifications = true },
+                            pendingActivityAttachmentId = expenseAttachmentDraft?.first,
+                            pendingActivityAttachmentFileName = expenseAttachmentDraft?.second,
+                            onPendingAttachmentConsumed = { expenseAttachmentDraft = null },
                         )
                     }
                 }

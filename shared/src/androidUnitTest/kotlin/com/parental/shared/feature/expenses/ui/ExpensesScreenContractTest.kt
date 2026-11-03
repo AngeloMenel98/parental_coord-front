@@ -255,14 +255,13 @@ class ExpensesScreenContractTest {
     }
 
     @Test
-    fun `el formulario de alta no inventa un campo de subida de archivo`() {
+    fun `el formulario no abre un selector propio para subir archivos`() {
         val sheet = source("CreateExpenseSheet.kt")
 
         assertTrue(
-            "presign" !in sheet && "attachment" !in sheet.lowercase() && "upload" !in sheet.lowercase(),
-            "🔴 T27 no incluye la subida de documentos: no existe endpoint todavía " +
-                "(`expense_attachment` es sólo una tabla). El formulario no debe fingir un " +
-                "campo de archivo.",
+            "presign" !in sheet && "rememberFilePicker" !in sheet && "picker.launch" !in sheet,
+            "🔴 T30 recoge el comprobante en la actividad; el formulario de gastos no debe " +
+                "abrir un segundo selector ni inventar otra ruta de subida.",
         )
     }
 

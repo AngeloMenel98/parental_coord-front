@@ -94,7 +94,8 @@ internal fun ActividadDetailSheet(
     attachments: List<ActivityAttachmentDto> = emptyList(),
     attachmentsLoading: Boolean = false,
     onLoadAttachments: (String) -> Unit = {},
-    onAddAttachment: (String, String, String, ByteArray) -> Unit = { _, _, _, _ -> },
+    onAddAttachment: (String, String, String, ByteArray, (ActivityAttachmentDto) -> Unit) -> Unit = { _, _, _, _, _ -> },
+    onCreateExpenseFromAttachment: (String, String, String) -> Unit = { _, _, _ -> },
     onRenameAttachment: (String, String, String) -> Unit = { _, _, _ -> },
     onReplaceAttachment: (String, String, String, String, ByteArray) -> Unit = { _, _, _, _, _ -> },
     onDeleteAttachment: (String, String) -> Unit = { _, _ -> },
@@ -108,6 +109,17 @@ internal fun ActividadDetailSheet(
     // `LazyColumn`, y si ese item salía de composición el launcher se
     // desregistraba con la selección en curso. Un solo picker para las dos CTAs.
     val picker = rememberFilePicker()
+    var pendingExpenseChoice by remember { mutableStateOf<Pair<String, FileData>?>(null) }
+    val pickAttachment: (String, FileData) -> Unit = { activityId, file ->
+        pendingExpenseChoice = activityId to file
+    }
+    fun savePickedAttachment(asExpense: Boolean) {
+        val (activityId, file) = pendingExpenseChoice ?: return
+        pendingExpenseChoice = null
+        onAddAttachment(activityId, file.name, file.mimeType, file.bytes) { attachment ->
+            if (asExpense) onCreateExpenseFromAttachment(activityId, attachment.id, file.name)
+        }
+    }
     // El `onDismissRequest` del host se recrea en cada recomposición (captura el `id` vivo):
     // sin esto el lambda de la "X" podría invocar un descarte ya obsoleto.
     val currentDismiss by rememberUpdatedState(onDismissRequest)
@@ -171,7 +183,7 @@ internal fun ActividadDetailSheet(
                             children = children,
                             onInertAction = onInertAction,
                             attachments = attachments,
-                            onAddAttachment = onAddAttachment,
+                            onAddAttachment = pickAttachment,
                             onRenameAttachment = onRenameAttachment,
                             onReplaceAttachment = onReplaceAttachment,
                             onDeleteAttachment = onDeleteAttachment,
@@ -195,11 +207,24 @@ internal fun ActividadDetailSheet(
                         // Sin este cable el CTA caía en el lambda por defecto
                         // (no-op) y el botón no hacía NADA aunque el picker
                         // devolviera un archivo.
-                        onAddAttachment = onAddAttachment,
+                        onPickAttachment = pickAttachment,
                         picker = picker,
                     )
                 }
             }
+        }
+        if (pendingExpenseChoice != null) {
+            AlertDialog(
+                onDismissRequest = { savePickedAttachment(asExpense = false) },
+                title = { Text("¿Es un gasto?") },
+                text = { Text("Podés crear el gasto con este comprobante. El archivo también quedará en la actividad.") },
+                confirmButton = {
+                    TextButton(onClick = { savePickedAttachment(asExpense = true) }) { Text("Sí") }
+                },
+                dismissButton = {
+                    TextButton(onClick = { savePickedAttachment(asExpense = false) }) { Text("No") }
+                },
+            )
         }
     }
 }
@@ -234,7 +259,7 @@ private fun DetailContent(
     onInertAction: (String) -> Unit,
     children: List<VinculoChild> = emptyList(),
     attachments: List<ActivityAttachmentDto> = emptyList(),
-    onAddAttachment: (String, String, String, ByteArray) -> Unit = { _, _, _, _ -> },
+    onAddAttachment: (String, FileData) -> Unit = { _, _ -> },
     onRenameAttachment: (String, String, String) -> Unit = { _, _, _ -> },
     onReplaceAttachment: (String, String, String, String, ByteArray) -> Unit = { _, _, _, _, _ -> },
     onDeleteAttachment: (String, String) -> Unit = { _, _ -> },
@@ -306,7 +331,7 @@ private fun DetailContent(
                 onAdd = {
                     picker.launch { f ->
                         if (f != null) {
-                            onAddAttachment(activityId, f.name, f.mimeType, f.bytes)
+                            onAddAttachment(activityId, f)
                         }
                     }
                 },
@@ -391,7 +416,7 @@ private fun DetailFooter(
     onComplete: (String) -> Unit,
     isCompleting: Boolean,
     onDecline: (String) -> Unit,
-    onAddAttachment: (String, String, String, ByteArray) -> Unit,
+    onPickAttachment: (String, FileData) -> Unit,
     picker: FilePicker,
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
@@ -475,7 +500,7 @@ private fun DetailFooter(
                     text = "Cargar comprobante",
                     modifier = Modifier.fillMaxWidth().clickable {
                         picker.launch { fd ->
-                            if (fd != null) onAddAttachment(actividad.id, fd.name, fd.mimeType, fd.bytes)
+                            if (fd != null) onPickAttachment(actividad.id, fd)
                         }
                     }
                         .padding(Spacing.lg),

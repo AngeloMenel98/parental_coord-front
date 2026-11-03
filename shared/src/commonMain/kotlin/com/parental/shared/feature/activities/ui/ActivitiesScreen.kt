@@ -53,6 +53,7 @@ internal enum class TimelineMode(val label: String) {
 fun ActividadesScreen(
     viewModel: ActividadesViewModel,
     onNavigateBottom: (String) -> Unit = {},
+    onCreateExpenseFromAttachment: (String, String, String) -> Unit = { _, _, _ -> },
     /** S12 · G-5 — contador de no leídas para la campana de la barra global. */
     unreadCount: Int = 0,
     /** S12 · G-2 — abre la lista de notificaciones. `null` esconde la campana. */
@@ -201,6 +202,7 @@ fun ActividadesScreen(
                 attachmentsLoading = viewModel.attachmentsLoading.collectAsState().value,
                 onLoadAttachments = viewModel::loadAttachments,
                 onAddAttachment = viewModel::addAttachment,
+                onCreateExpenseFromAttachment = onCreateExpenseFromAttachment,
                 onRenameAttachment = viewModel::renameAttachment,
                 onReplaceAttachment = viewModel::replaceAttachment,
                 onDeleteAttachment = viewModel::deleteAttachment,
