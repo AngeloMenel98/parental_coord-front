@@ -2,6 +2,12 @@ package com.parental.shared.feature.expenses.ui
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -150,6 +156,8 @@ fun ExpensesScreen(
                     uiState = uiState,
                     onStatusSelected = { viewModel.selectStatusFilter(it) },
                     onExpenseClick = { viewModel.openDetail(it) },
+                    onApprove = { id -> viewModel.approve(id) },
+                    onReject = { id -> viewModel.reject(id) },
                     onLoadMore = { viewModel.loadMore() },
                 )
             }
@@ -181,6 +189,8 @@ private fun ExpensesContent(
     uiState: ExpensesUiState,
     onStatusSelected: (ExpenseStatus?) -> Unit,
     onExpenseClick: (String) -> Unit,
+    onApprove: (String) -> Unit,
+    onReject: (String) -> Unit,
     onLoadMore: () -> Unit,
 ) {
     val summary = uiState.summary
@@ -192,15 +202,20 @@ private fun ExpensesContent(
             )
         })
     }
+    // Sólo una fila deslizada a la vez: abrir una cierra la anterior.
+    var openExpenseId by remember { mutableStateOf<String?>(null) }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(Spacing.lg),
-        verticalArrangement = Arrangement.spacedBy(Spacing.md),
+        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
     ) {
         if (summary != null) {
-            item(key = "summary") {
-                SummaryCards(
+            item(key = "balance") {
+                BalanceHeader(summary = summary)
+            }
+            item(key = "filters") {
+                StatusFilterRow(
                     summary = summary,
                     selectedStatus = uiState.selectedStatus,
                     onStatusSelected = onStatusSelected,
@@ -213,12 +228,27 @@ private fun ExpensesContent(
                 ExpensesEmptyState(modifier = Modifier.padding(vertical = Spacing.padded))
             }
         } else {
-            items(uiState.items, key = { it.id }) { expense ->
-                ExpenseRow(
-                    expense = expense,
-                    categoryMap = categoryMap,
-                    onClick = { onExpenseClick(expense.id) },
-                )
+            item(key = "list-frame") {
+                Surface(
+                    color = MaterialTheme.colorScheme.surface,
+                    shape = MaterialTheme.shapes.medium,
+                ) {
+                    Column {
+                        uiState.items.forEach { expense ->
+                            ExpenseRow(
+                                expense = expense,
+                                categoryMap = categoryMap,
+                                swipeOpen = openExpenseId == expense.id,
+                                onSwipeOpenChange = { open ->
+                                    openExpenseId = if (open) expense.id else null
+                                },
+                                onClick = { onExpenseClick(expense.id) },
+                                onApprove = { onApprove(expense.id) },
+                                onReject = { onReject(expense.id) },
+                            )
+                        }
+                    }
+                }
             }
 
             if (uiState.canLoadMore) {
@@ -233,118 +263,161 @@ private fun ExpensesContent(
     }
 }
 
+/**
+ * S1 · el saldo del vínculo, tal como lo manda el servidor.
+ *
+ * Es el número que el endpoint de resumen ya calcula y que la pantalla no mostraba. El
+ * cliente NO lo recalcula (R1): sólo elige la leyenda y el color por el signo. `Por pagar` y
+ * `Por cobrar` quedan como dato: un saldo no es un filtro.
+ */
 @Composable
-private fun SummaryCards(
-    summary: ExpenseSummaryDto,
-    selectedStatus: ExpenseStatus?,
-    onStatusSelected: (ExpenseStatus?) -> Unit,
-) {
-    val inProgressTriple = StatusTokens.triple(StatusTokens.Status.InProgress, isSystemInDarkTheme())
-    val doneTriple = StatusTokens.triple(StatusTokens.Status.Done, isSystemInDarkTheme())
+private fun BalanceHeader(summary: ExpenseSummaryDto, modifier: Modifier = Modifier) {
+    val saldo = summary.saldo
+    val dark = isSystemInDarkTheme()
+    val status = when {
+        saldo > 0 -> StatusTokens.Status.Ok
+        saldo < 0 -> StatusTokens.Status.Ko
+        else -> null
+    }
+    val amountColor = status
+        ?.let { StatusTokens.triple(it, dark).content }
+        ?: MaterialTheme.colorScheme.onSurface
+    val legend = when {
+        saldo > 0 -> "A favor tuyo"
+        saldo < 0 -> "En contra"
+        else -> "Al día"
+    }
 
     Column(
-        modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = Spacing.xs, vertical = Spacing.sm),
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-        ) {
-            SummaryCard(
-                modifier = Modifier.weight(1f),
+        Text(
+            text = "Saldo del vínculo",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            text = formatMoney(saldo),
+            style = MaterialTheme.typography.displaySmall,
+            fontWeight = FontWeight.SemiBold,
+            color = amountColor,
+            maxLines = 1,
+        )
+        Text(
+            text = "$legend · actualizado hoy",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(modifier = Modifier.height(Spacing.md))
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(Spacing.hairline)
+                .background(MaterialTheme.colorScheme.outlineVariant),
+        )
+        Spacer(modifier = Modifier.height(Spacing.sm))
+        Row(modifier = Modifier.fillMaxWidth()) {
+            BalanceFigure(
                 label = "Por pagar",
                 value = formatMoney(summary.porPagar),
-                isSelected = false,
-                onClick = null,
-                dotColor = inProgressTriple.dot,
-                containerColor = inProgressTriple.container,
-                contentColor = inProgressTriple.content,
-            )
-            SummaryCard(
                 modifier = Modifier.weight(1f),
+            )
+            BalanceFigure(
                 label = "Por cobrar",
                 value = formatMoney(summary.porCobrar),
-                isSelected = false,
-                onClick = null,
-                dotColor = doneTriple.dot,
-                containerColor = doneTriple.container,
-                contentColor = doneTriple.content,
-            )
-        }
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-        ) {
-            SummaryCard(
                 modifier = Modifier.weight(1f),
-                label = "Pendientes",
-                value = summary.counts.pendientes.toString(),
-                isSelected = selectedStatus == ExpenseStatus.PENDING,
-                onClick = { onStatusSelected(toggleStatus(selectedStatus, ExpenseStatus.PENDING)) },
-                dotColor = MaterialTheme.colorScheme.primary,
-                containerColor = MaterialTheme.colorScheme.primaryContainer,
-                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-            )
-            SummaryCard(
-                modifier = Modifier.weight(1f),
-                label = "Pagados",
-                value = summary.counts.pagados.toString(),
-                isSelected = selectedStatus == ExpenseStatus.PAID,
-                onClick = { onStatusSelected(toggleStatus(selectedStatus, ExpenseStatus.PAID)) },
-                dotColor = doneTriple.dot,
-                containerColor = doneTriple.container,
-                contentColor = doneTriple.content,
             )
         }
     }
 }
 
-private fun toggleStatus(current: ExpenseStatus?, target: ExpenseStatus): ExpenseStatus? =
-    if (current == target) null else target
-
 @Composable
-private fun SummaryCard(
-    label: String,
-    value: String,
-    isSelected: Boolean,
-    onClick: (() -> Unit)?,
-    dotColor: Color,
-    containerColor: Color,
-    contentColor: Color,
+private fun BalanceFigure(label: String, value: String, modifier: Modifier = Modifier) {
+    Column(modifier = modifier) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+        )
+    }
+}
+
+/**
+ * S2 · filtros por estado con el conteo del servidor.
+ *
+ * Reemplazan a las cuatro tarjetas: antes dos filtraban y dos no, con la misma forma. Ahora
+ * el filtro es una fila de chips y los dos saldos viven arriba, donde nadie espera tocarlos.
+ */
+@Composable
+private fun StatusFilterRow(
+    summary: ExpenseSummaryDto,
+    selectedStatus: ExpenseStatus?,
+    onStatusSelected: (ExpenseStatus?) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Card(
-        // `onClick = null` ⇒ la tarjeta NO es filtro (las de saldo): un saldo no
-        // tiene status por el cual filtrar.
-        modifier = modifier.then(
-            if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier,
-        ),
-        colors = CardDefaults.cardColors(
-            containerColor = if (isSelected) dotColor else containerColor,
-        ),
+    data class Filter(val label: String, val count: Int, val status: ExpenseStatus?)
+
+    val counts = summary.counts
+    val all = counts.pendientes + counts.aprobados + counts.pagados + counts.rechazados
+    val filters = listOf(
+        Filter("Todas", all, null),
+        Filter("Pendientes", counts.pendientes, ExpenseStatus.PENDING),
+        Filter("Aprobados", counts.aprobados, ExpenseStatus.APPROVED),
+        Filter("Pagados", counts.pagados, ExpenseStatus.PAID),
+        Filter("Rechazados", counts.rechazados, ExpenseStatus.REJECTED),
+    )
+
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelSmall,
-                color = if (isSelected) Color.White else contentColor,
-                textAlign = TextAlign.Center,
-                maxLines = 1,
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = value,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = if (isSelected) Color.White else contentColor,
-                textAlign = TextAlign.Center,
-                maxLines = 1,
-            )
+        filters.forEach { filter ->
+            val selected = selectedStatus == filter.status
+            Surface(
+                onClick = { onStatusSelected(filter.status) },
+                color = if (selected) {
+                    MaterialTheme.colorScheme.secondaryContainer
+                } else {
+                    MaterialTheme.colorScheme.surface
+                },
+                contentColor = if (selected) {
+                    MaterialTheme.colorScheme.onSecondaryContainer
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+                shape = MaterialTheme.shapes.medium,
+                border = if (selected) {
+                    null
+                } else {
+                    BorderStroke(Spacing.hairline, MaterialTheme.colorScheme.outline)
+                },
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = Spacing.md, vertical = Spacing.sm),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.xxs),
+                ) {
+                    Text(
+                        text = filter.label,
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                    )
+                    Text(
+                        text = filter.count.toString(),
+                        style = MaterialTheme.typography.labelSmall,
+                    )
+                }
+            }
         }
     }
 }

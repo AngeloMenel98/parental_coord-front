@@ -72,45 +72,53 @@ class ExpensesScreenContractTest {
     fun `los conteos de la cabecera salen del resumen del servidor`() {
         val screen = source("ExpensesScreen.kt")
 
+        // Los chips de filtro leen los cuatro conteos del resumen: el cliente no recalcula
+        // números de dinero ni de conteos (R1).
         assertTrue(
-            "summary.counts.pendientes" in screen,
-            "El conteo de pendientes sale del endpoint de resumen: el cliente no recalcula " +
-                "números de dinero ni de conteos (R1).",
+            "val counts = summary.counts" in screen,
+            "Los conteos salen de `summary.counts`, no de la lista cargada: contar en el " +
+                "cliente daría un número distinto al del servidor en cuanto haya paginación.",
         )
-        assertTrue(
-            "summary.counts.pagados" in screen,
-            "El conteo de pagados sale del endpoint de resumen, igual que el de pendientes.",
-        )
+        for (count in listOf("pendientes", "aprobados", "pagados", "rechazados")) {
+            assertTrue(
+                "counts.$count" in screen,
+                "Falta el conteo `$count` del resumen: cada filtro muestra su número.",
+            )
+        }
         assertTrue(
             "formatMoney(summary.porPagar)" in screen && "formatMoney(summary.porCobrar)" in screen,
             "Los dos saldos se formatean con `formatMoney` (FR-6): un solo formato de " +
                 "moneda en toda la app.",
+        )
+        assertTrue(
+            "summary.saldo" in screen && "formatMoney(saldo)" in screen,
+            "🔴 S1: el saldo del vínculo se muestra tal como lo manda el servidor.",
         )
     }
 
     // ── 2 · Las tarjetas de saldo no son filtros ───────────────────────────────────
 
     @Test
-    fun `las tarjetas de saldo no filtran la lista`() {
+    fun `los saldos no filtran la lista`() {
         val screen = source("ExpensesScreen.kt")
-        val balanceCards = screen.split("label = \"Por ").drop(1)
+        val header = screen.substringAfter("private fun BalanceHeader(")
+            .substringBefore("@Composable\nprivate fun BalanceFigure(")
 
         assertTrue(
-            balanceCards.size >= 2,
-            "Se esperaban las dos tarjetas de saldo (Por pagar / Por cobrar).",
+            header.isNotBlank(),
+            "Se esperaba el encabezado de saldo (S1).",
         )
-        for (card in balanceCards) {
-            val block = card.substringBefore("SummaryCard(").ifEmpty {
-                card.substringAfter("SummaryCard(")
-            }
-            assertTrue(
-                "onClick = null" in block,
-                "🔴 Una tarjeta de saldo está mapeada a un status. Un saldo no es un " +
-                    "status: la versión anterior mapeaba \"Por cobrar\" a `paid`, o sea " +
-                    "que tocar la tarjeta de \"lo que me deben\" mostraba los gastos YA " +
-                    "saldados.",
-            )
-        }
+        assertTrue(
+            "onClick" !in header,
+            "🔴 Un saldo no es un filtro: el encabezado del saldo no puede tener `onClick`. " +
+                "La versión anterior mapeaba \"Por cobrar\" al status `paid`, o sea que " +
+                "tocar \"lo que me deben\" mostraba los gastos YA saldados.",
+        )
+        assertTrue(
+            "private fun BalanceFigure(" in screen,
+            "Los dos brutos (Por pagar / Por cobrar) son datos, no botones: van como " +
+                "`BalanceFigure`.",
+        )
     }
 
     @Test
