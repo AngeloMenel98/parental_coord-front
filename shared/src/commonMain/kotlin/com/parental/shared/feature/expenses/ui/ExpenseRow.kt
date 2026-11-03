@@ -11,8 +11,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -25,55 +23,92 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.parental.shared.core.ui.components.CategoryInfo
 import com.parental.shared.core.ui.theme.CategoryTokens
+import com.parental.shared.core.ui.theme.Spacing
 import com.parental.shared.core.ui.theme.StatusTokens
 import com.parental.shared.core.ui.theme.parseHexColor
 import com.parental.shared.core.util.formatMoney
-import com.parental.shared.core.util.formatRelativeTime
+import com.parental.shared.feature.expenses.domain.ledgerDate
 import com.parental.shared.feature.expenses.domain.model.ExpenseResponseDto
 import com.parental.shared.feature.expenses.domain.model.ExpenseStatus
 import com.parental.shared.feature.expenses.domain.model.displayName
+import com.parental.shared.feature.expenses.domain.payerShare
+import com.parental.shared.feature.expenses.ui.swipe.ExpenseSwipeBox
 
 /**
- * Fila de la lista de gastos (S4/T29).
+ * Fila de la lista de gastos como asiento de un libro (S3).
  *
- * Muestra: concepto, badge de estado, tag de categoría, advertencia `sin doc.`,
- * creador + fecha relativa, y monto alineado a la derecha.
+ * Anatomía: fecha a la izquierda (día grande sobre el mes abreviado), concepto, chips de
+ * estado + categoría (y `sin doc.` cuando falta el documento), y a la derecha el monto total
+ * con la parte que le toca a quien pregunta.
+ *
+ * S4: si el SERVIDOR habilitó aprobar o rechazar (`canApprove`/`canReject`), la fila se desliza
+ * a la izquierda y deja las dos acciones detrás; el cliente no deduce el permiso del estado.
  */
 @Composable
 fun ExpenseRow(
     expense: ExpenseResponseDto,
     categoryMap: Map<String, CategoryInfo>,
     modifier: Modifier = Modifier,
+    swipeOpen: Boolean = false,
+    onSwipeOpenChange: (Boolean) -> Unit = {},
     onClick: () -> Unit = {},
+    onApprove: () -> Unit = {},
+    onReject: () -> Unit = {},
 ) {
-    Card(
-        modifier = modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface,
-        ),
+    val date = ledgerDate(expense.expenseDate)
+    val share = payerShare(expense.amount, expense.splitRatioPayer)
+    val showShare = expense.splitRatioPayer in 0..99
+    val canSwipe = expense.canApprove || expense.canReject
+
+    ExpenseSwipeBox(
+        open = swipeOpen,
+        onOpenChange = onSwipeOpenChange,
+        enabled = canSwipe,
+        onApprove = onApprove,
+        onReject = onReject,
+        modifier = modifier.fillMaxWidth(),
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(12.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
+                .clickable(onClick = onClick)
+                .padding(horizontal = Spacing.xs, vertical = Spacing.md),
             verticalAlignment = Alignment.Top,
         ) {
             Column(
+                modifier = Modifier.width(44.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text(
+                    text = date.day,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                )
+                if (date.parsed) {
+                    Text(
+                        text = date.month,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.width(Spacing.md))
+
+            Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
+                verticalArrangement = Arrangement.spacedBy(Spacing.xxs),
             ) {
                 Text(
                     text = expense.concept,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Medium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.xxs),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     StatusBadge(status = expense.status)
@@ -82,19 +117,28 @@ fun ExpenseRow(
                         MissingDocumentTag()
                     }
                 }
-                Text(
-                    text = "${expense.requestedBy} · ${formatRelativeTime(expense.createdAt)}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
             }
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                text = formatMoney(expense.amount),
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Right,
-            )
+
+            Spacer(modifier = Modifier.width(Spacing.sm))
+
+            Column(horizontalAlignment = Alignment.End) {
+                Text(
+                    text = formatMoney(expense.amount),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    textAlign = TextAlign.End,
+                    maxLines = 1,
+                )
+                if (showShare) {
+                    Text(
+                        text = "Tu parte ${formatMoney(share)}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.End,
+                        maxLines = 1,
+                    )
+                }
+            }
         }
     }
 }
@@ -142,7 +186,7 @@ private fun CategoryTag(info: CategoryInfo?) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            androidx.compose.foundation.Canvas(modifier = Modifier.size(6.dp)) {
+            Canvas(modifier = Modifier.size(6.dp)) {
                 drawCircle(dot)
             }
             Text(
