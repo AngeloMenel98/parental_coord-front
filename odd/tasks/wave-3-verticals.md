@@ -870,3 +870,52 @@ them.
   review log is full of "the rule was written twice" and "the copy that ignored
   the status is the one that 409s". A blanket purge would have deleted the
   institutional memory, not the noise.
+
+- **L26 (tres hallazgos del usuario sobre el entorno real, 2026-11-03) — el worker
+  estaba muerto desde T30-back.** El usuario reportó tres cosas que no se ven en los
+  tests: las tarjetas del Home no aparecían, el detalle de un gasto pintaba UUIDs, y
+  una actividad del lunes 2 que ya había pasado no estaba en `overdue`.
+
+  **1 · EL WORKER NO ARRANCABA — y por eso las actividades no avanzaban.** El contenedor
+  `parental-coordination-worker` estaba en un crash-loop: `Nest can't resolve dependencies
+  of the ExpensesRepository … "ExpenseAttachmentEntityRepository" at index [1] is
+  available in the NotificationsFanOutModule context`. T30-back le dio a
+  `ExpensesRepository` un SEGUNDO repositorio (el de los adjuntos), y
+  `NotificationsFanOutModule` —que provee ese repository A MANO, re-declarando la lista de
+  `forFeature` en vez de importar `ExpensesModule` para no arrastrar el controller al
+  worker— quedó con la lista vieja. Tres consecuencias, todas del mismo crash:
+  **SIN timers** (nadie armaba el `END`, ni el `RESPONSE_TIMEOUT`, ni el
+  `VERIFY_TIMEOUT`), **SIN barrido** (el reparador de 15 minutos) y **SIN fan-out**
+  (nadie recibía una sola notificación). La actividad del lunes 2 quedó en `assisting`
+  para siempre: `assisting → in_progress → verify` nunca corrieron. **Es el mismo modo de
+  fallo que el `StorageModule` del `WorkerModule`:** un módulo que provee a mano tiene
+  que replicar la lista de `forFeature` del módulo al que reemplaza.
+  Arreglado en B `8b8b7de` (una entidad en la lista, más la nota que lo explica). Con el
+  worker arriba, el barrido immediately alcanzó a los dos rezagados: la del lunes 2 pasó
+  a `verify` con la ventana armada (`verify_at` = ahora, `deadline` = ahora + 36 h) y la
+  otra, de `assigned`, a `overdue`. El fan-out drenó el outbox y creó las tres
+  notificaciones que faltaban ("Actividad vencida", "en curso", "por verificar").
+  ⚠ La actividad del lunes 2 **no va a `overdue` todavía, y no es un bug**: la ventana de
+  verificación son 36 h desde la LLEGADA a `verify` (la ruling del usuario: la ventana se
+  abre al llegar), así que vence el 4 de noviembre a las 22:43 — o antes si alguien la
+  completa.
+
+  **2 · EL DETALLE DE UN GASTO PINTABA UUIDs.** "Solicitado por", "Contraparte" y
+  "Aprobado por" mostraban el id crudo. La categoría ya venía con su nombre
+  (`categoryName`), así que los miembros siguen la misma regla: **el servidor resuelve el
+  nombre para mostrar** (B `d7698b6` + F `c90507e`). Los nombres salen de UNA consulta
+  por página (`findMemberNames`), como los ids de los miembros — por gasto sería un N+1.
+  Esa consulta NO filtra por `left_at`: el nombre es un dato de la persona, no del
+  vínculo (alguien que se fue deja de ser contraparte, no deja de tener nombre). Verificado
+  contra la API viva: `requestedByName: 'Maria Ollama'`, `counterpartName: 'Juan Perez'`.
+
+  **3 · LAS TARJETAS DEL HOME NO ESTABAN EN EL TELÉFONO — porque el APK era viejo.** El
+  `lastUpdateTime` del paquete instalado era del **2026-11-02 15:18**, anterior a T20 (que
+  se entregó el 3 de noviembre): el dispositivo corría el APK de la ola 3, sin las tres
+  tarjetas. Las APIs que las alimentan funcionan (`/expenses/bond/:id/summary` → 200 con
+  `{saldo: 320, …}`; `/activities/bond/:id` → 200 con las flags), así que no era un
+  problema de datos sino de binario. El APK nuevo está compilado (`:androidApp:assembleDebug`
+  en verde, 422 tests en el front) y **pendiente de instalar**: el teléfono se desconectó
+  del USB antes de poder hacerlo. Hasta que se instale, el Home del dispositivo no muestra
+  "Asignadas", "Vencidas" ni "Saldo gastos", y la hoja de detalle no ofrece "Asignar" ni
+  "Reasignar".
