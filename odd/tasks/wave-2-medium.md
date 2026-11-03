@@ -143,7 +143,8 @@ discarded, not translated):
 | `assisting` | nadie | ninguno (espera automática) | `in_progress` al `scheduledStart` | |
 | `in_progress` | sistema | | `verify` al fin (`scheduledEnd ?? scheduledStart`) | |
 | `verify` | miembro | **Completado** | `done` | → `overdue` |
-| `overdue` | asignado | Confirmar / No asiste | `assisting` / `not_assisting` (T8, aceptación tardía) | |
+| `overdue` | asignado | **No asiste** | `not_assisting` (T8) | |
+| `overdue` | — | ~~Confirmar~~ | ~~`assisting`~~ — **la aceptación tardía se quitó (2026-11-03)** | |
 | `not_assisting` | cualquier miembro | **Reasignar** | `assigned` (T9, reinicia la ventana) | |
 | `done` | | ninguno | terminal | |
 | `cancelled` | | ninguno | terminal | |
@@ -157,7 +158,8 @@ llega como flags del servidor, como ya hacen `canDelete`/`canCancel`/`canDecline
 | Flag | Vale en |
 |---|---|
 | `canAssign` | `created` |
-| `canConfirm`, `canDecline` | `assigned` y `overdue` (solo el asignado) |
+| `canConfirm` | `assigned` (sólo el asignado) — **la aceptación tardía se quitó (2026-11-03)** |
+| `canDecline` | `assigned` y `overdue` (sólo el asignado) |
 | `canReassign` | `not_assisting` |
 | `canComplete` | `in_progress` y `verify` |
 | `canUnassign` | eliminado (siempre false un release) |

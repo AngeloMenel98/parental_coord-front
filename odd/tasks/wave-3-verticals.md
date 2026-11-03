@@ -131,7 +131,8 @@ lead time) plus the three rulings the user made when this wave was started.
 | `T16` (new id) | `created` → `overdue` | system | clear `deadline` | `activity.created_overdue` |
 | `T11` (KEPT) | `in_progress` → `done` | bond member | set `completedAt` | `activity.done` |
 | `T7` (existing) | `assigned` → `overdue` | system | — | `activity.overdue` |
-| `T8` (existing) | `overdue` → `assisting` / `not_assisting` | assignee | see the origin rule | `activity.assisting` / `activity.not_assisting` |
+| `T8` (existing, **REDUCED**) | `overdue` → `not_assisting` | assignee | see the origin rule | `activity.not_assisting` |
+| ~~`T8`~~ (**REMOVED**) | ~~`overdue` → `assisting`~~ | — | — | la aceptación tardía se quitó (2026-11-03) |
 
 **T11 stays.** The `END` timer no longer closes the activity (it moves it to `verify`), but
 the **member** keeps the ability to close it early — before its scheduled end. That
@@ -168,10 +169,24 @@ This is the `max(end, now) + 36h` variant, one line away from the literal anchor
 and `verify` — today they only whitelist `assigned`, `assisting` and `in_progress`, so a
 lost timer would never self-heal. Five swept states after this change.
 
-**The `overdue` origin rule (the user's third decision).** Late acceptance (`T8`) exists
+**The `overdue` origin rule (the user's third decision).** The late response (`T8`) exists
 **only** when the activity reached `overdue` from `assigned`. An activity that timed out
 from `created` (nobody assigned it) or from `verify` (nobody completed it) is terminal in
 `overdue`: no "Confirmar", no "No asiste" — only what the matrix allows.
+
+**⚠ THE LATE ACCEPTANCE IS GONE (the user's decision, 2026-11-03).** `T8` used to have TWO
+halves: `overdue → assisting` (the late acceptance) and `overdue → not_assisting` (the
+late "No asiste"). The first one was **removed**: a `created`→`assigned`→`overdue`
+activity kept its "Confirmar" button alive after the 36 h window had closed, and the
+assignee could still confirm it late. It happened with "A largo plazo": its window
+expired on Oct 31, the button stayed, and on Nov 3 it was confirmed late and went back to
+`assisting`. It looked like a live activity with an action button, and it was not.
+Now `canConfirm` is true **only** in `assigned`, and the rule `overdue → assisting` is out
+of the catalog — so the endpoint answers **409**, not just "the button disappeared"
+(hiding the button while the door stays open would make the flag a lie).
+The late **"No asiste"** stays, and it is what keeps the state from becoming a dead end:
+the assignee hands the activity back (`not_assisting`), and from there anyone can
+reassign it (`T9`). Without that exit, an expired activity could only be cancelled.
 
 The origin is derived from data, not from a new status:
 
@@ -919,3 +934,33 @@ them.
   del USB antes de poder hacerlo. Hasta que se instale, el Home del dispositivo no muestra
   "Asignadas", "Vencidas" ni "Saldo gastos", y la hoja de detalle no ofrece "Asignar" ni
   "Reasignar".
+
+- **L27 (la aceptación tardía se quita — 2026-11-03).** El usuario reportó que la
+  actividad "A largo plazo" —que ya había vencido— **seguía mostrando el botón
+  "Confirmar"**, y que al confirmarla volvió a `assisting`. Los datos lo confirman:
+  `confirmed_at = 2026-11-03 11:07`, con la ventana vencida el 31 de octubre.
+
+  **La causa no era un botón mal pintado: era la RULING.** `canConfirm` era TRUE también en
+  `overdue` (la aceptación tardía, `T8`), y el botón se pintaba desde ese flag. El
+  `T8` tenía DOS mitades —`overdue → assisting` (aceptar tarde) y `overdue → not_assisting`
+  ("no asiste" tarde)— y la primera se va.
+
+  **Qué cambió (B, un commit).** El catálogo pierde la regla `overdue → assisting`: el
+  endpoint ahora responde **409** como cualquier transición inexistente, y no sólo
+  "desaparece el botón" (esconderlo con la puerta abierta haría que el flag mintiera —
+  la misma lección del "do not reintroduce"). Y `canConfirm` queda **sólo en `assigned`**.
+
+  **El "No asiste" tardío SE QUEDA, y es lo que evita el callejón sin salida.** El que no
+  aceptó en la ventana devuelve la actividad (`not_assisting`), y de ahí la reasigna
+  cualquiera (T9). Sin esa salida, una actividad vencida sólo se podría cancelar — que es
+  justo lo que el usuario resolvió con la tarea T21.
+
+  **Por qué no era una pérdida de capacidad.** La aceptación tardía se puso en su día
+  para que una actividad vencida no quedara sin salida. Con `T9` (reasignar) ya hay
+  salida, y mejor: el que la rechaza la devuelve y otro la toma con una ventana nueva.
+
+  **Los tests.** El mapa (`overdue → assisting` ahora es `undefined`, y su prueba lo
+  dice), la política (en `overdue` el asignado NO puede confirmar pero SÍ puede decir que
+  no asiste) y el servicio (el `confirm` tardío es un 409 y no escribe). **84 suites /
+  1047 tests**, `tsc`/eslint/prettier limpios en los archivos tocados. El front NO cambia:
+  el botón ya se pintaba desde `canConfirm` del DTO, así que sigue al flag solo.
