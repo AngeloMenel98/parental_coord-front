@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "chosen": "04-saldo-vivo-libro-swipe.html",
+  "handoffs": {
+    "04-saldo-vivo-libro-swipe.html": {
+      "status": "in_progress",
+      "queued": false,
+      "sentAt": "2026-11-03T13:08:16.080Z",
+      "startedAt": "2026-11-03T13:08:28.048Z",
+      "implementedAt": null,
+      "note": "Arrancando la implementación del 04 (saldo vivo, libro, swipe) sobre ExpensesScreen/ExpenseRow."
+    }
+  }
+}

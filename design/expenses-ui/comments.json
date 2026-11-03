@@ -1,0 +1,82 @@
+{
+  "version": 1,
+  "comments": [
+    {
+      "id": "jcgd1a8x",
+      "file": "01-un-saldo-tres-filtros.html",
+      "selector": "body > div > section > div > main > section",
+      "excerpt": "Saldo del vínculo $1.250,00 A favor tuyo · actualizado hoy Por pagar $2.430,00 Por cobrar $3.680,00",
+      "comment": "me gusta la tarjeta de saldo. Me imagino que a medida que cada gasto se va saldando, esto se modifica.",
+      "createdAt": "2026-11-03T12:25:09.656Z",
+      "status": "resolved",
+      "sentAt": "2026-11-03T12:34:43.162Z",
+      "resolvedAt": "2026-11-03T12:36:39.569Z"
+    },
+    {
+      "id": "nx8bl82x",
+      "file": "02-libro-de-cuentas.html",
+      "selector": "body > div > section > div > main > div:nth-of-type(4) > button:nth-of-type(1)",
+      "excerpt": "3nov Consulta pediátrica Pendiente Salud $7.200,00 tu parte $3.600,00",
+      "comment": "Me gusta mas esta manera de presentar los gastos.",
+      "createdAt": "2026-11-03T12:30:01.319Z",
+      "status": "resolved",
+      "sentAt": "2026-11-03T12:34:43.162Z",
+      "resolvedAt": "2026-11-03T12:36:39.569Z"
+    },
+    {
+      "id": "oivj9ntt",
+      "file": "01-un-saldo-tres-filtros.html",
+      "selector": "body > div > section > div > main > div",
+      "excerpt": "Todas 7 Pendientes 2 Aprobados 1 Pagados 3 Rechazados 1",
+      "comment": "Prefiero filtrar los gastos por el Estado que por las categorias.",
+      "createdAt": "2026-11-03T12:30:59.019Z",
+      "status": "resolved",
+      "sentAt": "2026-11-03T12:34:43.162Z",
+      "resolvedAt": "2026-11-03T12:36:39.569Z"
+    },
+    {
+      "id": "49s125c5",
+      "file": "02-libro-de-cuentas.html",
+      "selector": "body > div > section > div > main > div:nth-of-type(4) > button:nth-of-type(1)",
+      "excerpt": "3nov Consulta pediátrica Pendiente Salud $7.200,00 tu parte $3.600,00",
+      "comment": "Me gustaria que se haga un swipe left para Aprobar/Rechazar. Que los botones sean Rectangulares y ocupen el alto de la card entera",
+      "createdAt": "2026-11-03T12:33:48.545Z",
+      "status": "resolved",
+      "sentAt": "2026-11-03T12:34:43.162Z",
+      "resolvedAt": "2026-11-03T12:36:39.569Z"
+    },
+    {
+      "id": "pnpwa8jt",
+      "file": "02-libro-de-cuentas.html",
+      "selector": "body > div > section > div > main > div:nth-of-type(3)",
+      "excerpt": "Todas Salud Educación Familiar Recreación",
+      "comment": "haceme una 4 opcion con todos los comentarios combinados",
+      "createdAt": "2026-11-03T12:34:34.828Z",
+      "status": "resolved",
+      "sentAt": "2026-11-03T12:34:43.162Z",
+      "resolvedAt": "2026-11-03T12:36:39.569Z"
+    },
+    {
+      "id": "gtlcvykn",
+      "file": "04-saldo-vivo-libro-swipe.html",
+      "selector": "body > div > section > div > main > p",
+      "excerpt": "Deslizá una fila pendiente para aprobar o rechazar.",
+      "comment": "El Desliza no hace falta que este.",
+      "createdAt": "2026-11-03T12:39:09.462Z",
+      "status": "resolved",
+      "sentAt": "2026-11-03T13:03:13.326Z",
+      "resolvedAt": "2026-11-03T13:03:48.781Z"
+    },
+    {
+      "id": "m1nyp5ue",
+      "file": "04-saldo-vivo-libro-swipe.html",
+      "selector": "body > div > section > div > main > section > p:nth-of-type(4)",
+      "excerpt": "Se recalcula con cada gasto que se aprueba o se salda.",
+      "comment": "Este comentario tampoco hace falta",
+      "createdAt": "2026-11-03T12:39:27.036Z",
+      "status": "resolved",
+      "sentAt": "2026-11-03T13:03:13.326Z",
+      "resolvedAt": "2026-11-03T13:03:48.781Z"
+    }
+  ]
+}

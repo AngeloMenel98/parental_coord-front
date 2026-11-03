@@ -22,6 +22,13 @@
       "tradeoff": "La portada arranca por lo que espera una decisión: los gastos pendientes con Aprobar/Rechazar en la fila, sin abrir el detalle; abajo el saldo en una franja y el historial con un segmentado por estado. Máxima velocidad para resolver; a cambio, el balance es secundario y la pantalla deja de servir para mirar cómo viene el mes.",
       "width": 390,
       "height": 844
+    },
+    {
+      "file": "04-saldo-vivo-libro-swipe.html",
+      "title": "Saldo vivo, libro, swipe",
+      "tradeoff": "La combinación elegida: saldo del vínculo como encabezado (recalculado al aprobar o saldar, con los dos brutos debajo), filtros por estado, y la lista como libro con fecha a la izquierda y tu parte. Las filas pendientes se deslizan a la izquierda y dejan dos acciones rectangulares a alto completo (Rechazar / Aprobar) en vez de botones que sólo viven en el detalle. Gana la lectura de balance del 01 y la densidad del 02 con la acción a un gesto; a cambio, el swipe necesita descubrimiento (de ahí la línea de ayuda) y compite con el gesto de scroll horizontal de los filtros.",
+      "width": 390,
+      "height": 844
     }
   ]
 }

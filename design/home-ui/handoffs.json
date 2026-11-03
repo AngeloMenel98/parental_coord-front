@@ -3,12 +3,12 @@
   "chosen": "04-hoy-con-anillo.html",
   "handoffs": {
     "04-hoy-con-anillo.html": {
-      "status": "in_progress",
+      "status": "implemented",
       "queued": false,
       "sentAt": "2026-11-03T11:22:26.537Z",
       "startedAt": "2026-11-03T11:22:44.780Z",
-      "implementedAt": null,
-      "note": "Arrancando la implementación del artboard 04 (Hoy, con anillo) en Compose."
+      "implementedAt": "2026-11-03T11:41:55.961Z",
+      "note": "Implementado en Compose (shared/feature/home) y verificado en un dispositivo real, en claro y en oscuro. Build + 458 tests verdes."
     }
   }
 }

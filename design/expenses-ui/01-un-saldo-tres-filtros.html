@@ -53,6 +53,8 @@
   .balance { background: var(--surface); border: 1px solid var(--outline-variant); border-radius: 16px; padding: 16px; }
   .balance .amount { font-family: var(--serif); font-size: 36px; font-weight: 600; line-height: 42px; color: var(--aprobado); margin-top: 2px; }
   .balance .hint { font-size: 12px; color: var(--on-surface-variant); }
+  .balance .rule { font-size: 11px; color: var(--on-surface-variant); margin-top: 6px; display: flex; align-items: center; gap: 6px; }
+  .balance .rule svg { width: 13px; height: 13px; flex: none; color: var(--outline); }
   .split { display: grid; grid-template-columns: 1fr 1fr; margin-top: 14px; border-top: 1px solid var(--outline-variant); }
   .split div { padding-top: 10px; }
   .split div + div { border-left: 1px solid var(--outline-variant); padding-left: 12px; }
@@ -117,6 +119,10 @@
           <p class="eyebrow" id="bal-title">Saldo del vínculo</p>
           <p class="amount">$1.250,00</p>
           <p class="hint">A favor tuyo · actualizado hoy</p>
+          <p class="rule">
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 4V1L8 5l4 4V6a6 6 0 1 1-6 6H4a8 8 0 1 0 8-8z"/></svg>
+            Se recalcula con cada gasto que se aprueba o se salda.
+          </p>
           <div class="split">
             <div>
               <p class="lbl">Por pagar</p>
