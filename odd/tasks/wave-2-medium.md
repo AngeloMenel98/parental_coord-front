@@ -186,11 +186,27 @@ So T21 is **F+B**, and the two halves are separated by the contract below.
   `status === 'not_assisting'`. Neither depends on who asks: any **member of the bond**
   may act (R3 says "cualquier miembro" for both rows). Membership is the service's job
   (`assertActivityMember`), never the policy's.
+  - ⚠ **QUIÉN PUEDE REASIGNAR — y quién NO.** No es "el que la asignó": esa figura no
+    existe en el modelo. La fila guarda `created_by` y `assigned_to`; un reasignado
+    cambia `assigned_to` y `created_by` sigue siendo el mismo. Quien reasigna es
+    **cualquier miembro del vínculo** —ni el creador ni el anterior asignado—, y la
+    precondición NO es "la asignó él" sino **"el asignado la rechazó"** (el estado es
+    `not_assisting`; R3: "T9 (Reasignar), que exige que el asignado haya rechazado").
+    Lo que el creador conserva es **Cancelar** (`canCancel = isCreator && !isPast`,
+    con motivo obligatorio), y lo que el asignado conserva son **Confirmar** y
+    **No asistir** (`canRespond`: sólo el asignado, y sólo en `assigned`/`overdue`).
+  - ⚠ **Lo que impide ROBAR una asignación viva NO es la ruta: es el catálogo.** No hay
+    regla hacia `assigned` desde `assigned`/`assisting`/`in_progress`/`verify`, así que
+    un intento ahí es un **409**. La ruta no acota el estado por sí misma: `assign` sobre
+    una actividad en `not_assisting` aplica T9, y `reassign` sobre una en `created`
+    aplica T3 — las dos rutas resuelven la transición por el ESTADO, como resuelve todo
+    el resto del módulo. El reachable set es `{created, not_assisting}` en las dos, y
+    duplicar el estado en la ruta sería una segunda copia de la regla.
 - Errors, matching the module's conventions: **404** the activity does not exist or the
-  caller is not a member of its bond · **409** the status is not the one the route serves
-  (a stale `created` that already moved to `assigned`) · **404** `assignedTo` is not an
-  active member of the activity's bond (the message must not reveal whether that user
-  exists at all).
+  caller is not a member of its bond · **409** there is no legal transition to
+  `assigned` from the current status (a live assignment, a terminal state, a cancelled
+  one) · **404** `assignedTo` is not an active member of the activity's bond (the message
+  must not reveal whether that user exists at all).
 - The transition goes through the **existing chokepoint** `ActivitiesService.transition()`,
   never a direct write: `to: ActivityStatus.ASSIGNED` with `fields: { assignedTo }`.
   `T3`/`T9` already carry `deadline: 'set'`, so the 36 h window is re-armed by
@@ -652,3 +668,39 @@ T23 depends on this.
   la suite está verde, pero el botón "Asignar" con su selector no se ha abierto en el
   teléfono; y sin el back publicado, un servidor real todavía no manda las flags
   (`canAssign`/`canReassign` vienen en `false` por defecto ⇒ sin botones).
+
+- **2026-11-03 · L4 — la revisión del riesgo 2 (autorización) y una corrección de
+  contrato.** El usuario preguntó si `canReassign` era para "el que la asignó". **No**:
+  quien reasigna es cualquier miembro del vínculo, y la precondición es que **el
+  asignado la rechazó** (el estado `not_assisting`), no quién la asignó. Esa figura no
+  existe en el modelo: la fila guarda `created_by` y `assigned_to`, y un reasignado
+  cambia `assigned_to` mientras `created_by` sigue siendo el mismo. El creador conserva
+  **Cancelar** (con motivo) y el asignado conserva **Confirmar** / **No asistir**. Es lo
+  que dice R3 ("cualquier miembro" en las dos filas; "T9 … que exige que el asignado
+  haya rechazado"), y el catálogo de transiciones ya lo decía antes de esta ola: `T3` y
+  `T9` llevan `actors: ['bond_member']` desde que se escribieron.
+
+  **El riesgo 2 revisado punto por punto.** El permiso NO lo decide el front: lo
+  calculan `canAssign`/`canReassign` en la política pura del servidor, y lo que impide
+  robar una asignación viva NO es la ruta sino el **catálogo**: no hay regla hacia
+  `assigned` desde `assigned`/`assisting`/`in_progress`/`verify`, así que un intento ahí
+  es un 409 (probado). El objetivo tiene que ser un miembro activo del vínculo, y si no
+  lo es es un 404 **sin revelar si ese usuario existe** — la misma regla que usa el
+  módulo de gastos. El guard de "tarde" (T8) no aplica aquí: no hay aceptación tardía
+  en juego, hay una asignación nueva. Y el actor no puede salirse del chokepoint: la
+  transición pasa por `transition()`, que valida la regla, el actor y la versión.
+
+  **La corrección.** La spec decía "409 — el estado no es el que la ruta sirve". Eso NO
+  es lo que hace el código, y la diferencia no era cosmética: **las dos rutas son
+  intercambiables**. `assign` sobre una actividad en `not_assisting` aplica T9, y
+  `reassign` sobre una en `created` aplica T3, porque ambas resuelven la transición por
+  el ESTADO (como todo el módulo) y no por la ruta. Comprobado con una sonda descartable
+  antes de decidir, no de memoria. Lo que NO cambia es el conjunto alcanzable
+  (`{created, not_assisting}`) ni el 409 de una asignación viva. La decisión fue
+  **corregir la spec y no el código**: acotar el estado en la ruta duplicaría la regla
+  del catálogo en otro capa —justo el "dos copias de una regla" que este repo viene
+  arrastrando— y el front nunca cruza las dos (llama `assign` sólo con `canAssign` y
+  `reassign` sólo con `canReassign`). Los dos casos cruzados quedan **fijados en
+  tests** (`applies T9 when the activity is in not_assisting` y `applies T3 when the
+  activity is in created`), para que el día que alguien duplique el estado en la ruta
+  el test lo delate.
