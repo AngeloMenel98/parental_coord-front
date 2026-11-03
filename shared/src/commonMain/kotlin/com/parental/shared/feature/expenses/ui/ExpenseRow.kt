@@ -1,6 +1,7 @@
 package com.parental.shared.feature.expenses.ui
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
@@ -70,7 +71,10 @@ fun ExpenseRow(
     ) {
         Row(
             modifier = Modifier
+                // Fondo OPACO: las acciones del swipe viven detrás y no deben verse a
+                // través de la fila cuando está cerrada.
                 .fillMaxWidth()
+                .background(MaterialTheme.colorScheme.surface)
                 .clickable(onClick = onClick)
                 .padding(horizontal = Spacing.xs, vertical = Spacing.md),
             verticalAlignment = Alignment.Top,

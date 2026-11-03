@@ -1,6 +1,6 @@
 package com.parental.shared.feature.expenses.ui.swipe
 
-import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -14,7 +14,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -66,16 +69,23 @@ fun ExpenseSwipeBox(
 
     val actionWidth = 78.dp
     val maxSwipePx = with(LocalDensity.current) { (actionWidth * 2).toPx() }
-    val offset = remember { Animatable(0f) }
+    // El desplazamiento es estado de UI: durante el arrastre sigue el dedo 1:1 y al soltar
+    // se anima al extremo. Nada de lanzar una corrutina por evento de drag.
+    var offsetPx by remember { mutableFloatStateOf(if (open) -maxSwipePx else 0f) }
     val scope = rememberCoroutineScope()
     val duration = MotionTokens.durationStandard
 
+    suspend fun settle(target: Float) {
+        animate(
+            initialValue = offsetPx,
+            targetValue = target,
+            animationSpec = tween(durationMillis = duration),
+        ) { value, _ -> offsetPx = value }
+    }
+
     // El estado de apertura vive arriba: acá sólo se anima hacia donde el llamador dice.
     LaunchedEffect(open, maxSwipePx) {
-        offset.animateTo(
-            targetValue = if (open) -maxSwipePx else 0f,
-            animationSpec = tween(durationMillis = duration),
-        )
+        settle(if (open) -maxSwipePx else 0f)
     }
 
     Box(modifier = modifier) {
@@ -112,26 +122,21 @@ fun ExpenseSwipeBox(
                 .layout { measurable, constraints ->
                     val placeable = measurable.measure(constraints)
                     layout(placeable.width, placeable.height) {
-                        placeable.place(offset.value.roundToInt(), 0)
+                        placeable.place(offsetPx.roundToInt(), 0)
                     }
                 }
-                .pointerInput(open, enabled) {
+                .pointerInput(open, maxSwipePx) {
                     detectHorizontalDragGestures(
                         onDragEnd = {
-                            val shouldOpen = offset.value < -maxSwipePx / 2f
+                            val shouldOpen = offsetPx < -maxSwipePx / 2f
                             onOpenChange(shouldOpen)
                             scope.launch {
-                                offset.animateTo(
-                                    targetValue = if (shouldOpen) -maxSwipePx else 0f,
-                                    animationSpec = tween(durationMillis = duration),
-                                )
+                                settle(if (shouldOpen) -maxSwipePx else 0f)
                             }
                         },
                         onHorizontalDrag = { change, dragAmount ->
                             change.consume()
-                            val next = (offset.value + dragAmount)
-                                .coerceIn(-maxSwipePx, 0f)
-                            scope.launch { offset.snapTo(next) }
+                            offsetPx = (offsetPx + dragAmount).coerceIn(-maxSwipePx, 0f)
                         },
                     )
                 }
