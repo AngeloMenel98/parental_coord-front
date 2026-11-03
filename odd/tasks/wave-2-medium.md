@@ -405,8 +405,8 @@ rolls the expense back instead of leaving it orphaned.
 | T35 | Compliance formula: exclude `cancelled`, period copy | B+F | S6 | — | pending | — |
 | T18 | Verify window in the front | F | S7 | inline (wave 3) | done | F `8a43020` |
 | T19 | Expense detail + approve/reject/pay | F | S7 | delegated (wave 3) | done | F `0e30788` |
-| T20 | Home metric cards | F | S11 | — | pending (T28 done) | — |
-| T21 | Status-aware action matrix | F+B | S7 | — | pending (T18, T25 done) | — |
+| T20 | Home metric cards | F | S11 | inline (parent) | done | F `4d16111` |
+| T21 | Status-aware action matrix | F+B | S7 | back delegated (writer, `src/activities/**`); front delegated (writer) | done | B `b7c65d2`; F `741ed6a` |
 | T22 | Expense policy + audit | B | S8 | inline | done | B `f2d190b` |
 | T23 | Expense notifications + 7-day reminder | B | S9 | inline | done | B `6c04ed3` |
 | T24 | Expenses write API: create, detail, edit, cancel, approve/reject/pay | B | S10 | inline | done | B `7975695` + `0aa8742` |
@@ -575,3 +575,80 @@ T23 depends on this.
 
 
 - **2026-11-01 · T23 review acknowledged.** The user granted candidate-specific review consent. The reliability lens returned no findings; exact native acknowledgement succeeded and burned the review authority for this candidate. No correction was required. T23 is complete.
+
+
+- **2026-11-03 · L2 — the wave reopens: T20 and T21.** The user asked for T20/T21 and
+  for a PR from `develop` to `main`, and dropped the prod migration item ("forget about
+  supabase for now"). Two facts found while reading the code, both recorded in S7/S11:
+
+  1. **T21 was filed as front-only and is not.** The plan assumed the server already
+     exposed the flags. It does not: `ActivityPolicyService` computes `canDelete`,
+     `canCancel`, `canConfirm`, `canDecline` and `canComplete` — there is **no
+     `canAssign` and no `canReassign`**, and `activities.controller.ts` has **no assign
+     and no reassign route** (`create`, `confirm`, `decline`, `DELETE`, `cancel`,
+     `complete` and the reads). The engine was ready — `T3` (`created → assigned`) and
+     `T9` (`not_assisting → assigned`) are in the closed catalog with
+     `actors: ['bond_member']` — but nothing could reach them. Consequence: an activity
+     created without an assignee could never be assigned (it only timed out to
+     `overdue`), and an activity somebody declined was a **dead end** (cancel only).
+     The wave-3 log (L18) had claimed "the back exposes all three" — it does not, and
+     that sentence was the reason the task looked front-only.
+  2. **The wave-3 claim that the assignment happens at creation is only half true.**
+     `activities.service.ts:402` reads `dto.assignedTo ?? null` and
+     `resolveInitial(assignedTo != null)` — an activity created WITH an assignee starts
+     in `assigned`, and one created WITHOUT it starts in `created`, where nothing can
+     pick it up. That is why the `created` row of the matrix was reachable in the data
+     but dead in the product.
+
+  So T21 became **F+B**: the back half adds the two flags and the two routes, the front
+  half consumes them. The contract between the halves is written out in S7 and both
+  halves implement exactly that.
+
+  **T20** (the three Home metric cards) stayed front-only, as filed. Two decisions the
+  plan did not spell out, made here and recorded in S11:
+  - **"Asignadas" and "Vencidas" count MY activities**, not the bond's: the Home is a
+    personal panel and the balance already comes signed from the current user's point of
+    view (R1). "Vencidas" is the late slice of "Asignadas" — the same load, overdue.
+  - **A metric that could not be computed shows a dash, never a `0`.** A `0` the user
+    reads as "you have none" is worse than a hole: `null` (no list, no session user id)
+    and `0` (you really have none) are different facts.
+
+- **2026-11-03 · L3 — T20 y T21 entregadas.** **T20** → F `4d16111` (11 archivos,
+  671+/14−): las tres tarjetas del Home, el conteo en cliente (`HomeCounts.kt`, función
+  pura) y el plegado de las tres fuentes en el resumen. **T21** → B `b7c65d2` (la mitad
+  del back) y F `741ed6a` (la mitad del front).
+
+  **Back (B `b7c65d2`, 10 archivos, 486+/3−).** Las dos flags en la política (PURA: sin
+  repositorio ni servicios) y en los DOS DTO (resumen y detalle); las dos rutas
+  `POST /:id/assign` y `POST /:id/reassign` con `assignedTo` opcional (sin destino la
+  toma el actor); la transición pasa por el ÚNICO chokepoint `transition()`; y **T9 gana
+  `declinedAt: false` y `confirmedAt: false`** — un reasignado arranca en limpio, o el
+  motivo de rechazo del anterior quedaba en pantalla para alguien que nunca rechazó.
+  `buildTransitionFields` limpia también el `declined_reason`. La respuesta es ESTRECHA
+  (`{ id, status, assignedTo }`), como las demás acciones del módulo: devolver la fila
+  publicaba `version`, `bondId` y `deletedAt` — columnas internas que ningún cliente
+  necesita. Es una corrección del padre sobre el trabajo entregado. Suite: **84 suites /
+  1026 tests**, `tsc` limpio, eslint limpio, prettier limpio.
+
+  **Front (F `741ed6a`, 8 archivos, 913+).** Los dos flags en el modelo (con `= false`
+  por defecto: un servidor viejo degrada a "sin botones", no a "botones que fallan"), las
+  dos llamadas con el cuerpo armado CAMPO POR CAMPO (`{}` sin destino), los dos botones
+  en la hoja de detalle y un selector que REUSA el `memberCandidates` del alta — sin
+  petición nueva y sin una segunda derivación de candidatos. Suite: **421 tests** en
+  `testDebugUnitTest`, 0 fallos; `:androidApp:assembleDebug` en verde.
+
+  **Una corrección del padre sobre el trabajo entregado.** La primera versión parcheaba
+  el detalle en el cliente: `status` y `assignedTo` del servidor, y `canAssign`/
+  `canReassign` en `false` **derivados por el cliente**. Eso es una segunda copia de la
+  política — exactamente lo que la regla del repo prohíbe ("Si el cliente derivara un
+  flag, habría dos copias de la política y divergirían en cuanto cambiara una") — y
+  dejaba `canConfirm` viejo: el que se asigna la actividad no veía su "Confirmar
+  asignación" hasta reabrir la hoja. Ahora, tras la acción, el detalle se **vuelve a
+  PREGUNTAR** al servidor (un GET, sin pasar por `Loading`) y el cliente no calcula
+  ningún flag. El test nuevo lo fija: tras asignarse a sí mismo, el `canConfirm` que
+  muestra la hoja es el que mandó el servidor.
+
+  **Lo que NO se verificó:** nada de esto se vio en un dispositivo. El APK se compiló y
+  la suite está verde, pero el botón "Asignar" con su selector no se ha abierto en el
+  teléfono; y sin el back publicado, un servidor real todavía no manda las flags
+  (`canAssign`/`canReassign` vienen en `false` por defecto ⇒ sin botones).

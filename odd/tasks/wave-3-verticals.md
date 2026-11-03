@@ -445,10 +445,12 @@ them.
 
 ## Open items
 
-1. **Prod (Supabase) is three migrations behind** — `1792819200000` (the expense model
+1. ~~**Prod (Supabase) is three migrations behind**~~ — DROPPED by the user on
+   2026-11-03 ("forget about supabase for now"). `1792819200000` (the expense model
    fields), `1793491200000` (the outbox aggregate type) and `1793577600000`
-   (`activity.verify_at`) were never applied there. Applying a migration to prod is a
-   remote write and needs the user's explicit approval. Dev and test are at 16.
+   (`activity.verify_at`) were never applied to prod; dev and test are at 16. It stays
+   as a record: applying a migration to prod is a remote write and needs the user's
+   word, and that word was explicitly withheld for now. NOT a task of this wave.
 2. **The back worktree carries pre-existing prettier noise** in 9 files (43 insertions,
    36 deletions — formatting only, not authored by this wave). It stays out of every
    commit except where a file this wave must touch (T25 touches
