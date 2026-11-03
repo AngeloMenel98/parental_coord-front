@@ -197,7 +197,6 @@ class ExpensesViewModel(
         loadExpenses()
     }
 
-    /** Abre el detalle de un gasto. */
     fun openDetail(id: String) {
         _uiState.update { it.copy(detail = DetailUiState.Loading(id)) }
         scope.launch {
@@ -221,12 +220,10 @@ class ExpensesViewModel(
         performAction(id) { api.approveExpense(token, id) }
     }
 
-    /** Rechaza un gasto con motivo opcional. */
     fun reject(id: String, reason: String? = null) {
         performAction(id) { api.rejectExpense(token, id, reason) }
     }
 
-    /** Marca un gasto como pagado. */
     fun pay(id: String) {
         performAction(id) { api.payExpense(token, id) }
     }
@@ -264,7 +261,6 @@ class ExpensesViewModel(
         }
     }
 
-    /** Abre la hoja de alta de gastos. */
     fun openCreateSheet(initialConcept: String? = null, activityAttachmentId: String? = null) {
         _uiState.update {
             it.copy(
@@ -275,7 +271,6 @@ class ExpensesViewModel(
         }
     }
 
-    /** Cierra la hoja de alta. */
     fun closeCreateSheet() {
         _uiState.update {
             it.copy(

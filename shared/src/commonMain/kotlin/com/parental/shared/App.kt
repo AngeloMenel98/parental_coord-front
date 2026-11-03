@@ -50,7 +50,6 @@ fun App() {
     val authRepository = remember { AuthRepository() }
     val sessionManager = remember { SessionManager() }
 
-    // Restore persisted session on startup
     LaunchedEffect(Unit) {
         sessionManager.restoreFromStorage()
         // Legacy sessions (pre userId) — backfill via GET /auth/me so the
@@ -88,7 +87,6 @@ private fun AppContent(
     }
 
     val currentScreen = if (sessionManager.loginPending) {
-        // Login in progress (bonds fetch pending) — keep on Login screen
         Screen.Login
     } else if (sessionManager.isLoggedIn) {
         when (sessionManager.role) {
@@ -110,7 +108,6 @@ private fun AppContent(
                 onLoginSuccess = { response ->
                     val name = response.user.firstName ?: response.user.email
 
-                    // Mark login as pending — keeps UI on Login screen during bonds fetch
                     sessionManager.beginLogin()
 
                     sessionManager.setSession(
@@ -120,7 +117,6 @@ private fun AppContent(
                         userId = response.user.id,
                     )
 
-                    // Fetch bonds and set the first one as active
                     val bondsApi = ApiClient.bondsApi()
                     try {
                         val result = bondsApi.getMyBonds(response.access_token)

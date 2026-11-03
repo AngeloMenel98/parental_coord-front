@@ -169,13 +169,6 @@ open class ExpensesApi(
         request: ExpenseUpdateRequest,
     ): ApiResult<ExpenseResponseDto> {
         return try {
-            // El cuerpo se arma CAMPO POR CAMPO, no serializando la data class:
-            // el cliente Ktor tiene `explicitNulls` activo, así que una data class
-            // mandaría `null` en todos los campos que el usuario no tocó — y el
-            // backend los leería como "poner en null" (no como "no tocar"), contra
-            // columnas NOT NULL. Además el backend rechaza con 400 cualquier
-            // propiedad que no exista en su DTO (`forbidNonWhitelisted`), y la
-            // contraparte del reparto la DERIVA el servidor: mandarla es un 400.
             val body = request.toPatchBody()
             val response = client.patch("$baseUrl/expenses/$id") {
                 header("Authorization", "Bearer $token")
