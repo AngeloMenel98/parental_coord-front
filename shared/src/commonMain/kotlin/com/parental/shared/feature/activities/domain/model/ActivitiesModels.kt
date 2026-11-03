@@ -37,6 +37,10 @@ data class Actividad(
     val canDecline: Boolean = false,
     /** `in_progress` **y** `verify` (R3): es el gate real del CTA "Finalizar". */
     val canComplete: Boolean = false,
+    /** `created` (T21): es el gate real del CTA "Asignar". */
+    val canAssign: Boolean = false,
+    /** `not_assisting` (T21): es el gate real del CTA "Reasignar". */
+    val canReassign: Boolean = false,
 )
 
 @Serializable
@@ -63,6 +67,10 @@ data class ActividadDetalle(
     val canDecline: Boolean = false,
     /** `in_progress` **y** `verify` (R3): es el gate real del CTA "Finalizar". */
     val canComplete: Boolean = false,
+    /** `created` (T21): es el gate real del CTA "Asignar". */
+    val canAssign: Boolean = false,
+    /** `not_assisting` (T21): es el gate real del CTA "Reasignar". */
+    val canReassign: Boolean = false,
     /** `now >= coalesce(scheduledEnd, scheduledStart)` — sólo lo manda el detalle. */
     val isPast: Boolean = false,
     /**
@@ -148,6 +156,22 @@ data class CompleteActivityResponse(
     val id: String,
     val status: String,
     val completedAt: String? = null,
+)
+
+/** `POST /activities/:id/assign` → `{id, status, assignedTo}`. */
+@Serializable
+data class AssignActivityResponse(
+    val id: String,
+    val status: String,
+    val assignedTo: String? = null,
+)
+
+/** `POST /activities/:id/reassign` → `{id, status, assignedTo}`. */
+@Serializable
+data class ReassignActivityResponse(
+    val id: String,
+    val status: String,
+    val assignedTo: String? = null,
 )
 
 // ═══════════════════════════════════════════════════════════════════════════

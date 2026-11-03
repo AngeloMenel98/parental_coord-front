@@ -112,6 +112,10 @@ data class ActivitiesUiState(
     val memberCandidates: List<MemberCandidate> = emptyList(),
     /** True SOLO mientras `POST /:id/complete` está en vuelo (single-flight global). */
     val isCompleting: Boolean = false,
+    /** True SOLO mientras `POST /:id/assign` está en vuelo (single-flight global). */
+    val isAssigning: Boolean = false,
+    /** True SOLO mientras `POST /:id/reassign` está en vuelo (single-flight global). */
+    val isReassigning: Boolean = false,
     // ── activity-swipe-actions: mutaciones de swipe ────────────────────────
     /** Diálogo de motivo de Cancelar / No asistir — A1. `Closed` = no hay diálogo. */
     val swipeReason: SwipeReasonUiState = SwipeReasonUiState.Closed,
@@ -248,6 +252,18 @@ class ActividadesViewModel(
 
     /** `POST /:id/complete` en vuelo. */
     private var completeJob: Job? = null
+
+    /** Contador de generación de "Asignar" — misma garantía que [createGeneration]. */
+    private var assignGeneration = 0
+
+    /** `POST /:id/assign` en vuelo. */
+    private var assignJob: Job? = null
+
+    /** Contador de generación de "Reasignar" — misma garantía que [createGeneration]. */
+    private var reassignGeneration = 0
+
+    /** `POST /:id/reassign` en vuelo. */
+    private var reassignJob: Job? = null
 
     private var loadJob: Job? = null
 
@@ -725,6 +741,113 @@ class ActividadesViewModel(
 
     fun consumeSnackbar() {
         _uiState.value = _uiState.value.copy(snackbarMessage = null)
+    }
+
+    // ── assign/reassign · ASIGNAR / REASIGNAR (T21) ─────────────────────────
+
+    /**
+     * POST /activities/:id/assign — "Asignar" (T21).
+     *
+     * Single-flight, mismo estilo que `completeActivity`. Éxito ⇒ el servidor cambió
+     * el estado a `assigned`, así que se refresca el detalle abierto y se refetchea la
+     * lista; sin esto la hoja seguiría mostrando `created` y la tarjeta el estado viejo.
+     */
+    fun assignActivity(activityId: String, assignedTo: String?) {
+        if (_uiState.value.isAssigning) return
+        val gen = ++assignGeneration
+        _uiState.value = _uiState.value.copy(isAssigning = true)
+        assignJob?.cancel()
+        assignJob = scope.launch {
+            when (val result = activitiesApi.assignActivity(token, activityId, assignedTo)) {
+                is ApiResult.Success -> withContext(dispatcher) {
+                    if (gen != assignGeneration) return@withContext
+                    _uiState.value = _uiState.value.copy(
+                        isAssigning = false,
+                        snackbarMessage = "Actividad asignada",
+                    )
+                    refreshDetailSilently(activityId)
+                    loadAll()
+                }
+                is ApiResult.Error -> withContext(dispatcher) {
+                    if (gen != assignGeneration) return@withContext
+                    _uiState.value = _uiState.value.copy(
+                        isAssigning = false,
+                        snackbarMessage = result.message,
+                    )
+                }
+            }
+        }
+    }
+
+    /**
+     * POST /activities/:id/reassign — "Reasignar" (T21).
+     *
+     * Mismo comportamiento que [assignActivity]: el estado pasa a `assigned`, se
+     * refresca el detalle y se refetchea la lista.
+     */
+    fun reassignActivity(activityId: String, assignedTo: String?) {
+        if (_uiState.value.isReassigning) return
+        val gen = ++reassignGeneration
+        _uiState.value = _uiState.value.copy(isReassigning = true)
+        reassignJob?.cancel()
+        reassignJob = scope.launch {
+            when (val result = activitiesApi.reassignActivity(token, activityId, assignedTo)) {
+                is ApiResult.Success -> withContext(dispatcher) {
+                    if (gen != reassignGeneration) return@withContext
+                    _uiState.value = _uiState.value.copy(
+                        isReassigning = false,
+                        snackbarMessage = "Actividad reasignada",
+                    )
+                    refreshDetailSilently(activityId)
+                    loadAll()
+                }
+                is ApiResult.Error -> withContext(dispatcher) {
+                    if (gen != reassignGeneration) return@withContext
+                    _uiState.value = _uiState.value.copy(
+                        isReassigning = false,
+                        snackbarMessage = result.message,
+                    )
+                }
+            }
+        }
+    }
+
+    /**
+     * Parchea el detalle abierto tras una asignación/reasignación exitosa.
+     *
+     * El servidor mandó `status` y `assignedTo`; al pasar a `assigned` los flags
+     * `canAssign` y `canReassign` se apagan (el servidor los calcula así). El resto
+     * de flags se corrige con el refetch de [loadAll].
+     */
+    /**
+     * Refresca el detalle ABIERTO sin pasar por `Loading`.
+     *
+     * ⚠ Los flags los calcula el SERVIDOR (R1/S2): el cliente no deriva ninguno, así
+     * que después de una acción que cambia el estado hay que VOLVER A PREGUNTÁRSELO.
+     * Un parche local dejaría `canConfirm` viejo —el que se asigna la actividad no
+     * vería su "Confirmar asignación" hasta reabrir la hoja— y sería una segunda
+     * copia de la política, que es justo lo que la regla del repo prohíbe.
+     *
+     * El detalle que se reemplaza es el que el servidor acaba de mandar: no se
+     * calcula nada acá.
+     */
+    private fun refreshDetailSilently(activityId: String) {
+        val gen = ++detailGeneration
+        detailJob?.cancel()
+        detailJob = scope.launch {
+            val result = activitiesApi.getActividad(token, activityId)
+            withContext(dispatcher) {
+                // Obsoleta (la hoja se cerró, o se abrió otra): no escribe NADA.
+                if (gen != detailGeneration) return@withContext
+                val current = _uiState.value.detail
+                if (current !is DetailUiState.Content || current.id != activityId) return@withContext
+                if (result is ApiResult.Success) {
+                    _uiState.value = _uiState.value.copy(
+                        detail = DetailUiState.Content(activityId, result.data),
+                    )
+                }
+            }
+        }
     }
 
     // ── activity-swipe-actions · ELIMINAR / CANCELAR / NO ASISTIR ─────────────

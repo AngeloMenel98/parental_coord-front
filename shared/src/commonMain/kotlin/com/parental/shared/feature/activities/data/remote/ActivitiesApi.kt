@@ -4,6 +4,7 @@ import com.parental.shared.core.error.ApiResult
 import com.parental.shared.feature.activities.domain.model.Actividad
 import com.parental.shared.feature.activities.domain.model.ActividadDetalle
 import com.parental.shared.feature.activities.domain.model.ActivityReasonRequest
+import com.parental.shared.feature.activities.domain.model.AssignActivityResponse
 import com.parental.shared.feature.activities.domain.model.CancelActivityResponse
 import com.parental.shared.feature.activities.domain.model.CompleteActivityResponse
 import com.parental.shared.feature.activities.domain.model.ConfirmAssignmentResponse
@@ -11,6 +12,7 @@ import com.parental.shared.feature.activities.domain.model.CreateActividadReques
 import com.parental.shared.feature.activities.domain.model.CreatedActividad
 import com.parental.shared.feature.activities.domain.model.DeclineActivityResponse
 import com.parental.shared.feature.activities.domain.model.DeleteActivityResponse
+import com.parental.shared.feature.activities.domain.model.ReassignActivityResponse
 import com.parental.shared.feature.activities.domain.model.RestoreActivityResponse
 import com.parental.shared.feature.activities.domain.model.UndoDeclineResponse
 import io.ktor.client.*
@@ -19,6 +21,9 @@ import io.ktor.client.call.body
 import io.ktor.client.request.*
 import io.ktor.http.*
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
 /**
  * Cuerpo de error del backend. `code` sólo existe si el endpoint lanza
@@ -167,6 +172,70 @@ open class ActivitiesApi(
             }
         } catch (e: Exception) {
             ApiResult.Error(0, "POST $baseUrl/activities/$id/complete failed: ${e.message}")
+        }
+    }
+
+    /**
+     * Cuerpo de POST /activities/:id/assign y de POST /activities/:id/reassign (T21).
+     *
+     * Se construye CAMPO POR CAMPO: el cliente Ktor tiene `explicitNulls` activo, así
+     * que una data class con `assignedTo = null` mandaría `"assignedTo": null` en vez
+     * de omitir la clave. El backend rechaza cualquier propiedad que no declare, por
+     * eso cuando no hay destino se envía `{}` y cuando hay destino se envía
+     * `{ "assignedTo": "<userId>" }`.
+     */
+    internal fun assignBody(assignedTo: String?): JsonObject = buildJsonObject {
+        assignedTo?.let { put("assignedTo", it) }
+    }
+
+    /**
+     * POST /activities/:id/assign — "Asignar" (T21).
+     */
+    open suspend fun assignActivity(
+        token: String,
+        id: String,
+        assignedTo: String?,
+    ): ApiResult<AssignActivityResponse> {
+        return try {
+            val response = client.post("$baseUrl/activities/$id/assign") {
+                header("Authorization", "Bearer $token")
+                contentType(ContentType.Application.Json)
+                setBody(assignBody(assignedTo))
+            }
+            if (response.status.isSuccess()) {
+                ApiResult.Success(response.body())
+            } else {
+                response.toApiError()
+            }
+        } catch (e: Exception) {
+            ApiResult.Error(0, "POST $baseUrl/activities/$id/assign failed: ${e.message}")
+        }
+    }
+
+    /**
+     * POST /activities/:id/reassign — "Reasignar" (T21).
+     *
+     * Misma disciplina de cuerpo que [assignActivity]: campo por campo, sin
+     * `null` explícito, para que el backend no reciba propiedades que no declara.
+     */
+    open suspend fun reassignActivity(
+        token: String,
+        id: String,
+        assignedTo: String?,
+    ): ApiResult<ReassignActivityResponse> {
+        return try {
+            val response = client.post("$baseUrl/activities/$id/reassign") {
+                header("Authorization", "Bearer $token")
+                contentType(ContentType.Application.Json)
+                setBody(assignBody(assignedTo))
+            }
+            if (response.status.isSuccess()) {
+                ApiResult.Success(response.body())
+            } else {
+                response.toApiError()
+            }
+        } catch (e: Exception) {
+            ApiResult.Error(0, "POST $baseUrl/activities/$id/reassign failed: ${e.message}")
         }
     }
 

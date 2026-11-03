@@ -68,6 +68,12 @@ import kotlinx.datetime.toLocalDateTime
  */
 private val TERMINAL_STATUSES = setOf("done", "cancelled", "not_assisting")
 
+/** T21 · Selector de miembro para "Asignar" o "Reasignar". */
+private sealed interface AssignPickerState {
+    data class Assign(val activityId: String) : AssignPickerState
+    data class Reassign(val activityId: String) : AssignPickerState
+}
+
 /**
  * Raíz de la hoja — `activity-detail-modal`, T2-1.
  *
@@ -91,6 +97,10 @@ internal fun ActividadDetailSheet(
     onComplete: (String) -> Unit,
     isCompleting: Boolean,
     onDecline: (String) -> Unit = {},
+    /** T21 · `POST /:id/assign` en vuelo. */
+    isAssigning: Boolean = false,
+    /** T21 · `POST /:id/reassign` en vuelo. */
+    isReassigning: Boolean = false,
     attachments: List<ActivityAttachmentDto> = emptyList(),
     attachmentsLoading: Boolean = false,
     onLoadAttachments: (String) -> Unit = {},
@@ -101,6 +111,10 @@ internal fun ActividadDetailSheet(
     onDeleteAttachment: (String, String) -> Unit = { _, _ -> },
     /** S9 · D-5 — hijos del vínculo, para resolver `childrenIds` a nombres. */
     children: List<VinculoChild> = emptyList(),
+    /** T21 · candidatos a "Asignar a" / "Reasignar a" — el MISMO que usa el alta. */
+    memberCandidates: List<MemberCandidate> = emptyList(),
+    onAssign: (String, String?) -> Unit = { _, _ -> },
+    onReassign: (String, String?) -> Unit = { _, _ -> },
 ) {
     val scope = rememberCoroutineScope()
     val closeFocus = remember { FocusRequester() }
@@ -113,6 +127,8 @@ internal fun ActividadDetailSheet(
     val pickAttachment: (String, FileData) -> Unit = { activityId, file ->
         pendingExpenseChoice = activityId to file
     }
+    // T21 · Selector de miembro para "Asignar" / "Reasignar". `null` = cerrado.
+    var assignPicker by remember { mutableStateOf<AssignPickerState?>(null) }
     fun savePickedAttachment(asExpense: Boolean) {
         val (activityId, file) = pendingExpenseChoice ?: return
         pendingExpenseChoice = null
@@ -209,6 +225,11 @@ internal fun ActividadDetailSheet(
                         // devolviera un archivo.
                         onPickAttachment = pickAttachment,
                         picker = picker,
+                        memberCandidates = memberCandidates,
+                        onOpenAssignPicker = { assignPicker = AssignPickerState.Assign(state.actividad.id) },
+                        onOpenReassignPicker = { assignPicker = AssignPickerState.Reassign(state.actividad.id) },
+                        isAssigning = isAssigning,
+                        isReassigning = isReassigning,
                     )
                 }
             }
@@ -223,6 +244,40 @@ internal fun ActividadDetailSheet(
                 },
                 dismissButton = {
                     TextButton(onClick = { savePickedAttachment(asExpense = false) }) { Text("No") }
+                },
+            )
+        }
+        val pickerTarget = assignPicker
+        if (pickerTarget != null) {
+            val title = when (pickerTarget) {
+                is AssignPickerState.Assign -> "Asignar a"
+                is AssignPickerState.Reassign -> "Reasignar a"
+            }
+            AlertDialog(
+                onDismissRequest = { assignPicker = null },
+                title = { Text(title) },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                        Text("Elegí quién se hace cargo de esta actividad.")
+                        memberCandidates.forEach { candidate ->
+                            TextButton(
+                                onClick = {
+                                    when (pickerTarget) {
+                                        is AssignPickerState.Assign -> onAssign(pickerTarget.activityId, candidate.id)
+                                        is AssignPickerState.Reassign -> onReassign(pickerTarget.activityId, candidate.id)
+                                    }
+                                    assignPicker = null
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                Text(candidate.name)
+                            }
+                        }
+                    }
+                },
+                confirmButton = {},
+                dismissButton = {
+                    TextButton(onClick = { assignPicker = null }) { Text("Cancelar") }
                 },
             )
         }
@@ -418,8 +473,53 @@ private fun DetailFooter(
     onDecline: (String) -> Unit,
     onPickAttachment: (String, FileData) -> Unit,
     picker: FilePicker,
+    memberCandidates: List<MemberCandidate>,
+    onOpenAssignPicker: () -> Unit,
+    onOpenReassignPicker: () -> Unit,
+    isAssigning: Boolean,
+    isReassigning: Boolean,
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
+        // T21 · "Asignar" se pinta SOLO cuando el SERVIDOR dice que esta transición existe:
+        // `canAssign` es `true` iff `status == "created"`. El cliente NO deriva el flag del
+        // estado: si lo hiciera, habría dos copias de la política y divergirían.
+        if (actividad.canAssign) {
+            Button(
+                onClick = onOpenAssignPicker,
+                enabled = !isAssigning,
+                modifier = Modifier.fillMaxWidth()
+                    .padding(start = Spacing.lg, end = Spacing.lg, bottom = Spacing.sm),
+            ) {
+                if (isAssigning) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(DetailGeometry.progressSize),
+                        strokeWidth = ProgressStroke.thin,
+                    )
+                } else {
+                    Text("Asignar")
+                }
+            }
+        }
+        // T21 · "Reasignar" se pinta SOLO cuando el SERVIDOR dice que esta transición existe:
+        // `canReassign` es `true` iff `status == "not_assisting"`. Misma regla: cliente no
+        // deriva, sólo pinta lo que manda el DTO.
+        if (actividad.canReassign) {
+            Button(
+                onClick = onOpenReassignPicker,
+                enabled = !isReassigning,
+                modifier = Modifier.fillMaxWidth()
+                    .padding(start = Spacing.lg, end = Spacing.lg, bottom = Spacing.sm),
+            ) {
+                if (isReassigning) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(DetailGeometry.progressSize),
+                        strokeWidth = ProgressStroke.thin,
+                    )
+                } else {
+                    Text("Reasignar")
+                }
+            }
+        }
         // S3/T18 · "Finalizar" se pinta SOLO cuando el SERVIDOR dice que esta transición
         // existe para este usuario: `canComplete` es `in_progress` **y** `verify` (R3).
         // Antes el gate era `status != "done"`, así que el botón aparecía en `created`,

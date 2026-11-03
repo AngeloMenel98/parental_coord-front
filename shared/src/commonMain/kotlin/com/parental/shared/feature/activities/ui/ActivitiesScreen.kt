@@ -198,6 +198,11 @@ fun ActividadesScreen(
                 // asignación está confirmada, así que esta acción vive aquí (abajo se
                 // abre el diálogo de motivo obligatorio, el mismo que usa el swipe).
                 onDecline = { id -> viewModel.startSwipeAction(id, SwipeAction.DECLINE) },
+                memberCandidates = uiState.memberCandidates,
+                onAssign = viewModel::assignActivity,
+                onReassign = viewModel::reassignActivity,
+                isAssigning = uiState.isAssigning,
+                isReassigning = uiState.isReassigning,
                 attachments = viewModel.attachments.collectAsState().value,
                 attachmentsLoading = viewModel.attachmentsLoading.collectAsState().value,
                 onLoadAttachments = viewModel::loadAttachments,
