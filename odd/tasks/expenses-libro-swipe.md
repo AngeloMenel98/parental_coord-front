@@ -65,4 +65,9 @@ incluye el historial heredado de `develop`.
 
 L6 (verificación): `:shared:testDebugUnitTest` verde y `:androidApp:assembleDebug` verde. La
 captura en dispositivo NO se pudo hacer: el teléfono se desconectó (`adb devices` vacío) justo
-después de compilar. Queda pendiente ver la pantalla real antes de dar el diseño por cerrado.
+después de compilar y no volvió a aparecer. Queda pendiente ver la pantalla real antes de dar el
+diseño por cerrado.
+
+L7: sin dispositivo, la revisión del gesto encontró dos defectos que la captura tampoco habría
+mostrado bien: la fila no tenía fondo y las acciones del swipe se veían siempre detrás, y el
+drag lanzaba una corrutina por evento de puntero. Los dos corregidos antes de cerrar.
