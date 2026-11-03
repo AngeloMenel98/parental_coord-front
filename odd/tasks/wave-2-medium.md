@@ -704,3 +704,50 @@ T23 depends on this.
   tests** (`applies T9 when the activity is in not_assisting` y `applies T3 when the
   activity is in created`), para que el día que alguien duplique el estado en la ruta
   el test lo delate.
+
+- **2026-11-03 · L5 — la verificación independiente de la autorización (el recibo del
+  riesgo 2).** Declarar `Risk: item 2` obliga a una verificación independiente, y no
+  estaba hecha: se lanzó un revisor adversarial sobre la superficie de autorización de
+  `assign`/`reassign`, con la consigna de no creerse el modelo sino intentarlo.
+
+  **Veredicto: ningún defecto.** SeRenew ataron doce vías de entrada y las doce
+  quedaron bloqueadas, sin una sola escritura: llamador no miembro · llamador que dejó
+  el vínculo · vínculo inactivo · objetivo que dejó el vínculo · objetivo de otro
+  vínculo · objetivo que no existe · actividad borrada · actividad de otro vínculo ·
+  los cuatro estados de asignación viva (`assigned`/`assisting`/`in_progress`/`verify`) ·
+  los terminales y `overdue` · la doble asignación concurrente (un 200 y un 409 por el
+  CAS). El revisor dio la cadena de código que lo hace imposible: el controlador → el
+  servicio → `loadForMember` → el `WHERE deleted_at IS NULL` + `member.left_at IS NULL AND
+  bond.is_active` → el chokepoint → el `FOR UPDATE` con el CAS.
+
+  **Cinco huecos sin fijar, ahora cerrados (B `12ae188`).** La respuesta estrecha (nada de
+  `version`, `bondId` ni `deletedAt`); el **actor** en el payload del outbox (una
+  reasignación es atribuible); el 409 de cada estado vivo, vencido y terminal **en las dos
+  rutas**; la lectura sin las filas borradas (el guard del soft delete vive en el `WHERE`
+  del repositorio, y ahora está fijado que la ruta usa esa lectura); y la pertenencia del
+  objetivo acotada al vínculo. En el catálogo, las cuatro reglas que impiden volver a
+  `assigned` desde una asignación viva.
+
+  **Un endurecimiento del tipo.** `assignedTo` estaba en `ApplyTransitionFields` sólo por
+  laintersección ad-hoc del servicio: la escritura sobrevivía porque el repositorio hace
+  `Object.assign(row, input.fields)`, o sea que el TIPO no sabía de la columna que
+  estaba escribiendo. Ahora `assignedTo` está declarado en el tipo.
+
+  **Un defecto MÍO, corregido.** `262888b` había dejado una violación de `prettier` en el
+  spec del servicio (una línea de más de 100 caracteres). El gate con `--fix` la tapaba;
+  el `prettier --check` sin `--fix` la ve. Corregida.
+
+  **Un hallazgo preexistente, NO de este trabajo (queda reportado, no se toca).** El webhook
+  **pierde el actor**: `payload-builder.ts:107` hace `actor: asString(raw.actor) ?? ''`
+  pero el actor del outbox es un objeto `{type, id, role}`. La fila del outbox SÍ lo
+  lleva (la auditoría de la transición es correcta); lo que se pierde es la copia que va
+  al webhook. El spec del webhook se pasa a mano un actor de tipo string, así que nunca
+  lo atrapa. Es de la ola 3, no de T21, y arreglarlo cambiaría el contrato de TODOS los
+  eventos — no se toca en este alcance.
+
+  **Dos notas de endurecimiento que no se tocan (y por qué).** El chequeo de pertenencia
+  del objetivo queda FUERA de la transacción: un miembro que saliera entre el chequeo y el
+  commit podría ser asignado — inofensivo, porque un ex-miembro recibe 404 en la actividad.
+  Y `canAssign`/`canReassign` no llevan `isPast` (a diferencia de `canDelete`/`canCancel`):
+  las rutas tampoco lo llevan, así que bandera y ruta coinciden, y el barrido de 15 min
+  sigue avanzando la actividad — no queda ningún estado zombi.
