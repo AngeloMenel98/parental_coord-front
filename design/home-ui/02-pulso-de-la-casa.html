@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Inicio · Dirección 02 — El pulso de la casa</title>
+<style>
+  :root {
+    --primary: #00696D; --on-primary: #FFFFFF;
+    --primary-container: #9CF1F6; --on-primary-container: #002022;
+    --secondary: #4A6365; --secondary-container: #CCE8EA; --on-secondary-container: #051F21;
+    --surface: #FAFDFC; --on-surface: #191C1D;
+    --surface-variant: #DAE4E5; --on-surface-variant: #3F4849;
+    --outline: #6F797A; --outline-variant: #BEC8C9;
+    --error: #BA1A1A;
+
+    --educacion: #303F9F; --salud: #AD1457; --vencida: #C62828; --cumplida: #2E7D32;
+    --verificar: #9E5F00;
+
+    --serif: Georgia, 'Times New Roman', serif;
+    --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    --mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: var(--sans); background: #E4ECEC; min-height: 100vh; padding: 24px 0; }
+  .stage { display: flex; gap: 40px; justify-content: center; align-items: flex-start; flex-wrap: wrap; padding: 0 24px; }
+  .frame-label { font-size: 11px; font-weight: 500; font-variant: small-caps; letter-spacing: .5px; color: #3F4849; margin-bottom: 8px; }
+  .frame-note { font-size: 12px; color: #3F4849; max-width: 390px; margin-top: 10px; line-height: 1.55; }
+
+  /* Andamiaje de revisión: probar el avance del mes y ver la rampa del anillo. */
+  .probe { width: 390px; margin-top: 12px; display: grid; grid-template-columns: 1fr auto; gap: 6px 12px; align-items: center; }
+  .probe label { font-size: 11px; font-weight: 500; font-variant: small-caps; letter-spacing: .5px; color: #3F4849; }
+  .probe output { font-family: var(--mono); font-size: 11px; color: #3F4849; text-align: right; }
+  .probe input[type="range"] { grid-column: 1 / -1; width: 100%; accent-color: #00696D; }
+  .probe .ramp { grid-column: 1 / -1; font-size: 11px; line-height: 1.5; color: #3F4849; }
+  @media (prefers-reduced-motion: no-preference) { .gauge-center .pct { transition: color 150ms; } }
+
+  .phone { width: 390px; height: 844px; background: var(--surface-variant); color: var(--on-surface); display: flex; flex-direction: column; border-radius: 24px; overflow: hidden; box-shadow: 0 8px 32px rgba(0,32,34,.18); }
+  button { font-family: inherit; }
+  :focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 4px; }
+  @media (prefers-reduced-motion: no-preference) {
+    .attn, .icon-btn, .text-btn, .avatar-btn { transition: background 150ms, box-shadow 150ms; }
+  }
+
+  .topbar { background: var(--surface); display: flex; align-items: center; height: 56px; padding: 0 8px 0 16px; flex: none; border-bottom: 1px solid var(--outline-variant); }
+  .topbar h1 { font-size: 18px; font-weight: 500; flex: 1; white-space: nowrap; }
+  .icon-btn { width: 44px; height: 44px; border: 0; background: transparent; border-radius: 50%; display: grid; place-items: center; cursor: pointer; color: var(--on-surface-variant); position: relative; flex: none; }
+  .icon-btn:hover { background: rgba(0,105,109,.06); }
+  .badge { position: absolute; top: 6px; right: 6px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: var(--error); color: #FFF; font-size: 10px; font-weight: 700; display: grid; place-items: center; }
+
+  .feed { flex: 1; overflow-y: auto; padding: 20px 16px 20px; display: flex; flex-direction: column; gap: 16px; scrollbar-width: none; }
+  .feed::-webkit-scrollbar { display: none; }
+  .feed > * { flex: none; }
+
+  .navbar { flex: none; display: flex; border-top: 1px solid var(--outline-variant); background: var(--surface); }
+  .nav-item { flex: 1; border: 0; background: none; padding: 8px 0 12px; font-size: 12px; color: var(--on-surface-variant); cursor: pointer; }
+  .nav-item svg { display: block; margin: 0 auto 2px; }
+  .nav-item .pill { display: inline-block; padding: 3px 16px; border-radius: 16px; }
+  .nav-item[aria-current="page"] { color: var(--primary); font-weight: 600; }
+  .nav-item[aria-current="page"] .pill { background: var(--primary-container); }
+
+  .eyebrow { font-size: 11px; font-weight: 500; font-variant: small-caps; letter-spacing: .5px; color: var(--on-surface-variant); }
+  .text-btn { border: 0; background: none; color: var(--primary); font-size: 12px; font-weight: 500; padding: 6px 8px; border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; gap: 2px; min-height: 32px; }
+  .text-btn:hover { background: rgba(0,105,109,.08); }
+  .text-btn svg { width: 14px; height: 14px; }
+
+  /* ── Cabecera editorial: quién soy, con quién vivo ── */
+  .masthead { display: flex; align-items: flex-start; gap: 12px; }
+  .masthead .block { flex: 1; min-width: 0; }
+  .masthead h2 { font-family: var(--serif); font-size: 32px; font-weight: 400; line-height: 40px; margin-top: 2px; }
+  .avatars { display: flex; align-items: center; padding-top: 8px; }
+  .avatar-btn { width: 40px; height: 40px; border-radius: 50%; border: 2px solid var(--surface-variant); background: var(--primary-container); color: var(--on-primary-container); font-size: 15px; font-weight: 600; cursor: pointer; display: grid; place-items: center; padding: 0; }
+  .avatar-btn + .avatar-btn { margin-left: -12px; }
+
+  /* ── La frase que resume el día ── */
+  .pulse { font-family: var(--serif); font-size: 19px; line-height: 29px; color: var(--on-surface); }
+  .pulse b { font-weight: 600; }
+  .pulse b.alert { color: var(--vencida); }
+  .pulse b.ok { color: var(--cumplida); }
+  .pulse .aside { display: block; font-family: var(--sans); font-size: 12px; line-height: 18px; color: var(--on-surface-variant); margin-top: 6px; }
+
+  /* ── Tarjeta del mes, con el anillo como pieza central ── */
+  .card { background: var(--surface); border: 1px solid var(--outline-variant); border-radius: 16px; }
+  .month { padding: 16px 16px 14px; }
+  .month-head { display: flex; align-items: baseline; gap: 8px; }
+  .month-head h3 { font-size: 16px; font-weight: 600; }
+  .month-head .period { font-size: 12px; color: var(--on-surface-variant); flex: 1; }
+  .gauge-wrap { display: grid; place-items: center; margin: 10px 0 4px; position: relative; }
+  .gauge { display: block; }
+  .gauge-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; pointer-events: none; }
+  .gauge-center .pct { font-family: var(--serif); font-size: 36px; font-weight: 600; line-height: 40px; }
+  .gauge-center .sub { font-size: 11px; font-weight: 500; font-variant: small-caps; letter-spacing: .5px; color: var(--on-surface-variant); }
+  .member-row { display: flex; align-items: center; gap: 10px; padding-top: 10px; border-top: 1px solid var(--outline-variant); }
+  .member-row .name { font-size: 14px; font-weight: 500; flex: none; }
+  .member-row .bar { flex: 1; height: 4px; border-radius: 2px; background: var(--surface-variant); overflow: hidden; }
+  .member-row .bar span { display: block; height: 100%; background: var(--secondary); border-radius: 2px; }
+  .member-row .pct2 { font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; flex: none; }
+  .month-foot { display: flex; justify-content: flex-end; margin-top: 6px; }
+
+  /* ── Lo que necesita tu atención ── */
+  .section-head { display: flex; align-items: baseline; gap: 8px; }
+  .section-head h2 { font-size: 16px; font-weight: 600; flex: 1; }
+  .attn-list { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+  .attn { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; padding: 10px 12px 10px 14px; min-height: 56px; border: 1px solid var(--outline-variant); border-radius: 12px; background: var(--surface); cursor: pointer; color: inherit; position: relative; overflow: hidden; }
+  .attn::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; }
+  .attn.overdue::before { background: #E53935; }
+  .attn.verify::before { background: #B26A00; }
+  .attn:hover { box-shadow: 0 2px 8px rgba(0,32,34,.10); }
+  .attn .body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+  .attn .kicker { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 500; font-variant: small-caps; letter-spacing: .5px; }
+  .attn .kicker i { width: 6px; height: 6px; border-radius: 50%; }
+  .attn.overdue .kicker { color: var(--vencida); }
+  .attn.overdue .kicker i { background: #E53935; }
+  .attn.verify .kicker { color: var(--verificar); }
+  .attn.verify .kicker i { background: #B26A00; }
+  .attn .title { font-size: 15px; font-weight: 500; line-height: 22px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .attn .meta { font-size: 11px; color: var(--on-surface-variant); font-family: var(--mono); letter-spacing: .2px; }
+  .attn .end { flex: none; font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--on-surface-variant); }
+  .attn svg.chev { width: 18px; height: 18px; color: var(--outline); flex: none; }
+</style>
+</head>
+<body>
+<div class="stage">
+
+  <section class="frame" aria-label="Inicio: El pulso de la casa">
+    <p class="frame-label">02 · El pulso de la casa</p>
+
+    <div class="phone">
+      <header class="topbar">
+        <h1>Coordinación Parental</h1>
+        <button class="icon-btn" aria-label="Notificaciones: 2 sin leer">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 22a2 2 0 0 0 2-2h-4a2 2 0 0 0 2 2zm6-6V11c0-3.07-1.63-5.64-4.5-6.32V4a1.5 1.5 0 0 0-3 0v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></svg>
+          <span class="badge" aria-hidden="true">2</span>
+        </button>
+        <button class="icon-btn" aria-label="Cerrar sesión">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/></svg>
+        </button>
+      </header>
+
+      <main class="feed">
+        <div class="masthead">
+          <div class="block">
+            <p class="eyebrow">Martes 3 de noviembre</p>
+            <h2>Hola, Ángelo</h2>
+          </div>
+          <div class="avatars" role="group" aria-label="Familiares del vínculo">
+            <button class="avatar-btn" aria-label="Emma: 1 tarea vencida">E</button>
+            <button class="avatar-btn" aria-label="Tomás: al día">T</button>
+          </div>
+        </div>
+
+        <p class="pulse">
+          Tenés <b>2</b> tareas asignadas y <b class="alert">1 vencida</b>. El saldo de gastos
+          está a favor de <b class="ok">$1.250,00</b>.
+          <span class="aside">Noviembre va al 66,7% de cumplimiento en el vínculo.</span>
+        </p>
+
+        <section class="card month" aria-labelledby="month-title">
+          <div class="month-head">
+            <h3 id="month-title">Cumplimiento</h3>
+            <span class="period" id="month-sub">Noviembre · 8 de 12 tareas</span>
+          </div>
+
+          <div class="gauge-wrap">
+            <svg class="gauge" id="gauge-svg" width="176" height="176" viewBox="0 0 176 176" role="img"
+                 aria-label="Tu cumplimiento del mes: 66,7 por ciento, 8 de 12 tareas cumplidas">
+              <g transform="rotate(-90 88 88)" fill="none" stroke-width="14">
+                <circle cx="88" cy="88" r="72" pathLength="12" data-seg stroke="#B26A00" stroke-dasharray="0.86 11.14" stroke-dashoffset="-0.07"/>
+                <circle cx="88" cy="88" r="72" pathLength="12" data-seg stroke="#B26A00" stroke-dasharray="0.86 11.14" stroke-dashoffset="-1.07"/>
+                <circle cx="88" cy="88" r="72" pathLength="12" data-seg stroke="#B26A00" stroke-dasharray="0.86 11.14" stroke-dashoffset="-2.07"/>
+                <circle cx="88" cy="88" r="72" pathLength="12" data-seg stroke="#B26A00" stroke-dasharray="0.86 11.14" stroke-dashoffset="-3.07"/>
+                <circle cx="88" cy="88" r="72" pathLength="12" data-seg stroke="#B26A00" stroke-dasharray="0.86 11.14" stroke-dashoffset="-4.07"/>
+                <circle cx="88" cy="88" r="72" pathLength="12" data-seg stroke="#B26A00" stroke-dasharray="0.86 11.14" stroke-dashoffset="-5.07"/>
+                <circle cx="88" cy="88" r="72" pathLength="12" data-seg stroke="#B26A00" stroke-dasharray="0.86 11.14" stroke-dashoffset="-6.07"/>
+                <circle cx="88" cy="88" r="72" pathLength="12" data-seg stroke="#B26A00" stroke-dasharray="0.86 11.14" stroke-dashoffset="-7.07"/>
+                <circle cx="88" cy="88" r="72" pathLength="12" data-seg stroke="#DAE4E5" stroke-dasharray="0.86 11.14" stroke-dashoffset="-8.07"/>
+                <circle cx="88" cy="88" r="72" pathLength="12" data-seg stroke="#DAE4E5" stroke-dasharray="0.86 11.14" stroke-dashoffset="-9.07"/>
+                <circle cx="88" cy="88" r="72" pathLength="12" data-seg stroke="#DAE4E5" stroke-dasharray="0.86 11.14" stroke-dashoffset="-10.07"/>
+                <circle cx="88" cy="88" r="72" pathLength="12" data-seg stroke="#DAE4E5" stroke-dasharray="0.86 11.14" stroke-dashoffset="-11.07"/>
+              </g>
+            </svg>
+            <div class="gauge-center" aria-hidden="true">
+              <span class="pct" id="gauge-pct" style="color:#B26A00">66,7%</span>
+              <span class="sub" id="gauge-sub">8 de 12 tareas</span>
+            </div>
+          </div>
+
+          <div class="member-row">
+            <span class="name">Mariana</span>
+            <span class="bar" aria-hidden="true"><span style="width:91.7%"></span></span>
+            <span class="pct2">91,7%</span>
+          </div>
+
+          <div class="month-foot">
+            <button class="text-btn">
+              Ver el detalle del mes
+              <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M9.29 6.71 4 12l5.29 5.29 1.42-1.42L6.83 12l3.88-3.88z" transform="rotate(180 12 12)"/></svg>
+            </button>
+          </div>
+        </section>
+
+        <section aria-labelledby="attn-title">
+          <div class="section-head">
+            <h2 id="attn-title">Lo que necesita tu atención</h2>
+            <button class="text-btn">Ver todo</button>
+          </div>
+
+          <div class="attn-list">
+            <button class="attn overdue" aria-label="Vencida: Comprar útiles escolares, Educación, venció ayer. Abrir">
+              <span class="body">
+                <span class="kicker"><i aria-hidden="true"></i>Vencida</span>
+                <span class="title">Comprar útiles escolares</span>
+                <span class="meta">Educación · asignada a vos</span>
+              </span>
+              <span class="end">Ayer</span>
+              <svg class="chev" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M9.29 6.71 4 12l5.29 5.29 1.42-1.42L6.83 12l3.88-3.88z" transform="rotate(180 12 12)"/></svg>
+            </button>
+
+            <button class="attn verify" aria-label="Por verificar: Armar la mochila de Emma, Educación, entregada el domingo. Revisar">
+              <span class="body">
+                <span class="kicker"><i aria-hidden="true"></i>Por verificar</span>
+                <span class="title">Armar la mochila de Emma</span>
+                <span class="meta">Educación · entregada el domingo</span>
+              </span>
+              <span class="end">Revisar</span>
+              <svg class="chev" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M9.29 6.71 4 12l5.29 5.29 1.42-1.42L6.83 12l3.88-3.88z" transform="rotate(180 12 12)"/></svg>
+            </button>
+
+          </div>
+        </section>
+      </main>
+
+      <nav class="navbar" aria-label="Navegación principal">
+        <button class="nav-item" aria-current="page"><span class="pill"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg></span>Inicio</button>
+        <button class="nav-item"><span class="pill"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M19 4h-1V2h-2v2H8V2H6v2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2zm0 16H5V10h14v10zM5 8V6h14v2H5z"/></svg></span>Actividades</button>
+        <button class="nav-item"><span class="pill"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M21 18v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v1h-9a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h9zm-9-2h10V8H12v8zm4-2.5a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z"/></svg></span>Gastos</button>
+        <button class="nav-item"><span class="pill"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16 11c1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3 1.34 3 3 3zm-8 0c1.66 0 3-1.34 3-3S9.66 5 8 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg></span>Terceros</button>
+      </nav>
+    </div>
+
+    <div class="probe">
+      <label for="progress">Probar el avance del mes</label>
+      <output id="progress-out" for="progress">8 de 12 · 66,7%</output>
+      <input id="progress" type="range" min="0" max="12" step="1" value="8">
+      <p class="ramp">
+        Rampa del anillo: rojo hasta 25% · naranja hasta 50% · ámbar hasta 75% · verde desde 75%.
+        Los cuatro colores son tokens de status, no hex nuevos.
+      </p>
+    </div>
+
+    <p class="frame-note">
+      El inicio cuenta la casa <strong>en una frase</strong> antes de mostrar cualquier número: quién
+      sos, quiénes viven con vos, cómo va el mes y qué te reclama hoy. El anillo de 12 segmentos es
+      la única pieza grande de la pantalla —el cumplimiento es la razón de ser del vínculo— y las
+      métricas ya no existen como tarjetas: son texto y filas. Menos objetos, más lectura; a cambio,
+      cada dato exige un poco más de escaneo y no hay atajos visibles desde la portada.
+    </p>
+  </section>
+
+</div>
+
+<script>
+  (function () {
+    var RAMP = [[0, '#E53935'], [25, '#E65100'], [50, '#B26A00'], [75, '#43A047']];
+    var TRACK = '#DAE4E5';
+    var TOTAL = 12;
+    var svg = document.getElementById('gauge-svg');
+    var segs = svg ? svg.querySelectorAll('[data-seg]') : [];
+    var slider = document.getElementById('progress');
+    var out = document.getElementById('progress-out');
+    var pct = document.getElementById('gauge-pct');
+    var sub = document.getElementById('gauge-sub');
+    var monthSub = document.getElementById('month-sub');
+
+    function colorFor(percent) {
+      var color = RAMP[0][1];
+      RAMP.forEach(function (stop) { if (percent >= stop[0]) color = stop[1]; });
+      return color;
+    }
+    function fmt(percent) {
+      return (Math.round(percent * 10) / 10).toString().replace('.', ',') + '%';
+    }
+    function render(done) {
+      var percent = done / TOTAL * 100;
+      var color = colorFor(percent);
+      Array.prototype.forEach.call(segs, function (c, i) {
+        c.setAttribute('stroke', i < done ? color : TRACK);
+      });
+      pct.textContent = fmt(percent);
+      pct.style.color = color;
+      sub.textContent = done + ' de ' + TOTAL + ' tareas';
+      monthSub.textContent = 'Noviembre · ' + done + ' de ' + TOTAL + ' tareas';
+      svg.setAttribute('aria-label', 'Tu cumplimiento del mes: ' + fmt(percent) + ', ' + done + ' de ' + TOTAL + ' tareas cumplidas');
+      out.textContent = done + ' de ' + TOTAL + ' · ' + fmt(percent);
+    }
+    if (slider) {
+      slider.addEventListener('input', function () { render(Number(slider.value)); });
+      render(Number(slider.value));
+    }
+  })();
+</script>
+</body>
+</html>

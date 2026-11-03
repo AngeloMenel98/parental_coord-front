@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "chosen": "04-hoy-con-anillo.html",
+  "handoffs": {
+    "04-hoy-con-anillo.html": {
+      "status": "in_progress",
+      "queued": false,
+      "sentAt": "2026-11-03T11:22:26.537Z",
+      "startedAt": "2026-11-03T11:22:44.780Z",
+      "implementedAt": null,
+      "note": "Arrancando la implementación del artboard 04 (Hoy, con anillo) en Compose."
+    }
+  }
+}

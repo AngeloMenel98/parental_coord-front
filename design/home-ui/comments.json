@@ -1,0 +1,126 @@
+{
+  "version": 1,
+  "comments": [
+    {
+      "id": "obg6x8lm",
+      "file": "01-hoy-en-foco.html",
+      "selector": "body > div > section > div > main",
+      "excerpt": "Martes 3 de noviembre Hola, Ángelo Vínculo activo Hoy 3 actividades Agenda 08:30 Control pediátrico de Tomás Salud Asignada 17:00 Fútbol de Emma Recreación Creada 1 actividad más hoy Ver todo Asignadas 2 Vencidas 1 Saldo gastos $1.250,00 Cumplimiento Noviembre Detalle 66,7% 8 de 12 tareas cumplidas",
+      "comment": "estas cards me deberian llevar a las actividades asignadas, a la vista de gastos.",
+      "createdAt": "2026-11-03T10:46:09.587Z",
+      "status": "resolved",
+      "sentAt": "2026-11-03T10:46:09.620Z",
+      "resolvedAt": "2026-11-03T10:47:38.522Z"
+    },
+    {
+      "id": "myawqugd",
+      "file": "01-hoy-en-foco.html",
+      "selector": "body > div > section > div > main",
+      "excerpt": "Martes 3 de noviembre Hola, Ángelo Vínculo activo Hoy 3 actividades Agenda 08:30 Control pediátrico de Tomás Salud Asignada 17:00 Fútbol de Emma Recreación Creada 1 actividad más hoy Ver todo Asignadas 2 Vencidas 1 Saldo gastos $1.250,00 Cumplimiento Noviembre Detalle 66,7% 8 de 12 tareas cumplidas",
+      "comment": "Me gustaria que no sea light mode, por ahi buscar q sea opcional",
+      "createdAt": "2026-11-03T10:48:13.481Z",
+      "status": "resolved",
+      "sentAt": "2026-11-03T10:53:46.330Z",
+      "resolvedAt": "2026-11-03T10:58:45.921Z"
+    },
+    {
+      "id": "bs4ur16d",
+      "file": "01-hoy-en-foco.html",
+      "selector": "body > div > section > div > main",
+      "excerpt": "Martes 3 de noviembre Hola, Ángelo Vínculo activo Hoy 3 actividades Agenda 08:30 Control pediátrico de Tomás Salud Asignada 17:00 Fútbol de Emma Recreación Creada 1 actividad más hoy Ver todo Asignadas 2 Vencidas 1 Saldo gastos $1.250,00 Cumplimiento Noviembre Detalle 66,7% 8 de 12 tareas cumplidas",
+      "comment": "Me gusta tanto el resumen de actividades de hoy , donde se encuentra lo de vinculo activo, no uses los chevron para navegar que sea una card clickeable.",
+      "createdAt": "2026-11-03T10:51:00.386Z",
+      "status": "resolved",
+      "sentAt": "2026-11-03T10:53:46.330Z",
+      "resolvedAt": "2026-11-03T10:58:45.921Z"
+    },
+    {
+      "id": "krmeu297",
+      "file": "01-hoy-en-foco.html",
+      "selector": "#fam-title",
+      "excerpt": "Familiares",
+      "comment": "En vez de familiares, que sean 'Hijos' o algo similar.",
+      "createdAt": "2026-11-03T10:51:59.760Z",
+      "status": "resolved",
+      "sentAt": "2026-11-03T10:53:46.330Z",
+      "resolvedAt": "2026-11-03T10:58:45.921Z"
+    },
+    {
+      "id": "mr1cxz1x",
+      "file": "02-pulso-de-la-casa.html",
+      "selector": "body > div > section > div > main > section:nth-of-type(1) > div:nth-of-type(2)",
+      "excerpt": "66,7% 8 de 12 tareas",
+      "comment": "Me gusta que tenga forma circular con cada tarea completada. Por ahi que a medida q va llegando al 100% pase de rojo a verde.",
+      "createdAt": "2026-11-03T10:53:18.306Z",
+      "status": "resolved",
+      "sentAt": "2026-11-03T10:53:46.330Z",
+      "resolvedAt": "2026-11-03T10:58:45.921Z"
+    },
+    {
+      "id": "9l2qzpua",
+      "file": "01-hoy-en-foco.html",
+      "selector": "body > div > section > div:nth-of-type(1) > div > button:nth-of-type(3)",
+      "excerpt": "Oscuro",
+      "comment": "usa un toggle switch con una luna o sol para claro o oscuro.",
+      "createdAt": "2026-11-03T11:02:11.008Z",
+      "status": "resolved",
+      "sentAt": "2026-11-03T11:03:59.407Z",
+      "resolvedAt": "2026-11-03T11:06:50.787Z"
+    },
+    {
+      "id": "wuwirxsx",
+      "file": "02-pulso-de-la-casa.html",
+      "selector": "body > div > section > div:nth-of-type(1) > main > section:nth-of-type(1) > div:nth-of-type(2)",
+      "excerpt": "66,7% 8 de 12 tareas",
+      "comment": "Podes hacer una combinacion entre el 01 y el 02 entre lo que te comente? es decir usar todo lo del uno pero cambiarle la card de porcentajes",
+      "createdAt": "2026-11-03T11:03:57.050Z",
+      "status": "resolved",
+      "sentAt": "2026-11-03T11:03:59.407Z",
+      "resolvedAt": "2026-11-03T11:06:50.787Z"
+    },
+    {
+      "id": "tawhh2wd",
+      "file": "04-hoy-con-anillo.html",
+      "selector": "body > div > section > div:nth-of-type(1) > p",
+      "excerpt": "04 · Hoy, con anillo",
+      "comment": "me imagino que esto queda afuera de la view",
+      "createdAt": "2026-11-03T11:10:49.057Z",
+      "status": "resolved",
+      "sentAt": "2026-11-03T11:15:09.718Z",
+      "resolvedAt": "2026-11-03T11:20:59.372Z"
+    },
+    {
+      "id": "s34saqoj",
+      "file": "04-hoy-con-anillo.html",
+      "selector": "body > div > section > div:nth-of-type(1) > div",
+      "excerpt": "",
+      "comment": "me gustaria q los iconos esten por dentro del toggle switch",
+      "createdAt": "2026-11-03T11:11:05.567Z",
+      "status": "resolved",
+      "sentAt": "2026-11-03T11:15:09.718Z",
+      "resolvedAt": "2026-11-03T11:20:59.372Z"
+    },
+    {
+      "id": "4a10jeqf",
+      "file": "04-hoy-con-anillo.html",
+      "selector": "body > div > section > div:nth-of-type(2) > main",
+      "excerpt": "Martes 3 de noviembre Hola, Ángelo Vínculo activo Hoy 3 actividades 08:30 Control pediátrico de Tomás Salud Asignada 17:00 Fútbol de Emma Recreación Creada 1 actividad más hoy Asignadas 2 Vencidas 1 Saldo gastos $1.250,00 Cumplimiento Noviembre · 8 de 12 tareas Detalle 66,7% 8 de 12 Mariana 91,7% Hi",
+      "comment": "los datos tienen que estar centrados",
+      "createdAt": "2026-11-03T11:12:05.281Z",
+      "status": "resolved",
+      "sentAt": "2026-11-03T11:15:09.718Z",
+      "resolvedAt": "2026-11-03T11:20:59.372Z"
+    },
+    {
+      "id": "godxj0lo",
+      "file": "04-hoy-con-anillo.html",
+      "selector": "body",
+      "excerpt": "04 · Hoy, con anillo Coordinación Parental 2 Martes 3 de noviembre Hola, Ángelo Vínculo activo Hoy 3 actividades 08:30 Control pediátrico de Tomás Salud Asignada 17:00 Fútbol de Emma Recreación Creada 1 actividad más hoy Asignadas 2 Vencidas 1 Saldo gastos $1.250,00 Cumplimiento Noviembre · 8 de 12",
+      "comment": "usa esta paleta de colores para el dark mode: Rol\tClaro (1)\tOscuro (2)\nPrimary\t\n#6200EE (500)\t\n#BB86FC (200)\nPrimary Variant\t\n#3700B3 (700)\t\n#3700B3 (700)\nSecondary\t\n#03DAC6 (200)\t\n#03DAC6 (200)\nSecondary Variant\t\n#018786 (900)\tno se usa (solo \n#03DAC6)\nBackground\t\n#FFFFFF\t\n#121212\nSurface\t\n#FFFFFF\t\n#121212\nError\t\n#B00020\t\n#CF6679\nOn Primary\t\n#FFFFFF\t\n#000000\nOn Secondary\t\n#000000\t\n#000000\nOn Background\t\n#000000\t\n#FFFFFF\nOn Surface\t\n#000000\t\n#FFFFFF\nOn Error\t\n#FFFFFF",
+      "createdAt": "2026-11-03T11:15:07.205Z",
+      "status": "resolved",
+      "sentAt": "2026-11-03T11:15:09.718Z",
+      "resolvedAt": "2026-11-03T11:20:59.372Z"
+    }
+  ]
+}

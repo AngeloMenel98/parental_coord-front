@@ -61,11 +61,15 @@ saldo NO se recalcula. Los estados loading / error / sin vínculo siguen existie
 
 | ID | Spec | Ruta | Estado |
 | --- | --- | --- | --- |
-| T1 | S6 | inline | paleta dark + rol del nav |
-| T2 | S2,S5 | worker | agenda de hoy y estado por hijo (dominio + API) |
-| T3 | S1,S3,S4,S5 | worker | reescritura de `HomeScreen` |
-| T4 | S2,S4,S5,S7 | worker | tests de dominio y contrato de fuente |
-| T5 | S6 | inline | `design/system.md` sincronizado |
+| T1 | S6 | inline | hecho · `eb84c1d` |
+| T2 | S2,S5 | inline | hecho · `63f917e` |
+| T3 | S1,S3,S4,S5 | inline | hecho · `feat(home): redesign Inicio` |
+| T4 | S2,S4,S5,S7 | inline | hecho · en los dos commits anteriores |
+| T5 | S6 | inline | hecho · `eb84c1d` (system.md) |
+
+Los writers delegados no arrancaron: la sesión padre está en `/home/angelo`, que no es un
+repo git, y el bootstrap del writer exige un project root seguro. El trabajo se hizo
+inline.
 
 ## Log
 
@@ -101,3 +105,20 @@ L14 (decisión): el artboard quedó `design/home-ui/04-hoy-con-anillo.html`; los
 01–03 se conservan como alternativas.
 
 L15 (decisión): S3 navega a la pestaña, sin filtro preseleccionado (ver Non-goals).
+
+L16 (ejecución): `develop` no es la rama por defecto del remoto, así que el trabajo va en
+`feat/home-hoy-con-anillo`. **Frontera de slice**: el conteo del gate mide la rama entera
+contra `origin/main` (99 commits heredados de `develop`, ~34k líneas); los commits de esta
+feature son las unidades de revisión reales:
+`eb84c1d` tema (~200), `63f917e` dominio+API+tests (656), `feat(home): redesign Inicio`
+(pantalla + contrato), `docs(design)` (documento + artboards).
+
+L17 (desvío de S4/S5): el artboard pide un botón `Detalle` en la card de cumplimiento y
+chips de hijo pulsables. No hay destino para ninguno de los dos (no existe pantalla de
+detalle de cumplimiento ni de hijo), así que se omitieron en vez de dejar botones que no
+hacen nada. Cuando exista el destino, se agrega el `onClick`.
+
+L18 (desvío de polaridad): las tarjetas del Home usan `surfaceVariant` como contenedor,
+igual que el resto de la app, en vez de la polaridad invertida del artboard (pantalla
+`surfaceVariant`, tarjeta `surface`). El track del anillo pasa a `outlineVariant` porque
+`surfaceVariant` sobre una tarjeta `surfaceVariant` es invisible.
