@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- Allow cleartext HTTP for Android emulator host loopback (10.0.2.2) -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">10.0.2.2</domain>
+        <domain includeSubdomains="true">localhost</domain>
+        <domain includeSubdomains="true">127.0.0.1</domain>
+        <!--
+          Teléfono FÍSICO en la misma red que el host: `10.0.2.2` no existe fuera del
+          emulador, así que la app habla con la IP LAN de la máquina (aquí 192.168.0.17,
+          iface wlp4s0). Sin esta línea el cleartext HTTP está BLOQUEADO y la app no
+          llega al backend local aunque la IP sea correcta.
+        -->
+        <domain includeSubdomains="true">192.168.0.17</domain>
+    </domain-config>
+</network-security-config>

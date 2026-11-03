@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sistema de diseño — Parental Coordination</title>
+<style>
+  :root {
+    --primary: #00696D; --on-primary: #FFFFFF;
+    --primary-container: #9CF1F6; --on-primary-container: #002022;
+    --secondary: #4A6365; --secondary-container: #CCE8EA; --on-secondary-container: #051F21;
+    --error: #BA1A1A; --error-container: #FFDAD6;
+    --background: #FAFDFC; --on-background: #191C1D;
+    --surface: #FAFDFC; --on-surface: #191C1D;
+    --surface-variant: #DAE4E5; --on-surface-variant: #3F4849;
+    --outline: #6F797A; --outline-variant: #BEC8C9;
+    --serif: Georgia, 'Times New Roman', serif;
+    --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    --mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: var(--sans); background: var(--background); color: var(--on-surface);
+    width: 1440px; padding: 48px 56px; line-height: 1.5;
+  }
+  h1 { font-family: var(--serif); font-size: 36px; font-weight: 400; margin-bottom: 4px; }
+  h2 { font-family: var(--serif); font-size: 24px; font-weight: 400; margin: 40px 0 16px; padding-bottom: 8px; border-bottom: 1px solid var(--outline-variant); }
+  .lede { color: var(--on-surface-variant); font-size: 14px; }
+  .grid { display: grid; gap: 12px; }
+  .swatches { grid-template-columns: repeat(6, 1fr); }
+  .swatch { border-radius: 12px; overflow: hidden; border: 1px solid var(--outline-variant); }
+  .swatch .fill { height: 72px; }
+  .swatch .meta { padding: 8px 10px; font-size: 11px; background: #fff; }
+  .swatch .meta b { display: block; font-size: 12px; }
+  .swatch .meta code { font-family: var(--mono); color: var(--on-surface-variant); }
+  .tag-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .tag { display: inline-flex; align-items: center; gap: 8px; border-radius: 12px; padding: 4px 8px; font-size: 11px; font-weight: 500; font-variant: small-caps; letter-spacing: 0.5px; }
+  .dot { width: 14px; height: 14px; border-radius: 50%; flex: none; }
+  .dot.small { width: 8px; height: 8px; }
+  .type-spec { display: grid; grid-template-columns: 220px 1fr; gap: 4px 24px; align-items: baseline; }
+  .type-spec .role { font-family: var(--mono); font-size: 11px; color: var(--on-surface-variant); }
+  .space-row { display: flex; align-items: flex-end; gap: 16px; }
+  .space-box { background: var(--primary-container); border: 1px solid var(--primary); border-radius: 4px; }
+  .space-item { text-align: center; font-family: var(--mono); font-size: 11px; color: var(--on-surface-variant); }
+  .radius-row { display: flex; gap: 16px; align-items: flex-end; }
+  .radius-box { width: 72px; height: 72px; background: var(--secondary-container); border: 1px solid var(--secondary); }
+  .chip { display: inline-block; border-radius: 12px; padding: 4px 8px; font-size: 11px; font-weight: 500; }
+  .row-demo { display: flex; align-items: center; background: #fff; border: 1px solid var(--outline-variant); border-radius: 12px; padding: 8px; max-width: 640px; }
+  .row-demo:hover { background: #F4FAFA; }
+  .row-demo:focus-within { outline: 2px solid var(--primary); outline-offset: 2px; }
+  .date-col { width: 48px; padding-right: 8px; text-align: center; flex: none; }
+  .date-col .day { font-size: 16px; font-weight: 600; line-height: 24px; }
+  .date-col .month { font-size: 11px; font-weight: 500; font-variant: small-caps; letter-spacing: .5px; color: var(--on-surface-variant); }
+  .rail { width: 1px; align-self: stretch; background: var(--outline); flex: none; }
+  .body { flex: 1; min-width: 0; padding: 4px 8px; }
+  .time { font-family: var(--mono); font-size: 12px; font-weight: 500; letter-spacing: .5px; color: var(--on-surface-variant); }
+  .title { font-size: 16px; line-height: 24px; font-weight: 500; }
+  .meta-chips { display: flex; gap: 6px; margin-top: 4px; }
+  .chev { color: var(--on-surface-variant); font-size: 16px; padding: 0 6px; }
+  .nav-demo { display: flex; border-top: 1px solid var(--outline-variant); background: #fff; max-width: 640px; border-radius: 0 0 12px 12px; overflow: hidden; }
+  .nav-item { flex: 1; text-align: center; padding: 10px 0 12px; font-size: 12px; color: var(--on-surface-variant); }
+  .nav-item .ico { display: block; font-size: 18px; margin-bottom: 2px; }
+  .nav-item.active { color: var(--primary); font-weight: 600; }
+  .nav-item.active .pill { background: var(--primary-container); border-radius: 16px; display: inline-block; padding: 2px 14px; }
+  .note { font-size: 12px; color: var(--on-surface-variant); margin-top: 8px; max-width: 640px; }
+  code { font-family: var(--mono); font-size: 0.95em; }
+  @media (prefers-reduced-motion: no-preference) {
+    .row-demo { transition: background 150ms; }
+  }
+</style>
+</head>
+<body>
+  <h1>Sistema de diseño</h1>
+  <p class="lede">Parental Coordination · sincronizado desde <code>shared/src/commonMain/kotlin/com/parental/shared/core/ui/theme/</code> y <code>core/ui/components/</code>. Esquema claro (default de la app). Fuente semilla: teal <code>#00696D</code>.</p>
+
+  <h2>Color de marca</h2>
+  <div class="grid swatches">
+    <div class="swatch"><div class="fill" style="background:#00696D"></div><div class="meta"><b>primary</b><code>#00696D</code></div></div>
+    <div class="swatch"><div class="fill" style="background:#9CF1F6"></div><div class="meta"><b>primaryContainer</b><code>#9CF1F6</code></div></div>
+    <div class="swatch"><div class="fill" style="background:#4A6365"></div><div class="meta"><b>secondary</b><code>#4A6365</code></div></div>
+    <div class="swatch"><div class="fill" style="background:#CCE8EA"></div><div class="meta"><b>secondaryContainer</b><code>#CCE8EA</code></div></div>
+    <div class="swatch"><div class="fill" style="background:#DAE4E5"></div><div class="meta"><b>surfaceVariant</b><code>#DAE4E5</code></div></div>
+    <div class="swatch"><div class="fill" style="background:#6F797A"></div><div class="meta"><b>outline</b><code>#6F797A</code></div></div>
+    <div class="swatch"><div class="fill" style="background:#BEC8C9"></div><div class="meta"><b>outlineVariant</b><code>#BEC8C9</code></div></div>
+    <div class="swatch"><div class="fill" style="background:#BA1A1A"></div><div class="meta"><b>error</b><code>#BA1A1A</code></div></div>
+    <div class="swatch"><div class="fill" style="background:#FFDAD6"></div><div class="meta"><b>errorContainer</b><code>#FFDAD6</code></div></div>
+    <div class="swatch"><div class="fill" style="background:#FAFDFC"></div><div class="meta"><b>surface</b><code>#FAFDFC</code></div></div>
+    <div class="swatch"><div class="fill" style="background:#3F4849"></div><div class="meta"><b>onSurfaceVariant</b><code>#3F4849</code></div></div>
+    <div class="swatch"><div class="fill" style="background:#80D4D9"></div><div class="meta"><b>inversePrimary</b><code>#80D4D9</code></div></div>
+  </div>
+
+  <h2>Categorías (6) — tríadas dot / container / content</h2>
+  <div class="tag-row">
+    <span class="tag" style="background:#FCE4EC;color:#AD1457"><span class="dot" style="background:#D81B60"></span>Salud</span>
+    <span class="tag" style="background:#E8EAF6;color:#303F9F"><span class="dot" style="background:#3F51B5"></span>Educación</span>
+    <span class="tag" style="background:#F3E5F5;color:#6A1B9A"><span class="dot" style="background:#8E24AA"></span>Familiar</span>
+    <span class="tag" style="background:#E0F2F1;color:#00695C"><span class="dot" style="background:#00897B"></span>Social</span>
+    <span class="tag" style="background:#FBE9E7;color:#B42C0E"><span class="dot" style="background:#F4511E"></span>Recreación</span>
+    <span class="tag" style="background:#EFEBE9;color:#5D4037"><span class="dot" style="background:#8D6E63"></span>Otros</span>
+  </div>
+  <p class="note">Categoría desconocida → <code>outline</code>, nunca el dot de otra categoría.</p>
+
+  <h2>Estados de actividad</h2>
+  <div class="tag-row">
+    <span class="chip" style="background:rgba(117,117,117,.15);color:#757575">Creada</span>
+    <span class="chip" style="background:rgba(30,136,229,.15);color:#1565C0">Asignada</span>
+    <span class="chip" style="background:rgba(230,81,0,.15);color:#BF360C">En progreso</span>
+    <span class="chip" style="background:rgba(178,106,0,.15);color:#9E5F00">Por verificar</span>
+    <span class="chip" style="background:rgba(67,160,71,.15);color:#2E7D32">Cumplida</span>
+    <span class="chip" style="background:rgba(229,57,53,.15);color:#C62828">Vencida</span>
+  </div>
+  <p class="note">Patrón de chip: radio 12, fondo = color al 15 %, texto en color del dot (o <code>content</code> de la tríada), <code>labelSmall</code> Medium, padding 8×4.</p>
+
+  <h2>Tipografía</h2>
+  <div class="type-spec">
+    <span class="role">headlineSmall · serif 24/32</span><span style="font-family:var(--serif);font-size:24px">Lunes 12 de mayo</span>
+    <span class="role">titleLarge · sans 22/28</span><span style="font-size:22px">Turno con el pediatra</span>
+    <span class="role">titleMedium · sans 16/24 Medium</span><span style="font-size:16px;font-weight:500">Reunión con la maestra</span>
+    <span class="role">bodyLarge · sans 16/24</span><span style="font-size:16px">Retiro del colegio a las 17:30</span>
+    <span class="role">bodySmall · sans 12/16</span><span style="font-size:12px">Límite: hoy 18:00</span>
+    <span class="role">labelSmall · 11/16 smcp</span><span style="font-size:11px;font-weight:500;font-variant:small-caps;letter-spacing:.5px">Todos · Eventos</span>
+    <span class="role">TypeTokens.time · mono 12/16</span><span style="font-family:var(--mono);font-size:12px;font-weight:500;letter-spacing:.5px">09:30</span>
+  </div>
+
+  <h2>Espaciado y forma</h2>
+  <div class="space-row">
+    <div class="space-item"><div class="space-box" style="width:4px;height:4px;margin:0 auto"></div>4</div>
+    <div class="space-item"><div class="space-box" style="width:6px;height:6px;margin:0 auto"></div>6</div>
+    <div class="space-item"><div class="space-box" style="width:8px;height:8px;margin:0 auto"></div>8</div>
+    <div class="space-item"><div class="space-box" style="width:12px;height:12px;margin:0 auto"></div>12</div>
+    <div class="space-item"><div class="space-box" style="width:16px;height:16px;margin:0 auto"></div>16</div>
+    <div class="space-item"><div class="space-box" style="width:24px;height:24px;margin:0 auto"></div>24</div>
+  </div>
+  <p class="note">Escala única: 4 / 6 / 8 / 12 / 16 / 24. Geometría del agenda: columna de fecha 48, nodo 14, disco de día 40, objetivo táctil ≥ 44 (48 en trabajo nuevo), ancho máximo de contenido 640.</p>
+  <div class="radius-row">
+    <div class="space-item"><div class="radius-box" style="border-radius:4px"></div>4</div>
+    <div class="space-item"><div class="radius-box" style="border-radius:8px"></div>8</div>
+    <div class="space-item"><div class="radius-box" style="border-radius:12px"></div>12</div>
+    <div class="space-item"><div class="radius-box" style="border-radius:16px"></div>16</div>
+    <div class="space-item"><div class="radius-box" style="border-radius:24px"></div>24</div>
+  </div>
+
+  <h2>Movimiento</h2>
+  <p class="lede">Una duración: <code>150 ms</code> estándar (crossfades de modo y vacío↔contenido). El esqueleto es estático; sin shimmer (DD-8, señal de movimiento reducido inalcanzable desde commonMain).</p>
+
+  <h2>Componente: fila de agenda (anatomía actual)</h2>
+  <div class="row-demo" tabindex="0">
+    <div class="date-col"><div class="day">12</div><div class="month">may</div></div>
+    <div class="rail"></div>
+    <span class="dot" style="background:#D81B60;margin:0 12px"></span>
+    <div class="body">
+      <div class="time">09:30</div>
+      <div class="title">Turno con el pediatra</div>
+      <div class="meta-chips">
+        <span class="chip" style="background:rgba(216,27,96,.15);color:#AD1457">Salud</span>
+        <span class="chip" style="background:rgba(30,136,229,.15);color:#1565C0">Asignada</span>
+      </div>
+    </div>
+    <span class="chev" aria-hidden="true">›</span>
+  </div>
+  <p class="note">Un nodo de semántica por fila (etiqueta fusionada); iconos decorativos fuera del árbol; el color nunca es la única señal — peso + etiqueta acompañan.</p>
+
+  <h2>Componente: navegación inferior</h2>
+  <nav class="nav-demo" aria-label="Navegación principal (demostración)">
+    <div class="nav-item"><span class="pill"><span class="ico">⌂</span></span>Inicio</div>
+    <div class="nav-item active"><span class="pill"><span class="ico">◷</span></span>Actividades</div>
+    <div class="nav-item"><span class="pill"><span class="ico">◈</span></span>Gastos</div>
+    <div class="nav-item"><span class="pill"><span class="ico">♟</span></span>Terceros</div>
+  </nav>
+</body>
+</html>
