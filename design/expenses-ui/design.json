@@ -1,0 +1,27 @@
+{
+  "title": "Gastos — rediseño de la lista",
+  "brief": "Tres direcciones para la pantalla de Gastos de la app de coordinación parental (Kotlin Multiplatform, Android primero). Parten de la anatomía actual: barra 'Gastos' con refrescar, cuatro tarjetas de resumen (Por pagar / Por cobrar / Pendientes / Pagados, donde sólo las dos últimas filtran), lista de gastos con estado, categoría y quién pidió, FAB 'Solicitar'. Los datos salen del contrato real: saldo, porPagar, porCobrar y counts del endpoint de resumen; estados pendiente/aprobado/rechazado/pagado.",
+  "artboards": [
+    {
+      "file": "01-un-saldo-tres-filtros.html",
+      "title": "Un saldo, tres filtros",
+      "tradeoff": "El saldo del vínculo —que el servidor ya calcula y que la pantalla hoy no muestra— pasa a ser el encabezado, con los dos brutos debajo, y las cuatro tarjetas se vuelven una fila de filtros por estado. La lista se agrupa por mes y cada fila suma quién pidió y tu parte. Cambio acotado y sin curva de aprendizaje; a cambio, el filtro por categoría y la búsqueda siguen sin existir.",
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "02-libro-de-cuentas.html",
+      "title": "Libro de cuentas",
+      "tradeoff": "Dos columnas —te deben / debés— con el neto al medio y los gastos como asientos con la fecha a la izquierda, al estilo de un extracto; el filtro pasa de estado a categoría. Máxima lectura de balance y densidad; a cambio, el estado queda como chip secundario, el alta baja del FAB a un botón al pie y la portada pierde la noción de 'qué tengo que aprobar'.",
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "03-bandeja-de-aprobacion.html",
+      "title": "Bandeja de aprobación",
+      "tradeoff": "La portada arranca por lo que espera una decisión: los gastos pendientes con Aprobar/Rechazar en la fila, sin abrir el detalle; abajo el saldo en una franja y el historial con un segmentado por estado. Máxima velocidad para resolver; a cambio, el balance es secundario y la pantalla deja de servir para mirar cómo viene el mes.",
+      "width": 390,
+      "height": 844
+    }
+  ]
+}

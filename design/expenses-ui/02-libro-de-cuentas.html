@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gastos · Dirección 02 — Libro de cuentas</title>
+<style>
+  :root {
+    --primary: #00696D; --on-primary: #FFFFFF;
+    --primary-container: #9CF1F6; --on-primary-container: #002022;
+    --secondary: #4A6365;
+    --surface: #FAFDFC; --on-surface: #191C1D;
+    --surface-variant: #DAE4E5; --on-surface-variant: #3F4849;
+    --outline: #6F797A; --outline-variant: #BEC8C9;
+    --error: #BA1A1A;
+    --a-favor: #2E7D32; --en-contra: #C62828;
+    --pendiente: #BF360C; --pendiente-bg: rgba(230,81,0,.15);
+    --aprobado: #2E7D32; --aprobado-bg: rgba(67,160,71,.15);
+    --pagado: #1565C0; --pagado-bg: rgba(30,136,229,.15);
+    --rechazado: #C62828; --rechazado-bg: rgba(229,57,53,.15);
+    --serif: Georgia, 'Times New Roman', serif;
+    --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    --mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: var(--sans); background: #E4ECEC; min-height: 100vh; padding: 24px 0; }
+  .stage { display: flex; gap: 40px; justify-content: center; align-items: flex-start; flex-wrap: wrap; padding: 0 24px; }
+  .frame-label { font-size: 11px; font-weight: 500; font-variant: small-caps; letter-spacing: .5px; color: #3F4849; margin-bottom: 8px; }
+  .frame-note { font-size: 12px; color: #3F4849; max-width: 390px; margin-top: 10px; line-height: 1.55; }
+  .phone { width: 390px; height: 844px; background: var(--surface); color: var(--on-surface); display: flex; flex-direction: column; border-radius: 24px; overflow: hidden; box-shadow: 0 8px 32px rgba(0,32,34,.18); }
+  button { font-family: inherit; }
+  :focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 4px; }
+
+  .topbar { background: var(--surface); display: flex; align-items: center; height: 56px; padding: 0 8px 0 16px; flex: none; }
+  .topbar h1 { font-family: var(--serif); font-size: 22px; font-weight: 400; flex: 1; }
+  .icon-btn { width: 44px; height: 44px; border: 0; background: transparent; border-radius: 50%; display: grid; place-items: center; cursor: pointer; color: var(--on-surface-variant); position: relative; }
+  .icon-btn:hover { background: rgba(0,105,109,.06); }
+  .badge { position: absolute; top: 6px; right: 6px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: var(--error); color: #FFF; font-size: 10px; font-weight: 700; display: grid; place-items: center; }
+
+  .feed { flex: 1; overflow-y: auto; padding: 0 16px 16px; scrollbar-width: none; }
+  .feed::-webkit-scrollbar { display: none; }
+  .feed > * { flex: none; }
+
+  .navbar { flex: none; display: flex; border-top: 1px solid var(--outline-variant); background: var(--surface); }
+  .nav-item { flex: 1; border: 0; background: none; padding: 8px 0 10px; font-size: 12px; color: var(--on-surface-variant); cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+  .nav-item .pill { display: block; padding: 3px 16px; border-radius: 16px; }
+  .nav-item[aria-current="page"] { color: var(--primary); font-weight: 600; }
+  .nav-item[aria-current="page"] .pill { background: var(--primary-container); }
+
+  .eyebrow { font-size: 11px; font-weight: 500; font-variant: small-caps; letter-spacing: .5px; color: var(--on-surface-variant); }
+
+  /* ── El balance, en dos columnas ── */
+  .ledger-head { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 8px 0 14px; }
+  .ledger-col { border-top: 3px solid transparent; padding-top: 10px; }
+  .ledger-col.deben { border-color: var(--aprobado); }
+  .ledger-col.debo { border-color: var(--en-contra); }
+  .ledger-col .lbl { font-size: 11px; font-weight: 500; font-variant: small-caps; letter-spacing: .5px; color: var(--on-surface-variant); }
+  .ledger-col .val { font-family: var(--serif); font-size: 26px; font-weight: 600; line-height: 32px; margin-top: 2px; white-space: nowrap; }
+  .ledger-col.deben .val { color: var(--a-favor); }
+  .ledger-col.debo .val { color: var(--en-contra); }
+  .ledger-col .sub { font-size: 11px; color: var(--on-surface-variant); }
+  .net { display: flex; align-items: baseline; justify-content: center; gap: 8px; padding: 10px 0 14px; border-top: 1px solid var(--outline-variant); border-bottom: 1px solid var(--outline-variant); }
+  .net .k { font-size: 11px; font-weight: 500; font-variant: small-caps; letter-spacing: .5px; color: var(--on-surface-variant); }
+  .net .v { font-family: var(--serif); font-size: 20px; font-weight: 600; color: var(--a-favor); }
+
+  /* ── Filtros por categoría ── */
+  .filters { display: flex; gap: 8px; overflow-x: auto; padding: 12px 0 10px; scrollbar-width: none; }
+  .filters::-webkit-scrollbar { display: none; }
+  .fchip { flex: none; height: 30px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--outline-variant); background: transparent; font-size: 12px; color: var(--on-surface-variant); cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+  .fchip[aria-pressed="true"] { border-color: var(--primary); background: var(--primary-container); color: var(--on-primary-container); font-weight: 600; }
+  .fchip i { width: 7px; height: 7px; border-radius: 50%; }
+
+  /* ── Libro ── */
+  .entries { display: flex; flex-direction: column; }
+  .entry { display: grid; grid-template-columns: 44px 1fr auto; gap: 12px; align-items: start; padding: 12px 2px; border-bottom: 1px solid var(--outline-variant); cursor: pointer; text-align: left; color: inherit; background: none; border-left: 0; border-right: 0; border-top: 0; width: 100%; }
+  .entry:hover { background: rgba(0,105,109,.04); }
+  .date { text-align: center; }
+  .date .d { font-family: var(--serif); font-size: 20px; font-weight: 600; line-height: 22px; }
+  .date .m { font-size: 10px; font-weight: 500; font-variant: small-caps; letter-spacing: .5px; color: var(--on-surface-variant); }
+  .entry .body { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+  .entry h3 { font-size: 14px; font-weight: 500; line-height: 20px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .entry .meta { display: flex; align-items: center; gap: 6px; }
+  .tag { display: inline-flex; align-items: center; gap: 5px; border-radius: 10px; padding: 1px 7px; font-size: 10px; font-weight: 500; }
+  .tag i { width: 5px; height: 5px; border-radius: 50%; }
+  .tag.pendiente { color: var(--pendiente); background: var(--pendiente-bg); } .tag.pendiente i { background: #E65100; }
+  .tag.aprobado { color: var(--aprobado); background: var(--aprobado-bg); } .tag.aprobado i { background: #43A047; }
+  .tag.pagado { color: var(--pagado); background: var(--pagado-bg); } .tag.pagado i { background: #1E88E5; }
+  .tag.rechazado { color: var(--rechazado); background: var(--rechazado-bg); } .tag.rechazado i { background: #E53935; }
+  .cat { font-size: 10px; color: var(--on-surface-variant); display: inline-flex; align-items: center; gap: 4px; }
+  .cat i { width: 6px; height: 6px; border-radius: 50%; }
+  .amount { text-align: right; font-variant-numeric: tabular-nums; }
+  .amount .v { font-family: var(--serif); font-size: 16px; font-weight: 600; white-space: nowrap; }
+  .amount .s { font-size: 10px; color: var(--on-surface-variant); white-space: nowrap; }
+
+  .intent { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0 14px; }
+  .intent p { font-size: 12px; color: var(--on-surface-variant); flex: 1; }
+  .btn-primary { height: 44px; padding: 0 18px; border-radius: 12px; border: 0; background: var(--primary); color: var(--on-primary); font-size: 14px; font-weight: 600; display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
+</style>
+</head>
+<body>
+<div class="stage">
+  <section class="frame" aria-label="Gastos: libro de cuentas">
+    <p class="frame-label">02 · Libro de cuentas</p>
+    <div class="phone">
+      <header class="topbar">
+        <h1>Gastos</h1>
+        <button class="icon-btn" aria-label="Notificaciones: 2 sin leer">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 22a2 2 0 0 0 2-2h-4a2 2 0 0 0 2 2zm6-6V11c0-3.07-1.63-5.64-4.5-6.32V4a1.5 1.5 0 0 0-3 0v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></svg>
+          <span class="badge" aria-hidden="true">2</span>
+        </button>
+        <button class="icon-btn" aria-label="Cerrar sesión">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/></svg>
+        </button>
+      </header>
+
+      <main class="feed">
+        <div class="ledger-head" role="group" aria-label="Balance del vínculo">
+          <div class="ledger-col deben">
+            <p class="lbl">Te deben</p>
+            <p class="val">$3.680,00</p>
+            <p class="sub">3 gastos</p>
+          </div>
+          <div class="ledger-col debo">
+            <p class="lbl">Debés</p>
+            <p class="val">$2.430,00</p>
+            <p class="sub">2 gastos</p>
+          </div>
+        </div>
+
+        <div class="net">
+          <span class="k">Neto</span>
+          <span class="v">+$1.250,00 a favor</span>
+        </div>
+
+        <div class="filters" role="group" aria-label="Filtrar por categoría">
+          <button class="fchip" aria-pressed="true">Todas</button>
+          <button class="fchip"><i style="background:#D81B60" aria-hidden="true"></i>Salud</button>
+          <button class="fchip"><i style="background:#3F51B5" aria-hidden="true"></i>Educación</button>
+          <button class="fchip"><i style="background:#8E24AA" aria-hidden="true"></i>Familiar</button>
+          <button class="fchip"><i style="background:#F4511E" aria-hidden="true"></i>Recreación</button>
+        </div>
+
+        <div class="entries">
+          <button class="entry" aria-label="3 de noviembre, Consulta pediátrica, Salud, pendiente, 7.200 pesos">
+            <span class="date"><span class="d">3</span><span class="m">nov</span></span>
+            <span class="body">
+              <h3>Consulta pediátrica</h3>
+              <span class="meta"><span class="tag pendiente"><i aria-hidden="true"></i>Pendiente</span><span class="cat"><i style="background:#D81B60" aria-hidden="true"></i>Salud</span></span>
+            </span>
+            <span class="amount"><span class="v">$7.200,00</span><br><span class="s">tu parte $3.600,00</span></span>
+          </button>
+
+          <button class="entry" aria-label="2 de noviembre, Cumpleaños de Emma, Recreación, pendiente, 9.800 pesos">
+            <span class="date"><span class="d">2</span><span class="m">nov</span></span>
+            <span class="body">
+              <h3>Cumpleaños de Emma</h3>
+              <span class="meta"><span class="tag pendiente"><i aria-hidden="true"></i>Pendiente</span><span class="cat"><i style="background:#F4511E" aria-hidden="true"></i>Recreación</span></span>
+            </span>
+            <span class="amount"><span class="v">$9.800,00</span><br><span class="s">tu parte $4.900,00</span></span>
+          </button>
+
+          <button class="entry" aria-label="1 de noviembre, Supermercado semanal, Familiar, pagado, 18.400 pesos">
+            <span class="date"><span class="d">1</span><span class="m">nov</span></span>
+            <span class="body">
+              <h3>Supermercado semanal</h3>
+              <span class="meta"><span class="tag pagado"><i aria-hidden="true"></i>Pagado</span><span class="cat"><i style="background:#8E24AA" aria-hidden="true"></i>Familiar</span></span>
+            </span>
+            <span class="amount"><span class="v">$18.400,00</span><br><span class="s">tu parte $9.200,00</span></span>
+          </button>
+
+          <button class="entry" aria-label="28 de octubre, Útiles escolares, Educación, aprobado, 12.500 pesos">
+            <span class="date"><span class="d">28</span><span class="m">oct</span></span>
+            <span class="body">
+              <h3>Útiles escolares</h3>
+              <span class="meta"><span class="tag aprobado"><i aria-hidden="true"></i>Aprobado</span><span class="cat"><i style="background:#3F51B5" aria-hidden="true"></i>Educación</span></span>
+            </span>
+            <span class="amount"><span class="v">$12.500,00</span><br><span class="s">tu parte $6.250,00</span></span>
+          </button>
+
+          <button class="entry" aria-label="27 de octubre, Remís a la escuela, Otros, pagado, 2.300 pesos">
+            <span class="date"><span class="d">27</span><span class="m">oct</span></span>
+            <span class="body">
+              <h3>Remís a la escuela</h3>
+              <span class="meta"><span class="tag pagado"><i aria-hidden="true"></i>Pagado</span><span class="cat"><i style="background:#8D6E63" aria-hidden="true"></i>Otros</span></span>
+            </span>
+            <span class="amount"><span class="v">$2.300,00</span><br><span class="s">tu parte $1.150,00</span></span>
+          </button>
+
+          <button class="entry" aria-label="25 de octubre, Cine familiar, Recreación, rechazado, 4.500 pesos">
+            <span class="date"><span class="d">25</span><span class="m">oct</span></span>
+            <span class="body">
+              <h3>Cine familiar</h3>
+              <span class="meta"><span class="tag rechazado"><i aria-hidden="true"></i>Rechazado</span><span class="cat"><i style="background:#F4511E" aria-hidden="true"></i>Recreación</span></span>
+            </span>
+            <span class="amount"><span class="v">$4.500,00</span><br><span class="s">tu parte $2.250,00</span></span>
+          </button>
+        </div>
+
+        <div class="intent">
+          <p>El saldo lo calcula el servidor: acá sólo se muestra.</p>
+          <button class="btn-primary">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+            Solicitar
+          </button>
+        </div>
+      </main>
+
+      <nav class="navbar" aria-label="Navegación principal">
+        <button class="nav-item"><span class="pill"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg></span>Inicio</button>
+        <button class="nav-item"><span class="pill"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M19 4h-1V2h-2v2H8V2H6v2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2zm0 16H5V10h14v10zM5 8V6h14v2H5z"/></svg></span>Actividades</button>
+        <button class="nav-item" aria-current="page"><span class="pill"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M21 18v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v1h-9a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h9zm-9-2h10V8H12v8zm4-2.5a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z"/></svg></span>Gastos</button>
+        <button class="nav-item"><span class="pill"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16 11c1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3 1.34 3 3 3zm-8 0c1.66 0 3-1.34 3-3S9.66 5 8 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg></span>Terceros</button>
+      </nav>
+    </div>
+    <p class="frame-note">
+      La pantalla se lee como un <strong>libro de cuentas</strong>: dos columnas —lo que te deben y
+      lo que debés— con el neto al medio, y después los asientos, uno por gasto, con la fecha a la
+      izquierda como en un extracto. El filtro pasa de estado a categoría, porque acá se busca un
+      gasto, no un trámite. Gana lectura de balance y densidad; pierde la urgencia del estado (queda
+      como chip secundario) y el alta baja del FAB a un botón al pie de la lista.
+    </p>
+  </section>
+</div>
+</body>
+</html>
