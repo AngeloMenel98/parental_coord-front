@@ -428,9 +428,9 @@ PRD `prd_improvement` H-2, H-3, PRD_expense FR-7.
 | T29 | Gastos front: summary cards + list + filters | F | S4 | delegated together with T19 (one front writer: the read surface) | done | F `0e30788` |
 | T19 | Gastos front: the expense detail + approve / reject / pay | F | S5 | delegated together with T29 | done | F `0e30788` |
 | T27 | Gastos front: "+ Solicitar" form + `sin doc.` warning | F | S6 | delegated (front writer) | done | F `8cdc674` |
-| T30 | Attachment → expense flow (+ the expense attachment API) | F+B | S7 | B delegated (writer, `src/expenses/**`); F pending | B done · F pending | B `1cefa36` |
-| T26 | Realtime: `expense.changed` + the live refresh | F+B | S8 | B delegated (writer, `src/realtime/**` + relay); F pending | B done · F pending | B `31ccdc3` |
-| T31 | Design-system pass | F | S9 | — | pending | — |
+| T30 | Attachment → expense flow (+ the expense attachment API) | F+B | S7 | B delegated (writer, `src/expenses/**`); F inline | done (the front was explicitly left unreviewed, L21) | B `1cefa36`; F `9e57774` |
+| T26 | Realtime: `expense.changed` + the live refresh | F+B | S8 | B delegated (writer, `src/realtime/**` + relay); F inline | done | B `31ccdc3`; F `e78d853` |
+| T31 | Design-system pass | F | S9 | inline (read-only map delegated) | in progress (small-screen check pending) | — |
 
 Delivery order: **T28 → T25 → {T29, T19, T27} → T18 → T30 → T26 → T31**. The front Gastos
 read surface (T29+T19) codes against the S1 contract and lands in parallel with the backend
@@ -457,6 +457,14 @@ them.
 3. **The wave-2 leftovers (T15, T16, T35) are still open** and are not in this wave.
 4. **The front repo has three uncommitted documents** (`gastos-and-ux-resolution.md`
    revision 4, `wave-1-ux-quick-wins.md`, `wave-2-medium.md`) from the previous session.
+   The `wave-1` working copy is a REWRITE that dropped its `## Specs`, `## Tasks` and
+   `## Log`; committing it as-is would delete the wave-1 history, so it stays
+   uncommitted until that is decided (L25).
+5. **The branch is far past a reviewable slice.** `feat/wave-0-quick-wins` carries
+   32 574 authored changed lines since `origin/main` across 87 commits (waves 0–3).
+   Each wave commits in ~400-line units, but the BRANCH as a whole is not a
+   reviewable unit: a PR would have to be cut per wave (the wave-3 slice boundary
+   is the front `cf3c12b`), and pushing is the user's decision.
 
 ---
 
@@ -776,3 +784,87 @@ them.
     datum still means something, R4), and the `sin fin programado` /
     `fin anterior al inicio` validations, untouched by the new date rule.
 
+- **L19 (T26 front half — `expense.changed` live refresh, 2026-11-02) — `F e78d853`.**
+  The front subscribes to the shared expense signal and reloads the expense list and
+  summary from REST. The user reports the front suite green: 378 tests, 0 failures.
+  T26 is complete alongside back commit `31ccdc3`.
+
+- **L20 (T30 front half — attachment-to-expense flow, 2026-11-02).**
+  The activity detail asks **"¿Es un gasto?"** after file selection. Both answers save
+  the activity attachment; **Sí** opens Gastos with the filename (without extension) as
+  the concept, and a successful expense create calls `/expenses/:id/attachments/convert`
+  with that activity attachment ID. Closing the expense form clears the pending
+  conversion and leaves the activity attachment intact. A conversion failure leaves the
+  created expense and reports that the document remains on the activity; it does not
+  attempt a destructive rollback. `ExpensesApi` also exposes the S7 presign/confirm
+  routes using the existing attachment request/response contracts. Verification:
+  `./gradlew :shared:allTests --no-daemon --console=plain` passed. F changes are in the
+  working tree and are not committed. RDD is enabled: assessment returned `high` with
+  `unassessable` because the new model file is untracked; selectorless STATUS then failed
+  twice in `pre_native` while opening its read-only target (`read-only file system`). No
+  review authority was created or approved; native review remains unavailable.
+
+- **L21 (user decision, 2026-11-02) — "deja T30 sin revision. continua con T31".**
+  The user explicitly leaves T30 unreviewed; no T30 review is to be run. Continue with T31.
+
+- **L22 (user decision, 2026-11-02) — "yes".** The user approved a one-time
+  `gpt-6-luna` substitution for the required T31 read-only explorer because the
+  repository's assigned `gpt-6.1-luna` is unavailable in this runtime.
+
+- **L23 (T31 progress, 2026-11-02):** Added shared empty/loading state composables and
+  adopted the frozen spacing/shape/type tokens across the home, expenses, notifications,
+  and admin surfaces. `:shared:testDebugUnitTest` and `:androidApp:assembleDebug` pass.
+  Installed/launched the debug APK on the authorized USB device and confirmed the Home
+  top bar, error state, and bottom navigation render within the small screen. The app
+  reports its backend is unreachable; navigating to Activities via ADB failed because
+  the device denied input injection, so other-screen visual checks remain pending. The
+  Engram mirror remains pending because this runtime has no registered session identity.
+
+
+- **L24 (T30 front half — delivered, 2026-11-03) — `F 9e57774`.**
+  The work that L20 left in the working tree is now a commit: 13 files, 287
+  insertions / 26 deletions. The commit is **T30 only** — T31's hunks were split
+  out of `ExpensesScreen.kt` first (it carried both the attachment draft prefill
+  and the `Spacing`/skeleton tokens), and the T31 changes to `HomeScreen`,
+  `AdminScreen` and `NotificationsScreen` were stashed aside, so the commit was
+  verified on its own tree: `:shared:allTests` → **82 suites / 766 tests, 0
+  failures**, `:shared:testDebugUnitTest` included. T31 was restored afterwards
+  from a patch taken before the split, and the working tree holds it again.
+
+  Two facts the commit confirmed:
+  - `bottomRoute = "expenses"` resolves: `App.kt:314` handles the Gastos branch
+    and `BottomNavBar.kt:19` already carries the item. The nav was not inert
+    after all.
+  - `ExpensesApi` now exposes the three routes of B `1cefa36` with the SAME
+    request/response contracts the activity attachments use; the create sheet
+    dropped its own picker, so there is exactly ONE upload path (the contract
+    test that used to assert "no attachment in the form" now asserts "no second
+    picker", with the reason in the message).
+
+- **L25 (the comment cleanup, 2026-11-03) — the criterion, and what it spared.**
+  The user asked to delete the unnecessary comments. The criterion applied: **a
+  comment earns its place when it records something the code cannot say — a
+  decision, a contract, a constraint, a warning, or the reason for an
+  otherwise-opaque construct. It does not when it only says what the next line
+  does.** What that deleted:
+  - `ExpensesApi.kt` — the in-method copy of the "the PATCH body is assembled
+    field by field" rule, which the `toPatchBody` KDoc already states. Two
+    copies of one rule is a guaranteed drift (the same defect T25b had with
+    `overdueOrigin()`).
+  - `ExpensesScreen.kt` — the in-method copy of the four-cards rule, already in
+    the screen's KDoc.
+  - `ExpensesViewModel.kt` — five KDocs that restated the function name
+    (`openDetail`, `reject`, `pay`, `openCreateSheet`, `closeCreateSheet`).
+  - `App.kt` — four narration lines ("Restore persisted session on startup",
+    "Login in progress", "Mark login as pending", "Fetch bonds and set the
+    first one as active").
+
+  What it **kept**, on purpose: every decision record — the REQ mappings, the
+  server-flags-as-authority rules, the `explicitNulls`/`forbidNonWhitelisted`
+  contract, the "do not reintroduce" notes (`canConfirmAssignment`, the A3
+  declined reason, `visibleDeclinedReason`), the thread-safety and race notes,
+  and the comments that explain an otherwise-empty `catch` or `else`. Those are
+  not noise: this codebase was bitten by exactly those regressions, and the
+  review log is full of "the rule was written twice" and "the copy that ignored
+  the status is the one that 409s". A blanket purge would have deleted the
+  institutional memory, not the noise.
