@@ -26,7 +26,7 @@
     {
       "file": "04-saldo-vivo-libro-swipe.html",
       "title": "Saldo vivo, libro, swipe",
-      "tradeoff": "La combinación elegida: saldo del vínculo como encabezado, con los dos brutos debajo, filtros por estado, y la lista como libro con fecha a la izquierda y tu parte. Las filas pendientes se deslizan a la izquierda y dejan dos acciones rectangulares a alto completo (Rechazar / Aprobar) en vez de botones que sólo viven en el detalle. Gana la lectura de balance del 01 y la densidad del 02 con la acción a un gesto; a cambio, el swipe necesita descubrimiento y compite con el gesto de scroll horizontal de los filtros.",
+      "tradeoff": "La combinación elegida: el saldo del vínculo en una card destacada del fondo (tinte primario, elevación y monto con signo y color), con los dos brutos debajo de la hairline, filtros por estado, y la lista como libro con fecha a la izquierda, categoría con su color y sin ícono, y tu parte. Las filas pendientes se deslizan a la izquierda y dejan dos acciones rectangulares a alto completo (Rechazar / Aprobar) en vez de botones que sólo viven en el detalle. Gana la lectura de balance del 01 y la densidad del 02 con la acción a un gesto; a cambio, el swipe necesita descubrimiento y compite con el gesto de scroll horizontal de los filtros.",
       "width": 390,
       "height": 844
     }

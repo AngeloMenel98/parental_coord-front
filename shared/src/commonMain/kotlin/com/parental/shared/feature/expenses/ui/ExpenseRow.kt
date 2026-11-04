@@ -1,6 +1,5 @@
 package com.parental.shared.feature.expenses.ui
 
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -10,7 +9,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -40,8 +38,9 @@ import com.parental.shared.feature.expenses.ui.swipe.ExpenseSwipeBox
  * Fila de la lista de gastos como asiento de un libro (S3).
  *
  * Anatomía: fecha a la izquierda (día grande sobre el mes abreviado), concepto, chips de
- * estado + categoría (y `sin doc.` cuando falta el documento), y a la derecha el monto total
- * con la parte que le toca a quien pregunta.
+ * estado y categoría, y a la derecha el monto total con la parte que le toca a quien pregunta.
+ * El tag de categoría va sólo con su nombre y su color, sin ícono; el aviso de documento
+ * faltante no vive en la lista.
  *
  * S4: si el SERVIDOR habilitó aprobar o rechazar (`canApprove`/`canReject`), la fila se desliza
  * a la izquierda y deja las dos acciones detrás; el cliente no deduce el permiso del estado.
@@ -120,9 +119,6 @@ fun ExpenseRow(
                     StatusBadge(status = expense.status)
                     CategoryTag(categoryMap[expense.categoryId])
                 }
-                if (!expense.hasDocument) {
-                    MissingDocumentTag()
-                }
             }
 
             Spacer(modifier = Modifier.width(Spacing.sm))
@@ -184,41 +180,17 @@ private fun CategoryTag(info: CategoryInfo?) {
             MaterialTheme.colorScheme.surfaceVariant,
             MaterialTheme.colorScheme.onSurfaceVariant,
         )
-    val (dot, container, content) = triple
+    val (_, container, content) = triple
     Surface(
         color = container,
         contentColor = content,
         shape = MaterialTheme.shapes.small,
     ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            Canvas(modifier = Modifier.size(6.dp)) {
-                drawCircle(dot)
-            }
-            Text(
-                text = "${info?.emoji ?: ""} $name".trim(),
-                style = MaterialTheme.typography.labelSmall,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-    }
-}
-
-@Composable
-private fun MissingDocumentTag() {
-    Surface(
-        color = MaterialTheme.colorScheme.errorContainer,
-        contentColor = MaterialTheme.colorScheme.onErrorContainer,
-        shape = MaterialTheme.shapes.small,
-    ) {
         Text(
-            text = "sin doc.",
+            text = name,
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
             style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Medium,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )

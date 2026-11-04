@@ -132,8 +132,8 @@ class ExpensesLedgerContractTest {
             "🔴 El monto total se formatea con `formatMoney`.",
         )
         assertTrue(
-            "hasDocument" in row && "sin doc." in row,
-            "🔴 FR-9: el aviso de documento faltante no se pierde en el rediseño.",
+            "hasDocument" !in row && "sin doc." !in row,
+            "🔴 La fila ya no muestra el tag `sin doc.`: el aviso vive sólo en el detalle.",
         )
     }
 
@@ -186,17 +186,7 @@ class ExpensesLedgerContractTest {
     @Test
     fun `los tags de la fila no pueden comprimirse en una tira vertical`() {
         val row = source("ExpenseRow.kt")
-        val category = row.indexOf("CategoryTag(categoryMap[expense.categoryId])")
-        val missingDocument = row.indexOf("if (!expense.hasDocument)")
 
-        assertTrue(
-            category >= 0 && missingDocument > category,
-            "🔴 La fila debe seguir mostrando categoría y el aviso `sin doc.`.",
-        )
-        assertTrue(
-            "}" in row.substring(category, missingDocument),
-            "🔴 Status y categoría terminan su propia fila: `sin doc.` no puede competir con ellos por el ancho y romper verticalmente.",
-        )
         assertTrue(
             "maxLines = 1" in row,
             "🔴 S3: cada tag queda en una sola línea; sin maxLines puede partirse verticalmente.",
@@ -204,6 +194,30 @@ class ExpensesLedgerContractTest {
         assertTrue(
             "overflow = TextOverflow.Ellipsis" in row,
             "🔴 Un tag largo se recorta con puntos suspensivos; no deforma la altura de la fila.",
+        )
+    }
+
+    @Test
+    fun `la categoria se pinta con color y sin icono`() {
+        val row = source("ExpenseRow.kt")
+        val category = row.indexOf("private fun CategoryTag(")
+        val missing = row.indexOf("private fun MissingDocumentTag(")
+        val block = row.substring(
+            category,
+            if (missing == -1) row.indexOf("private fun ExpenseStatus.toTokenStatus") else missing,
+        )
+
+        assertTrue(
+            category >= 0 && block.isNotBlank(),
+            "🔴 La fila tiene que seguir pintando la categoría.",
+        )
+        assertTrue(
+            "emoji" !in block && "drawCircle(" !in block,
+            "🔴 El tag de categoría no lleva ícono: solo el nombre, con su color.",
+        )
+        assertTrue(
+            "color = container" in block && "contentColor = content" in block,
+            "🔴 El tag conserva el color de la categoría (fondo y texto).",
         )
     }
 

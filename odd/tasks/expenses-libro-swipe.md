@@ -46,6 +46,7 @@ inventado.
 | T6 | S1,S2,S3,S4 | done · delegated · `412771c` |
 | T7 | S3 | done · delegated · viewer-specific share · `412771c` |
 | T8 | S3 | done · inline · fix the compressed `sin doc.` tag · `e7d4e72` |
+| T9 | S3 | done · inline · categoría sin ícono y sin tag `sin doc.` · `b477c4d` |
 
 ## Log
 
@@ -134,3 +135,14 @@ el APK y se volvió a capturar la pantalla: `sin doc.` aparece como chip horizon
 `Aprobado` y `Educación` permanecen en una línea y las dos filas ya no se deforman. Esta
 captura es la prueba visual final. Work unit: `e7d4e72`
 (`fix(expenses): keep ledger tags on stable lines`).
+
+L15 (corrección de la lista, pedido directo del usuario): "no me quitaste el icono de las
+categorias tags, y directamente sacarme el sin doc tag". El artboard ya estaba sin ícono,
+pero la app seguía pintando el emoji de la categoría y el punto de color (`CategoryTag` en
+`ExpenseRow`), y además mostraba el chip `sin doc.`. T9 aplica el pedido en Compose: el tag de
+categoría queda con el nombre y su color (fondo + texto), sin emoji ni punto, y se elimina
+`MissingDocumentTag` de la fila; el aviso de documento faltante sigue sólo en el detalle.
+RED: los contratos nuevos fallaron (3 de 28); GREEN: focalizados, suite completa y
+`:androidApp:assembleDebug` verdes. 53 suites / 494 tests, 0 fallos. Verificado en el Xiaomi
+físico: las tres filas muestran `Familiar`, `Educación` y `Salud` en color y sin ícono, y no
+aparece ningún `sin doc.`.

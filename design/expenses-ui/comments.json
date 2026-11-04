@@ -77,6 +77,83 @@
       "status": "resolved",
       "sentAt": "2026-11-03T13:03:13.326Z",
       "resolvedAt": "2026-11-03T13:03:48.781Z"
+    },
+    {
+      "id": "nma7gyee",
+      "file": "04-saldo-vivo-libro-swipe.html",
+      "selector": "body > div > section > div > main > section",
+      "excerpt": "Saldo del vínculo $1.250,00 A favor tuyo Por pagar $2.430,00 Por cobrar $3.680,00",
+      "comment": "Fijate que resalte esta card, osea que el fondo no sea del mismo color.",
+      "createdAt": "2026-11-04T10:25:23.323Z",
+      "status": "resolved",
+      "sentAt": "2026-11-04T10:27:13.167Z",
+      "resolvedAt": "2026-11-04T10:30:33.067Z"
+    },
+    {
+      "id": "pn66a92y",
+      "file": "04-saldo-vivo-libro-swipe.html",
+      "selector": "body > div > section > div > main > div:nth-of-type(2) > button:nth-of-type(1) > span:nth-of-type(2) > span > span:nth-of-type(2)",
+      "excerpt": "Familiar",
+      "comment": "Los tags de categoria no tienen que tener ningun icono.",
+      "createdAt": "2026-11-04T10:25:55.080Z",
+      "status": "resolved",
+      "sentAt": "2026-11-04T10:27:13.168Z",
+      "resolvedAt": "2026-11-04T10:30:33.067Z"
+    },
+    {
+      "id": "c99xcj1z",
+      "file": "04-saldo-vivo-libro-swipe.html",
+      "selector": "body > div > section > div > main > section",
+      "excerpt": "Saldo del vínculo $1.250,00 A favor tuyo Por pagar $2.430,00 Por cobrar $3.680,00",
+      "comment": "Me podes mostrar otras formas mas visuales de mostrar esto",
+      "createdAt": "2026-11-04T10:26:24.431Z",
+      "status": "resolved",
+      "sentAt": "2026-11-04T10:27:13.168Z",
+      "resolvedAt": "2026-11-04T11:08:53.029Z"
+    },
+    {
+      "id": "zxzmywgf",
+      "file": "04-saldo-vivo-libro-swipe.html",
+      "selector": "body > div > section > div > main > section > div > div:nth-of-type(1)",
+      "excerpt": "Por pagar $2.430,00",
+      "comment": "Se infiere por el color y el signo menos. Por lo que no hace falta",
+      "createdAt": "2026-11-04T10:26:51.315Z",
+      "status": "resolved",
+      "sentAt": "2026-11-04T10:27:13.168Z",
+      "resolvedAt": "2026-11-04T10:30:33.067Z"
+    },
+    {
+      "id": "ueh4to0n",
+      "file": "04-saldo-vivo-libro-swipe.html",
+      "selector": "#bal-breakdown",
+      "excerpt": "−$2.430,00 +$3.680,00",
+      "comment": "No me gusta, dame 3 opciones distintas. usa los otros modelos",
+      "createdAt": "2026-11-04T10:42:18.486Z",
+      "status": "resolved",
+      "sentAt": "2026-11-04T10:42:29.464Z",
+      "resolvedAt": "2026-11-04T11:08:45.664Z"
+    },
+    {
+      "id": "ka6pjq44",
+      "file": "04-saldo-vivo-libro-swipe.html",
+      "selector": "body > div > section > div > main > div:nth-of-type(2) > button:nth-of-type(1) > span:nth-of-type(2) > span",
+      "excerpt": "Pagado Familiar",
+      "comment": "deja el color del tag de categoria, Fijate tambien que hay un tag mas en el sistema que muestra que no tiene Doc. , ese no hace falta.",
+      "createdAt": "2026-11-04T10:51:49.778Z",
+      "status": "resolved",
+      "sentAt": "2026-11-04T11:08:54.759Z",
+      "resolvedAt": "2026-11-04T11:12:27.362Z"
+    },
+    {
+      "id": "r5lg18vn",
+      "file": "04-saldo-vivo-libro-swipe.html",
+      "selector": "body > div > section > div > main > section > section:nth-of-type(1)",
+      "excerpt": "OPCIÓN A Saldo del vínculo $1.250,00 A favor tuyo Por pagar $2.430,00 Por cobrar $3.680,00",
+      "comment": "## Componente: \"Fajo de billetes\" para el saldo del vínculo\n\nObjetivo\nReemplazar/complementar el bloque \"Saldo del vínculo\" con una ilustración de un fajo de billetes que represente visualmente el saldo (por cobrar − por pagar).\n\nEntradas\n- porCobrar (number)\n- porPagar (number)\n- saldo = porCobrar − porPagar (redondeado a 2 decimales)\n\nReglas visuales\n1. Saldo > 0 (a favor):\n   - Fajo en verde, con banda dorada al centro.\n   - Monto en verde, subtítulo \"A favor tuyo\".\n   - Símbolo \"$\" sobre la banda.\n2. Saldo < 0 (en contra):\n   - Mismo fajo pero en rojo, con banda roja oscura y texto blanco.\n   - Monto en rojo con signo \"−\", subtítulo \"En contra tuyo\".\n   - Símbolo \"−\" sobre la banda.\n3. Saldo = 0:\n   - Una sola capa gris plana, monto en gris, subtítulo \"Estás a mano\".\n\nCantidad de billetes (altura del fajo)\n- capas = clamp(ceil(|saldo| / 250), 1, 12). Con saldo 0, una capa plana gris.\n- Cada capa mide 10px de alto; el fajo crece hacia arriba desde una base fija.\n- El valor por capa (250) debe ser una constante configurable. Idealmente, escala relativa al contexto (por ejemplo, al saldo máximo del vínculo) en lugar de un valor fijo.\n- Ejemplo: saldo 1.250 → 5 capas.\n\nGeometría (SVG, viewBox 300x200)\n- Frente: rect x=60, ancho 170, alto = capas*10, base en y=150.\n- Cara superior: paralelogramo con desplazamiento (+30, −20).\n- Lateral derecho: paralelogramo en tono más oscuro.\n- Líneas finas entre capas (frente y lateral) para dar efecto de pila.\n- Banda: rect x=115, ancho 70, a todo el alto del fajo, con su cara superior.\n- Texto del monto centrado debajo (y=178, 24px, peso 500); subtítulo debajo (12px).\n\nFormato del monto\n- Locale es-AR: \"$1.250,00\" (punto de miles, coma decimal), con \"−\" delante si es negativo.\n\nPaleta (claro)\n- Positivo: frente #97C459, tope #C0DD97, lateral #3B6D11, borde #27500A, banda #FAC775 (borde #854F0B, texto #412402), monto #639922.\n- Negativo: frente #F09595, tope #F7C1C1, lateral #A32D2D, borde #791F1F, banda #791F1F (borde #501313, t",
+      "createdAt": "2026-11-04T11:08:24.999Z",
+      "status": "resolved",
+      "sentAt": "2026-11-04T11:08:54.759Z",
+      "resolvedAt": "2026-11-04T11:12:27.362Z"
     }
   ]
 }

@@ -49,15 +49,19 @@
 
   .eyebrow { font-size: 11px; font-weight: 500; font-variant: small-caps; letter-spacing: .5px; color: var(--on-surface-variant); }
 
-  /* ── Saldo (01) ── */
-  .balance { background: var(--surface); border: 1px solid var(--outline-variant); border-radius: 16px; padding: 14px 16px; }
-  .balance .amount { font-family: var(--serif); font-size: 36px; font-weight: 600; line-height: 42px; color: var(--a-favor); margin-top: 2px; text-align: left; }
-  .balance .hint { font-size: 12px; color: var(--on-surface-variant); }
-  .split { display: grid; grid-template-columns: 1fr 1fr; margin-top: 12px; border-top: 1px solid var(--outline-variant); }
-  .split div { padding-top: 8px; }
-  .split div + div { border-left: 1px solid var(--outline-variant); padding-left: 12px; }
-  .split .lbl { font-size: 10px; font-weight: 500; font-variant: small-caps; letter-spacing: .5px; color: var(--on-surface-variant); }
-  .split .val { font-family: var(--serif); font-size: 17px; font-weight: 600; margin-top: 2px; }
+  /* ── Saldo del vínculo: la card del 01, destacada del fondo ── */
+  .balance { position: relative; overflow: hidden; background: var(--primary-container); border: 1px solid rgba(0,32,34,.12); border-radius: 16px; padding: 14px 16px; box-shadow: 0 6px 20px rgba(0,32,34,.16); }
+  .balance::after { content: ""; position: absolute; width: 120px; height: 120px; right: -42px; top: -52px; border-radius: 50%; background: rgba(255,255,255,.35); }
+  .balance .eyebrow { position: relative; z-index: 1; color: var(--on-primary-container); font-weight: 600; }
+  .balance .amount { position: relative; z-index: 1; font-family: var(--serif); font-size: 36px; font-weight: 600; line-height: 42px; margin-top: 2px; }
+  .balance .amount.positive { color: var(--a-favor); }
+  .balance .amount.negative { color: var(--en-contra); }
+  .balance .amount.neutral { color: var(--on-primary-container); }
+  .balance .hint { position: relative; z-index: 1; font-size: 12px; color: var(--on-primary-container); }
+  .balance .split { position: relative; z-index: 1; display: grid; grid-template-columns: 1fr 1fr; margin-top: 12px; padding-top: 9px; border-top: 1px solid rgba(0,32,34,.18); }
+  .balance .split div + div { border-left: 1px solid rgba(0,32,34,.18); padding-left: 12px; }
+  .balance .split .lbl { font-size: 9px; font-weight: 600; font-variant: small-caps; letter-spacing: .5px; color: var(--on-primary-container); }
+  .balance .split .val { font-family: var(--serif); font-size: 16px; font-weight: 600; margin-top: 2px; color: var(--on-primary-container); }
 
   /* ── Filtros por estado (01) ── */
   .filters { display: flex; gap: 8px; overflow-x: auto; padding: 2px 0; scrollbar-width: none; }
@@ -88,8 +92,12 @@
   .tag.aprobado { color: var(--aprobado); background: var(--aprobado-bg); } .tag.aprobado i { background: #43A047; }
   .tag.pagado { color: var(--pagado); background: var(--pagado-bg); } .tag.pagado i { background: #1E88E5; }
   .tag.rechazado { color: var(--rechazado); background: var(--rechazado-bg); } .tag.rechazado i { background: #E53935; }
-  .cat { font-size: 10px; color: var(--on-surface-variant); display: inline-flex; align-items: center; gap: 4px; }
-  .cat i { width: 6px; height: 6px; border-radius: 50%; }
+  .cat { font-size: 10px; font-weight: 600; color: var(--on-surface-variant); white-space: nowrap; }
+  .cat.salud { color: #AD1457; }
+  .cat.educacion { color: #303F9F; }
+  .cat.familiar { color: #6A1B9A; }
+  .cat.recreacion { color: #B42C0E; }
+  .cat.otros { color: #5D4037; }
   .amount { text-align: right; font-variant-numeric: tabular-nums; }
   .amount .v { font-family: var(--serif); font-size: 16px; font-weight: 600; white-space: nowrap; }
   .amount .s { font-size: 10px; color: var(--on-surface-variant); white-space: nowrap; }
@@ -119,9 +127,9 @@
       <main class="feed">
         <section class="balance" aria-labelledby="bal-title">
           <p class="eyebrow" id="bal-title">Saldo del vínculo</p>
-          <p class="amount">$1.250,00</p>
+          <p class="amount positive">$1.250,00</p>
           <p class="hint">A favor tuyo</p>
-          <div class="split">
+          <div class="split" role="group" aria-label="Por pagar $2.430,00 y por cobrar $3.680,00">
             <div>
               <p class="lbl">Por pagar</p>
               <p class="val">$2.430,00</p>
@@ -151,7 +159,7 @@
               <span class="date"><span class="d">3</span><span class="m">nov</span></span>
               <span class="body">
                 <h3>Consulta pediátrica</h3>
-                <span class="meta"><span class="tag pendiente"><i aria-hidden="true"></i>Pendiente</span><span class="cat"><i style="background:#D81B60" aria-hidden="true"></i>Salud</span></span>
+                <span class="meta"><span class="tag pendiente"><i aria-hidden="true"></i>Pendiente</span><span class="cat salud">Salud</span></span>
               </span>
               <span class="amount"><span class="v">$7.200,00</span><br><span class="s">tu parte $3.600,00</span></span>
             </button>
@@ -166,7 +174,7 @@
               <span class="date"><span class="d">2</span><span class="m">nov</span></span>
               <span class="body">
                 <h3>Cumpleaños de Emma</h3>
-                <span class="meta"><span class="tag pendiente"><i aria-hidden="true"></i>Pendiente</span><span class="cat"><i style="background:#F4511E" aria-hidden="true"></i>Recreación</span></span>
+                <span class="meta"><span class="tag pendiente"><i aria-hidden="true"></i>Pendiente</span><span class="cat recreacion">Recreación</span></span>
               </span>
               <span class="amount"><span class="v">$9.800,00</span><br><span class="s">tu parte $4.900,00</span></span>
             </button>
@@ -176,7 +184,7 @@
             <span class="date"><span class="d">1</span><span class="m">nov</span></span>
             <span class="body">
               <h3>Supermercado semanal</h3>
-              <span class="meta"><span class="tag pagado"><i aria-hidden="true"></i>Pagado</span><span class="cat"><i style="background:#8E24AA" aria-hidden="true"></i>Familiar</span></span>
+              <span class="meta"><span class="tag pagado"><i aria-hidden="true"></i>Pagado</span><span class="cat familiar">Familiar</span></span>
             </span>
             <span class="amount"><span class="v">$18.400,00</span><br><span class="s">tu parte $9.200,00</span></span>
           </button>
@@ -185,7 +193,7 @@
             <span class="date"><span class="d">28</span><span class="m">oct</span></span>
             <span class="body">
               <h3>Útiles escolares</h3>
-              <span class="meta"><span class="tag aprobado"><i aria-hidden="true"></i>Aprobado</span><span class="cat"><i style="background:#3F51B5" aria-hidden="true"></i>Educación</span></span>
+              <span class="meta"><span class="tag aprobado"><i aria-hidden="true"></i>Aprobado</span><span class="cat educacion">Educación</span></span>
             </span>
             <span class="amount"><span class="v">$12.500,00</span><br><span class="s">tu parte $6.250,00</span></span>
           </button>
@@ -194,7 +202,7 @@
             <span class="date"><span class="d">27</span><span class="m">oct</span></span>
             <span class="body">
               <h3>Remís a la escuela</h3>
-              <span class="meta"><span class="tag pagado"><i aria-hidden="true"></i>Pagado</span><span class="cat"><i style="background:#8D6E63" aria-hidden="true"></i>Otros</span></span>
+              <span class="meta"><span class="tag pagado"><i aria-hidden="true"></i>Pagado</span><span class="cat otros">Otros</span></span>
             </span>
             <span class="amount"><span class="v">$2.300,00</span><br><span class="s">tu parte $1.150,00</span></span>
           </button>
@@ -203,7 +211,7 @@
             <span class="date"><span class="d">25</span><span class="m">oct</span></span>
             <span class="body">
               <h3>Cine familiar</h3>
-              <span class="meta"><span class="tag rechazado"><i aria-hidden="true"></i>Rechazado</span><span class="cat"><i style="background:#F4511E" aria-hidden="true"></i>Recreación</span></span>
+              <span class="meta"><span class="tag rechazado"><i aria-hidden="true"></i>Rechazado</span><span class="cat recreacion">Recreación</span></span>
             </span>
             <span class="amount"><span class="v">$4.500,00</span><br><span class="s">tu parte $2.250,00</span></span>
           </button>
@@ -223,12 +231,13 @@
       </nav>
     </div>
     <p class="frame-note">
-      La combinación de lo que elegiste: el <strong>saldo vivo</strong> del 01 (con los dos brutos
-      debajo), los <strong>filtros por estado</strong> del 01, y
-      el <strong>libro</strong> del 02 —fecha a la izquierda, concepto, categoría, tu parte— ahora con
-      <strong>swipe a la izquierda</strong>: las acciones son dos rectángulos que ocupan el alto
-      completo de la fila, Aprobar a la derecha del todo. Sólo las pendientes se deslizan; una fila
-      ya aprobada o pagada no ofrece acciones.
+      El <strong>saldo del vínculo</strong> vuelve a ser una sola card, ahora destacada del fondo
+      con el tinte primario, elevación y el monto con signo y color: los dos brutos siguen debajo
+      de la hairline. Le siguen los <strong>filtros por estado</strong> del 01 y el
+      <strong>libro</strong> del 02 —fecha a la izquierda, concepto, categoría con su color y sin
+      ícono, y tu parte— con <strong>swipe a la izquierda</strong>: dos acciones rectangulares a
+      alto completo, Aprobar al extremo. Sólo las pendientes se deslizan; una fila ya aprobada o
+      pagada no ofrece acciones.
     </p>
   </section>
 </div>

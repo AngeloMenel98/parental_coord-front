@@ -177,17 +177,12 @@ class ExpensesScreenContractTest {
     }
 
     @Test
-    fun `la fila avisa cuando el gasto no tiene documento`() {
+    fun `la fila ya no muestra el tag sin doc`() {
         val row = source("ExpenseRow.kt")
 
         assertTrue(
-            "hasDocument" in row,
-            "La fila tiene que mirar `hasDocument`: es el flag DERIVADO (no hay fila en " +
-                "`expense_attachment`) que PRD_expense FR-9 pide pintar como \"sin doc.\".",
-        )
-        assertTrue(
-            "sin doc." in row,
-            "El aviso de documento faltante dice \"sin doc.\": es el texto del PRD.",
+            "sin doc." !in row && "hasDocument" !in row,
+            "🔴 La lista no muestra el tag `sin doc.`; el aviso vive sólo en el detalle.",
         )
     }
 
