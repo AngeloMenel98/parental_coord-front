@@ -46,7 +46,7 @@ inventado.
 | T6 | S1,S2,S3,S4 | done · delegated · `412771c` |
 | T7 | S3 | done · delegated · viewer-specific share · `412771c` |
 | T8 | S3 | done · inline · fix the compressed `sin doc.` tag · `e7d4e72` |
-| T9 | S3 | done · inline · categoría sin ícono y sin tag `sin doc.` · `b477c4d` |
+| T9 | S3 | done · inline · categoría sin ícono y sin tag `sin doc.` · `f120dae` |
 
 ## Log
 
