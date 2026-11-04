@@ -47,7 +47,7 @@ inventado.
 | T7 | S3 | done · delegated · viewer-specific share · `412771c` |
 | T8 | S3 | done · inline · fix the compressed `sin doc.` tag · `e7d4e72` |
 | T9 | S3 | done · inline · categoría sin ícono y sin tag `sin doc.` · `f120dae` |
-| T10 | S1 | done · inline · card de saldo como la de cumplimiento · `pending` |
+| T10 | S1 | done · inline · card de saldo como la de cumplimiento · `2033916` |
 
 ## Log
 
