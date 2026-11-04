@@ -18,6 +18,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -32,7 +33,7 @@ import com.parental.shared.feature.expenses.domain.ledgerDate
 import com.parental.shared.feature.expenses.domain.model.ExpenseResponseDto
 import com.parental.shared.feature.expenses.domain.model.ExpenseStatus
 import com.parental.shared.feature.expenses.domain.model.displayName
-import com.parental.shared.feature.expenses.domain.payerShare
+import com.parental.shared.feature.expenses.domain.viewerShare
 import com.parental.shared.feature.expenses.ui.swipe.ExpenseSwipeBox
 
 /**
@@ -49,6 +50,7 @@ import com.parental.shared.feature.expenses.ui.swipe.ExpenseSwipeBox
 fun ExpenseRow(
     expense: ExpenseResponseDto,
     categoryMap: Map<String, CategoryInfo>,
+    currentUserId: String? = null,
     modifier: Modifier = Modifier,
     swipeOpen: Boolean = false,
     onSwipeOpenChange: (Boolean) -> Unit = {},
@@ -57,8 +59,8 @@ fun ExpenseRow(
     onReject: () -> Unit = {},
 ) {
     val date = ledgerDate(expense.expenseDate)
-    val share = payerShare(expense.amount, expense.splitRatioPayer)
-    val showShare = expense.splitRatioPayer in 0..99
+    val share = viewerShare(expense, currentUserId)
+    val showShare = share != null
     val canSwipe = expense.canApprove || expense.canReject
 
     ExpenseSwipeBox(
@@ -85,7 +87,7 @@ fun ExpenseRow(
             ) {
                 Text(
                     text = date.day,
-                    style = MaterialTheme.typography.titleLarge,
+                    style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
                 )
@@ -129,6 +131,7 @@ fun ExpenseRow(
                 Text(
                     text = formatMoney(expense.amount),
                     style = MaterialTheme.typography.titleMedium,
+                    fontFamily = FontFamily.Serif,
                     fontWeight = FontWeight.SemiBold,
                     textAlign = TextAlign.End,
                     maxLines = 1,

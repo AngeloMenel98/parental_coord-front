@@ -340,6 +340,7 @@ private fun AppContent(
                         }
                         ExpensesScreen(
                             viewModel = expensesViewModel,
+                            currentUserId = currentUserId,
                             onLogout = logout,
                             onNavigateBottom = onNavigateBottom,
                             unreadCount = unreadCount,

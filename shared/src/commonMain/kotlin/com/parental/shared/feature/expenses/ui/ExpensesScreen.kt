@@ -27,11 +27,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -77,6 +76,7 @@ import com.parental.shared.feature.expenses.domain.model.ExpenseSummaryDto
 @Composable
 fun ExpensesScreen(
     viewModel: ExpensesViewModel,
+    currentUserId: String? = null,
     onLogout: () -> Unit = {},
     onNavigateBottom: (String) -> Unit = {},
     unreadCount: Int = 0,
@@ -154,6 +154,7 @@ fun ExpensesScreen(
                 uiState.items.isEmpty() && uiState.summary == null -> ExpensesEmptyState()
                 else -> ExpensesContent(
                     uiState = uiState,
+                    currentUserId = currentUserId,
                     onStatusSelected = { viewModel.selectStatusFilter(it) },
                     onExpenseClick = { viewModel.openDetail(it) },
                     onApprove = { id -> viewModel.approve(id) },
@@ -187,6 +188,7 @@ fun ExpensesScreen(
 @Composable
 private fun ExpensesContent(
     uiState: ExpensesUiState,
+    currentUserId: String?,
     onStatusSelected: (ExpenseStatus?) -> Unit,
     onExpenseClick: (String) -> Unit,
     onApprove: (String) -> Unit,
@@ -228,26 +230,21 @@ private fun ExpensesContent(
                 ExpensesEmptyState(modifier = Modifier.padding(vertical = Spacing.padded))
             }
         } else {
-            item(key = "list-frame") {
-                Surface(
-                    color = MaterialTheme.colorScheme.surface,
-                    shape = MaterialTheme.shapes.medium,
-                ) {
-                    Column {
-                        uiState.items.forEach { expense ->
-                            ExpenseRow(
-                                expense = expense,
-                                categoryMap = categoryMap,
-                                swipeOpen = openExpenseId == expense.id,
-                                onSwipeOpenChange = { open ->
-                                    openExpenseId = if (open) expense.id else null
-                                },
-                                onClick = { onExpenseClick(expense.id) },
-                                onApprove = { onApprove(expense.id) },
-                                onReject = { onReject(expense.id) },
-                            )
-                        }
-                    }
+            items(uiState.items, key = { it.id }) { expense ->
+                ExpenseRow(
+                    expense = expense,
+                    categoryMap = categoryMap,
+                    currentUserId = currentUserId,
+                    swipeOpen = openExpenseId == expense.id,
+                    onSwipeOpenChange = { open ->
+                        openExpenseId = if (open) expense.id else null
+                    },
+                    onClick = { onExpenseClick(expense.id) },
+                    onApprove = { onApprove(expense.id) },
+                    onReject = { onReject(expense.id) },
+                )
+                if (expense.id != uiState.items.last().id) {
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 }
             }
 
@@ -288,47 +285,54 @@ private fun BalanceHeader(summary: ExpenseSummaryDto, modifier: Modifier = Modif
         else -> "Al día"
     }
 
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = Spacing.xs, vertical = Spacing.sm),
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.large,
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(Spacing.hairline, MaterialTheme.colorScheme.outlineVariant),
     ) {
-        Text(
-            text = "Saldo del vínculo",
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Text(
-            text = formatMoney(saldo),
-            style = MaterialTheme.typography.displaySmall,
-            fontWeight = FontWeight.SemiBold,
-            color = amountColor,
-            maxLines = 1,
-        )
-        Text(
-            text = "$legend · actualizado hoy",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(modifier = Modifier.height(Spacing.md))
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(Spacing.hairline)
-                .background(MaterialTheme.colorScheme.outlineVariant),
-        )
-        Spacer(modifier = Modifier.height(Spacing.sm))
-        Row(modifier = Modifier.fillMaxWidth()) {
-            BalanceFigure(
-                label = "Por pagar",
-                value = formatMoney(summary.porPagar),
-                modifier = Modifier.weight(1f),
+                .padding(horizontal = Spacing.lg, vertical = Spacing.md),
+        ) {
+            Text(
+                text = "Saldo del vínculo",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            BalanceFigure(
-                label = "Por cobrar",
-                value = formatMoney(summary.porCobrar),
-                modifier = Modifier.weight(1f),
+            Text(
+                text = formatMoney(saldo),
+                style = MaterialTheme.typography.displaySmall,
+                fontWeight = FontWeight.SemiBold,
+                color = amountColor,
+                maxLines = 1,
             )
+            Text(
+                text = legend,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(modifier = Modifier.height(Spacing.md))
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(Spacing.hairline)
+                    .background(MaterialTheme.colorScheme.outlineVariant),
+            )
+            Spacer(modifier = Modifier.height(Spacing.sm))
+            Row(modifier = Modifier.fillMaxWidth()) {
+                BalanceFigure(
+                    label = "Por pagar",
+                    value = formatMoney(summary.porPagar),
+                    modifier = Modifier.weight(1f),
+                )
+                BalanceFigure(
+                    label = "Por cobrar",
+                    value = formatMoney(summary.porCobrar),
+                    modifier = Modifier.weight(1f),
+                )
+            }
         }
     }
 }
@@ -344,6 +348,7 @@ private fun BalanceFigure(label: String, value: String, modifier: Modifier = Mod
         Text(
             text = value,
             style = MaterialTheme.typography.titleMedium,
+            fontFamily = androidx.compose.ui.text.font.FontFamily.Serif,
             fontWeight = FontWeight.SemiBold,
             maxLines = 1,
         )

@@ -89,32 +89,37 @@ fun ExpenseSwipeBox(
     }
 
     Box(modifier = modifier) {
-        Row(
+        Box(
             modifier = Modifier
-                .align(Alignment.CenterEnd)
-                .fillMaxHeight()
+                .matchParentSize()
                 .clearAndSetSemantics { },
         ) {
-            SwipeAction(
-                label = "Rechazar",
-                background = MaterialTheme.colorScheme.error,
-                contentColor = MaterialTheme.colorScheme.onError,
-                width = actionWidth,
-                onClick = {
-                    onOpenChange(false)
-                    onReject()
-                },
-            )
-            SwipeAction(
-                label = "Aprobar",
-                background = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
-                width = actionWidth,
-                onClick = {
-                    onOpenChange(false)
-                    onApprove()
-                },
-            )
+            Row(
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .fillMaxHeight(),
+            ) {
+                SwipeAction(
+                    label = "Rechazar",
+                    background = MaterialTheme.colorScheme.error,
+                    contentColor = MaterialTheme.colorScheme.onError,
+                    width = actionWidth,
+                    onClick = {
+                        onOpenChange(false)
+                        onReject()
+                    },
+                )
+                SwipeAction(
+                    label = "Aprobar",
+                    background = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                    width = actionWidth,
+                    onClick = {
+                        onOpenChange(false)
+                        onApprove()
+                    },
+                )
+            }
         }
 
         Box(

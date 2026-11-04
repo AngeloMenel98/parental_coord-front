@@ -1,19 +1,39 @@
 package com.parental.shared.feature.expenses.domain
 
+import com.parental.shared.feature.expenses.domain.model.ExpenseResponseDto
 import kotlinx.datetime.LocalDate
 
 /**
- * La parte que le toca a quien pide el gasto (S3).
+ * La parte que le toca a quien pide el gasto.
  *
- * El contrato guarda el porcentaje del solicitante (`splitRatioPayer`) y el servidor deriva
- * la contraparte, así que acá sólo se aplica ese porcentaje: no hay una segunda regla de
- * reparto en el cliente. Un ratio fuera de 0..100 se recorta — el backend no lo manda así,
- * pero una fila con "tu parte" mayor que el total sería peor que un recorte silencioso.
+ * Es un primitivo puro: aplica un porcentaje sobre el monto. Un ratio fuera de 0..100 se
+ * recorta — el backend no lo manda así, pero una fila con "tu parte" mayor que el total
+ * sería peor que un recorte silencioso.
  */
 internal fun payerShare(amount: Double, splitRatioPayer: Int): Double {
     if (!amount.isFinite()) return 0.0
     val ratio = splitRatioPayer.coerceIn(0, 100)
     return amount * ratio / 100.0
+}
+
+/**
+ * S3 (corregido en T7): "Tu parte" es la parte del usuario autenticado que consulta.
+ *
+ * - Si el viewer es quien pidió el gasto → `splitRatioPayer`.
+ * - Si el viewer es la contraparte → `splitRatioOther`.
+ * - Si la identidad todavía no se conoce → `null`; la fila omite la línea en vez de
+ *   mostrar la parte de otra persona.
+ *
+ * El saldo y los conteos siguen viniendo del servidor; acá sólo se decide qué porcentaje
+ * le corresponde al viewer.
+ */
+internal fun viewerShare(expense: ExpenseResponseDto, viewerId: String?): Double? {
+    if (viewerId == null) return null
+    return when (viewerId) {
+        expense.requestedBy -> payerShare(expense.amount, expense.splitRatioPayer)
+        expense.counterpartId -> payerShare(expense.amount, expense.splitRatioOther)
+        else -> null
+    }
 }
 
 /** El día y el mes abreviado de un asiento del libro (S3). */

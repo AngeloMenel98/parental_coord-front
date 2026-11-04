@@ -57,6 +57,41 @@ class ExpensesLedgerContractTest {
     }
 
     @Test
+    fun `el saldo conserva la tarjeta que el usuario eligio`() {
+        val screen = source("ExpensesScreen.kt")
+        val balance = screen.substringAfter("private fun BalanceHeader(")
+            .substringBefore("@Composable\nprivate fun BalanceFigure(")
+
+        assertTrue(
+            "Surface(" in balance,
+            "🔴 S1: el saldo tiene que conservar la tarjeta elegida por el usuario, no una columna suelta.",
+        )
+        assertTrue(
+            "shape = MaterialTheme.shapes.large" in balance,
+            "🔴 La tarjeta de saldo usa el radio grande del sistema de diseño.",
+        )
+        assertTrue(
+            "BorderStroke(Spacing.hairline, MaterialTheme.colorScheme.outlineVariant)" in balance,
+            "🔴 La tarjeta de saldo conserva la hairline de borde del artboard.",
+        )
+    }
+
+    @Test
+    fun `el encabezado no inventa una fecha de actualizacion`() {
+        val screen = source("ExpensesScreen.kt")
+
+        assertTrue(
+            "actualizado hoy" !in screen,
+            "🔴 El resumen no trae una fecha de actualización: la pantalla no puede inventarla.",
+        )
+        assertTrue(
+            "updatedAt" !in screen.substringAfter("private fun BalanceHeader(")
+                .substringBefore("@Composable\nprivate fun BalanceFigure("),
+            "🔴 El encabezado del saldo no puede derivar frescura de un campo que no existe en el contrato.",
+        )
+    }
+
+    @Test
     fun `los filtros son por estado y usan los conteos del servidor`() {
         val screen = source("ExpensesScreen.kt")
 
@@ -85,8 +120,8 @@ class ExpensesLedgerContractTest {
             "🔴 S3: la fecha se pinta como día + mes abreviado.",
         )
         assertTrue(
-            "payerShare(" in row,
-            "🔴 S3: la parte se calcula con `payerShare`, la única regla de reparto.",
+            "viewerShare(" in row,
+            "🔴 S3 (T7): la parte se calcula con `viewerShare`, la regla de reparto del viewer.",
         )
         assertTrue(
             "\"Tu parte " in row,
@@ -99,6 +134,52 @@ class ExpensesLedgerContractTest {
         assertTrue(
             "hasDocument" in row && "sin doc." in row,
             "🔴 FR-9: el aviso de documento faltante no se pierde en el rediseño.",
+        )
+    }
+
+    @Test
+    fun `la fila recibe la identidad del viewer desde la pantalla`() {
+        val screen = source("ExpensesScreen.kt")
+        val row = source("ExpenseRow.kt")
+
+        assertTrue(
+            "currentUserId: String?" in screen,
+            "🔴 T7: `ExpensesScreen` expone `currentUserId` para recibir la identidad autenticada.",
+        )
+        assertTrue(
+            "currentUserId = currentUserId" in screen,
+            "🔴 T7: `ExpensesContent` pasa la identidad a `ExpenseRow`.",
+        )
+        assertTrue(
+            "currentUserId: String?" in row,
+            "🔴 T7: `ExpenseRow` recibe `currentUserId` para decidir la parte del viewer.",
+        )
+        assertTrue(
+            "viewerShare(expense, currentUserId)" in row,
+            "🔴 T7: `ExpenseRow` resuelve la parte a partir de la identidad autenticada.",
+        )
+    }
+
+    @Test
+    fun `la fila conserva el libro plano con separadores`() {
+        val screen = source("ExpensesScreen.kt")
+        val row = source("ExpenseRow.kt")
+
+        assertTrue(
+            "item(key = \"list-frame\")" !in screen,
+            "🔴 S3: el libro no se envuelve en una tarjeta redondeada; son asientos planos separados por hairlines.",
+        )
+        assertTrue(
+            "items(uiState.items" in screen,
+            "🔴 La lista del libro debe componerse como ítems individuales del LazyColumn.",
+        )
+        assertTrue(
+            "HorizontalDivider(" in screen,
+            "🔴 Cada asiento del libro necesita su hairline separador.",
+        )
+        assertTrue(
+            "MaterialTheme.shapes.large" !in row,
+            "🔴 La tarjeta de saldo usa el radio grande; los asientos no deben heredarlo.",
         )
     }
 
@@ -142,6 +223,16 @@ class ExpensesLedgerContractTest {
         assertTrue(
             "MotionTokens.durationStandard" in swipe,
             "La animación usa el token de duración de la app (150 ms).",
+        )
+    }
+
+    @Test
+    fun `las acciones del swipe ocupan todo el alto de la fila`() {
+        val swipe = source("swipe/ExpenseSwipeBox.kt")
+
+        assertTrue(
+            "matchParentSize()" in swipe,
+            "🔴 S4: las acciones rectangulares deben medirse contra toda la fila, no contra un alto infinito.",
         )
     }
 

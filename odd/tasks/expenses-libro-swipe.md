@@ -18,8 +18,10 @@ categorías dejan de ser el filtro.
 
 S3. **La lista es un libro.** Cada fila: fecha a la izquierda (día en serif grande sobre el mes
 abreviado en tres letras), concepto, `StatusTag` de estado + categoría, y a la derecha el monto
-total con `Tu parte $x` debajo (`amount * splitRatioPayer / 100`, formateado con `formatMoney`).
-La fila abre el detalle al tocarla.
+total con `Tu parte $x` debajo. `$x` es la parte del usuario que consulta: si pidió el gasto,
+`amount * splitRatioPayer / 100`; si es la contraparte, `amount * splitRatioOther / 100`. Si la
+identidad del usuario todavía no se conoce, la línea se omite en vez de mostrar la parte de
+otro. El saldo y los conteos siguen viniendo del servidor; la fila abre el detalle al tocarla.
 
 S4. **Swipe sólo en lo que se puede decidir.** Una fila se desliza a la izquierda sólo si el
 servidor dice `canApprove` o `canReject` (nunca por estado deducido en el cliente). Detrás
@@ -41,6 +43,8 @@ inventado.
 | T3 | S3,S4 | `ExpenseRow` como fila de libro con swipe |
 | T4 | S1,S2,S3 | `ExpensesScreen`: saldo, filtros, lista |
 | T5 | S1-S5 | hecho · tests en los dos commits de código |
+| T6 | S1,S2,S3,S4 | done · delegated · `a737fcf` |
+| T7 | S3 | done · delegated · viewer-specific share · `a737fcf` |
 
 ## Log
 
@@ -71,3 +75,36 @@ diseño por cerrado.
 L7: sin dispositivo, la revisión del gesto encontró dos defectos que la captura tampoco habría
 mostrado bien: la fila no tenía fondo y las acciones del swipe se veían siempre detrás, y el
 drag lanzaba una corrutina por evento de puntero. Los dos corregidos antes de cerrar.
+
+L8 (verbatim): "look for the design i asked you to do for expenses view, but i saw that you did not do it correctly. Fix it"
+
+L9 (corrección): la comparación contra el artboard elegido y los comentarios_canvas
+encontró que la implementación Compose había perdido la tarjeta de saldo, agrupado la lista
+en una superficie redondeada sin separadores, añadido la leyenda temporal no respaldada
+"actualizado hoy", y dejado las acciones del swipe sin una garantía estructural de ocupar
+todo el alto de la fila. T6 corrige sólo esos desvíos y vuelve a abrir la verificación visual.
+
+L10 (defecto semántico descubierto al revisar T6): S3 decía siempre
+`amount * splitRatioPayer / 100` bajo la etiqueta "Tu parte", pero `splitRatioPayer` pertenece a
+quien SOLICITÓ el gasto. Para la contraparte, "tu parte" es `splitRatioOther`; con una sesión
+legacy cuyo `userId` todavía no se conoce, esa línea no se puede determinar y debe omitirse.
+T7 corrige S3 y lo fija con pruebas deterministas; no recalcula el saldo ni los conteos del
+servidor.
+
+L11 (entrega de la corrección): T6 y T7 quedaron implementados en el mismo work unit. T6
+restauró la tarjeta de saldo, quitó la copia temporal sin respaldo, aplanó el libro en
+ítems virtuales separados por hairline y midió el riel del swipe contra la fila completa.
+T7 corrigió la parte del viewer. RED: cuatro contratos nuevos fallaron (tarjeta de saldo,
+copy temporal, libro plano y alto del swipe); GREEN: los contratos focalizados y la suite
+completa pasaron. Verificación final: 53 suites / 492 tests, 0 fallos / 0 errores / 0 skips;
+`:androidApp:assembleDebug` verde; APK SHA-256
+`b4f018cf2c9f7328a95f8e1a5f0184ee4665bf24727a7ab9852454f1b7f23e98`; `git diff --check`
+verde; self-check del artboard (sin recursos remotos, landmark `main`, foco visible, sin
+copy obsoleto) verde. `gentle_review assess` clasificó el candidato como riesgo medio,
+`reviewDue=false` (`under_budget`), por lo que no se abrió una revisión nativa y no se
+requirió verificador independiente. La captura en dispositivo sigue pendiente: `adb devices`
+no lista ningún dispositivo.
+
+L12 (cierre): el handoff del artboard elegido queda implementado. La prueba en dispositivo
+sigue siendo la única prueba faltante y no se presenta como hecha. Work unit: `a737fcf`
+(`fix(expenses): align the ledger view with the approved design`).
