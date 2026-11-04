@@ -45,7 +45,7 @@ inventado.
 | T5 | S1-S5 | hecho · tests en los dos commits de código |
 | T6 | S1,S2,S3,S4 | done · delegated · `412771c` |
 | T7 | S3 | done · delegated · viewer-specific share · `412771c` |
-| T8 | S3 | inline · fix the compressed `sin doc.` tag · commit pending |
+| T8 | S3 | done · inline · fix the compressed `sin doc.` tag · `e7d4e72` |
 
 ## Log
 
@@ -132,4 +132,5 @@ la primera fila. T8 mueve el aviso a su propia línea y fija `maxLines = 1` +
 GREEN: 12/12 focalizados, suite completa y `:androidApp:assembleDebug` verdes. Se reinstaló
 el APK y se volvió a capturar la pantalla: `sin doc.` aparece como chip horizontal normal,
 `Aprobado` y `Educación` permanecen en una línea y las dos filas ya no se deforman. Esta
-captura es la prueba visual final.
+captura es la prueba visual final. Work unit: `e7d4e72`
+(`fix(expenses): keep ledger tags on stable lines`).
