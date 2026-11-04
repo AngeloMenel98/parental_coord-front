@@ -43,8 +43,8 @@ inventado.
 | T3 | S3,S4 | `ExpenseRow` como fila de libro con swipe |
 | T4 | S1,S2,S3 | `ExpensesScreen`: saldo, filtros, lista |
 | T5 | S1-S5 | hecho · tests en los dos commits de código |
-| T6 | S1,S2,S3,S4 | done · delegated · `a737fcf` |
-| T7 | S3 | done · delegated · viewer-specific share · `a737fcf` |
+| T6 | S1,S2,S3,S4 | done · delegated · `412771c` |
+| T7 | S3 | done · delegated · viewer-specific share · `412771c` |
 
 ## Log
 
@@ -106,5 +106,5 @@ requirió verificador independiente. La captura en dispositivo sigue pendiente: 
 no lista ningún dispositivo.
 
 L12 (cierre): el handoff del artboard elegido queda implementado. La prueba en dispositivo
-sigue siendo la única prueba faltante y no se presenta como hecha. Work unit: `a737fcf`
+sigue siendo la única prueba faltante y no se presenta como hecha. Work unit: `412771c`
 (`fix(expenses): align the ledger view with the approved design`).
