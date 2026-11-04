@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "chosen": "01-expediente.html",
+  "handoffs": {
+    "01-expediente.html": {
+      "status": "sent",
+      "queued": true,
+      "sentAt": "2026-11-04T12:24:19.092Z",
+      "startedAt": null,
+      "implementedAt": null
+    }
+  }
+}

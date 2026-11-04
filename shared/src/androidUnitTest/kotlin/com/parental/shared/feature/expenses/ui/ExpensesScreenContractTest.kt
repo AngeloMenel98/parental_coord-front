@@ -154,6 +154,7 @@ class ExpensesScreenContractTest {
     @Test
     fun `el detalle muestra los NOMBRES de las personas, no sus ids`() {
         val detail = source("ExpenseDetailScreen.kt")
+        val timeline = File(uiDir.parentFile, "domain/ExpenseTimeline.kt").readText()
 
         // Un UUID en pantalla no le dice nada a nadie: el nombre viene del servidor
         // (que ya resuelve el de la categoría) y el id es sólo el plan B.
@@ -167,11 +168,11 @@ class ExpensesScreenContractTest {
             "El detalle tiene que pintar el NOMBRE de la contraparte.",
         )
         assertTrue(
-            "expense.approvedByName" in detail,
-            "El detalle tiene que pintar el NOMBRE de quien aprobó.",
+            "expense.approvedByName" in timeline,
+            "La trazabilidad tiene que pintar el NOMBRE de quien aprobó.",
         )
         assertTrue(
-            "expense.requestedBy\n" !in detail && "value = expense.requestedBy)" !in detail,
+            "value = expense.requestedBy)" !in detail,
             "El detalle NO puede pintar el id crudo como si fuera un nombre.",
         )
     }

@@ -1,0 +1,27 @@
+{
+  "title": "Gasto — detalle",
+  "brief": "Tres direcciones para el detalle de un gasto de la app de coordinación parental (Kotlin Multiplatform, Android primero). Parten de la anatomía actual: barra con volver, tarjeta de encabezado con concepto, monto y estado, filas etiqueta/valor y botones verticales de acción. Los datos son los del contrato real: concepto, descripción, monto, fecha, estado (pendiente/aprobado/rechazado/pagado), categoría, solicitado por, contraparte, aprobado por y el, pagado el, división del reparto y si tiene comprobante. Las acciones salen de la política del servidor: la contraparte puede aprobar o rechazar mientras está pendiente; el solicitante puede editar o cancelar mientras está pendiente; cualquiera de las dos partes marca pagado cuando está aprobado.",
+  "artboards": [
+    {
+      "file": "01-expediente.html",
+      "title": "Expediente",
+      "tradeoff": "El detalle como ficha completa: encabezado con estado y categoría, monto y barra de división, grilla de datos (con — cuando falta el dato), descripción, bloque de documento con acción de adjuntar y la trazabilidad entera en una línea temporal dentro de un bloque desplegable que sólo suma pasos cuando ocurren, con las acciones al pie. Gana auditoría y lectura completa; a cambio es la dirección más densa y la acción principal compite con mucha información.",
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "02-decision-primero.html",
+      "title": "Decisión primero",
+      "tradeoff": "La pantalla arranca por la decisión: monto, quién lo pide y Aprobar/Rechazar dentro del mismo bloque, luego una franja de tres datos y tres secciones plegables (detalle, división, historial). Máxima velocidad para el que aprueba; a cambio, el historial y la descripción requieren un toque y la lectura forense queda en segundo plano.",
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "03-comprobante.html",
+      "title": "Comprobante",
+      "tradeoff": "El detalle como una hoja troquelada: renglones con puntos guía, total, columnas de la división, bloque de comprobante faltante y sello de estado, con una sola acción al pie. Gana la lectura de 'gasto con respaldo' y una jerarquía muy clara; a cambio, el historial completo no entra, el sello no puede depender sólo del color y la estética de papel no escala bien a todos los estados.",
+      "width": 390,
+      "height": 844
+    }
+  ]
+}

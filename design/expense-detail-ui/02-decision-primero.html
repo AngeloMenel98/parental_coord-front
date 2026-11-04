@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Detalle del gasto · Dirección 02 — Decisión primero</title>
+<style>
+  :root {
+    --primary: #00696D; --on-primary: #FFFFFF;
+    --primary-container: #9CF1F6; --on-primary-container: #002022;
+    --secondary: #4A6365; --secondary-container: #CCE8EA; --on-secondary-container: #051F21;
+    --surface: #FAFDFC; --on-surface: #191C1D;
+    --surface-variant: #DAE4E5; --on-surface-variant: #3F4849;
+    --outline: #6F797A; --outline-variant: #BEC8C9;
+    --error: #BA1A1A;
+    --pendiente: #BF360C; --pendiente-bg: rgba(230,81,0,.15);
+    --salud-bg: #FCE4EC; --salud-text: #AD1457;
+    --serif: Georgia, 'Times New Roman', serif;
+    --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: var(--sans); background: var(--surface-variant); min-height: 100vh; padding: 24px 0; }
+  .stage { display: flex; gap: 40px; justify-content: center; align-items: flex-start; flex-wrap: wrap; padding: 0 24px; }
+  .frame-label { font-size: 11px; font-weight: 500; font-variant: small-caps; letter-spacing: .5px; color: #3F4849; margin-bottom: 8px; }
+  .frame-note { font-size: 12px; color: #3F4849; max-width: 390px; margin-top: 10px; line-height: 1.55; }
+  .phone { width: 390px; height: 844px; background: var(--surface); color: var(--on-surface); display: flex; flex-direction: column; border-radius: 24px; overflow: hidden; box-shadow: 0 8px 32px rgba(0,32,34,.18); position: relative; }
+  button { font-family: inherit; }
+  :focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 4px; }
+
+  .topbar { background: var(--surface); display: flex; align-items: center; height: 56px; padding: 0 8px 0 4px; flex: none; border-bottom: 1px solid var(--outline-variant); }
+  .icon-btn { width: 44px; height: 44px; border: 0; background: transparent; border-radius: 50%; display: grid; place-items: center; cursor: pointer; color: var(--on-surface-variant); }
+  .icon-btn:hover { background: rgba(0,105,109,.06); }
+  .topbar h1 { font-family: var(--serif); font-size: 20px; font-weight: 400; flex: 1; }
+
+  .screen { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; scrollbar-width: none; }
+  .screen::-webkit-scrollbar { display: none; }
+
+  .eyebrow { font-size: 11px; font-weight: 500; font-variant: small-caps; letter-spacing: .5px; color: var(--on-surface-variant); }
+
+  .decision { background: var(--primary-container); color: var(--on-primary-container); border-radius: 16px; padding: 16px; }
+  .decision .eyebrow { color: var(--on-primary-container); font-weight: 600; }
+  .decision h2 { font-size: 18px; font-weight: 600; line-height: 24px; margin-top: 6px; }
+  .decision .amount { font-family: var(--serif); font-size: 36px; font-weight: 600; line-height: 42px; margin-top: 2px; }
+  .decision .who { font-size: 12px; margin-top: 2px; opacity: .9; }
+  .decision .row { display: flex; gap: 8px; margin-top: 14px; }
+  .decision .btn { flex: 1; min-height: 46px; border-radius: 12px; border: 1px solid transparent; font-size: 14px; font-weight: 600; cursor: pointer; }
+  .decision .reject { background: transparent; border-color: var(--on-primary-container); color: var(--on-primary-container); }
+  .decision .approve { background: var(--primary); color: var(--on-primary); }
+  .decision .approve:hover { box-shadow: inset 0 0 0 99px rgba(0,32,34,.10); }
+  .decision .reject:hover { background: rgba(0,32,34,.08); }
+
+  .facts { display: grid; grid-template-columns: repeat(3, 1fr); background: var(--surface); border: 1px solid var(--outline-variant); border-radius: 12px; overflow: hidden; }
+  .facts div { padding: 9px 10px; min-width: 0; }
+  .facts div + div { border-left: 1px solid var(--outline-variant); }
+  .facts .k { font-size: 9px; font-weight: 500; font-variant: small-caps; letter-spacing: .4px; color: var(--on-surface-variant); }
+  .facts .v { font-size: 13px; font-weight: 600; line-height: 18px; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .facts .v.warn { color: var(--error); }
+
+  .group { border: 1px solid var(--outline-variant); border-radius: 12px; overflow: hidden; background: var(--surface); }
+  .group h3 { font-size: 12px; font-weight: 600; }
+  .item { display: flex; align-items: center; gap: 10px; width: 100%; padding: 12px 12px; background: transparent; border: 0; border-bottom: 1px solid var(--outline-variant); text-align: left; color: inherit; cursor: pointer; font: inherit; }
+  .item:last-child { border-bottom: 0; }
+  .item:hover { background: rgba(0,105,109,.04); }
+  .item .body { flex: 1; min-width: 0; }
+  .item .sub { font-size: 11px; color: var(--on-surface-variant); margin-top: 1px; }
+  .item .chevron { color: var(--on-surface-variant); flex: none; }
+  .item[aria-expanded="true"] .chevron { transform: rotate(90deg); }
+
+  .expanded { border-bottom: 1px solid var(--outline-variant); padding: 0 12px 12px 12px; font-size: 12px; line-height: 19px; color: var(--on-surface-variant); }
+  .expanded:last-child { border-bottom: 0; }
+
+  .splitrow { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 2px; }
+  .splitrow .box { border-radius: 8px; padding: 8px 10px; }
+  .splitrow .box.payer { background: var(--pendiente-bg); color: var(--pendiente); }
+  .splitrow .box.other { background: var(--secondary-container); color: var(--on-secondary-container); }
+  .splitrow .k { font-size: 9px; font-variant: small-caps; letter-spacing: .4px; }
+  .splitrow .v { font-family: var(--serif); font-size: 15px; font-weight: 600; }
+
+  .audit { list-style: none; }
+  .audit li { display: flex; gap: 8px; font-size: 12px; line-height: 18px; padding-bottom: 6px; }
+  .audit li:last-child { padding-bottom: 0; }
+  .audit .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--primary); margin-top: 6px; flex: none; }
+  .audit .pending-dot { background: var(--outline-variant); }
+
+  .footnote { font-size: 11px; line-height: 17px; color: var(--on-surface-variant); padding: 2px 4px; }
+
+  .footbar { flex: none; padding: 10px 16px 16px; border-top: 1px solid var(--outline-variant); background: var(--surface); display: flex; gap: 8px; }
+  .linkbtn { flex: 1; min-height: 44px; border-radius: 10px; border: 1px solid var(--outline-variant); background: transparent; color: var(--on-surface-variant); font-size: 13px; font-weight: 600; cursor: pointer; }
+  .linkbtn:hover { background: rgba(0,105,109,.06); }
+</style>
+</head>
+<body>
+<div class="stage">
+  <section class="frame" aria-label="Detalle del gasto: decisión primero">
+    <p class="frame-label">02 · Decisión primero</p>
+    <div class="phone">
+      <header class="topbar">
+        <button class="icon-btn" aria-label="Volver">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+        </button>
+        <h1>Gasto</h1>
+      </header>
+
+      <main class="screen">
+        <section class="decision" aria-labelledby="dec-title">
+          <p class="eyebrow" id="dec-title">Te piden aprobación</p>
+          <h2>Consulta pediátrica</h2>
+          <p class="amount">$7.200,00</p>
+          <p class="who">Mariana González · Salud · 3 nov</p>
+          <div class="row">
+            <button class="btn reject">Rechazar</button>
+            <button class="btn approve">Aprobar</button>
+          </div>
+        </section>
+
+        <section class="facts" aria-label="Resumen del gasto">
+          <div><p class="k">Categoría</p><p class="v">Salud</p></div>
+          <div><p class="k">Fecha</p><p class="v">3 nov</p></div>
+          <div><p class="k">Comprobante</p><p class="v warn">No adjunto</p></div>
+        </section>
+
+        <section class="group" aria-label="Detalle del gasto">
+          <button class="item" aria-expanded="true">
+            <span class="body">
+              <h3>Detalle del gasto</h3>
+              <p class="sub">Descripción y datos de las partes</p>
+            </span>
+            <svg class="chevron" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M9.29 6.71a1 1 0 0 0 0 1.41L13.17 12l-3.88 3.88a1 1 0 1 0 1.42 1.41l4.58-4.58a1 1 0 0 0 0-1.42L10.7 6.7a1 1 0 0 0-1.41 0z"/></svg>
+          </button>
+          <p class="expanded">Control de rutina con la pediatra. Incluye receta y orden de estudios.<br>Contraparte: Ángelo Pérez.</p>
+
+          <button class="item" aria-expanded="true">
+            <span class="body">
+              <h3>División</h3>
+              <p class="sub">50% pagador · 50% otro</p>
+            </span>
+            <svg class="chevron" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M9.29 6.71a1 1 0 0 0 0 1.41L13.17 12l-3.88 3.88a1 1 0 1 0 1.42 1.41l4.58-4.58a1 1 0 0 0 0-1.42L10.7 6.7a1 1 0 0 0-1.41 0z"/></svg>
+          </button>
+          <div class="expanded">
+            <div class="splitrow">
+              <div class="box payer"><p class="k">Pagador</p><p class="v">$3.600,00</p></div>
+              <div class="box other"><p class="k">Otro</p><p class="v">$3.600,00</p></div>
+            </div>
+          </div>
+
+          <button class="item" aria-expanded="false">
+            <span class="body">
+              <h3>Historial</h3>
+              <p class="sub">Creado el 3 nov · sin aprobar</p>
+            </span>
+            <svg class="chevron" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M9.29 6.71a1 1 0 0 0 0 1.41L13.17 12l-3.88 3.88a1 1 0 1 0 1.42 1.41l4.58-4.58a1 1 0 0 0 0-1.42L10.7 6.7a1 1 0 0 0-1.41 0z"/></svg>
+          </button>
+        </section>
+
+        <p class="footnote">
+          Al aprobar, el gasto queda listo para pagarse. Rechazar pide un motivo opcional y deja
+          el gasto cerrado.
+        </p>
+      </main>
+
+      <div class="footbar">
+        <button class="linkbtn">Volver a Gastos</button>
+      </div>
+    </div>
+    <p class="frame-note">
+      La pantalla arranca por <strong>la decisión</strong>: monto, quién lo pide y los dos botones
+      dentro del mismo bloque, sin abrir nada más. Los datos quedan en una franja de tres celdas y
+      tres secciones plegables. Máxima velocidad para el que aprueba; a cambio, el historial y la
+      descripción requieren un toque y la lectura forense es secundaria.
+    </p>
+  </section>
+</div>
+</body>
+</html>

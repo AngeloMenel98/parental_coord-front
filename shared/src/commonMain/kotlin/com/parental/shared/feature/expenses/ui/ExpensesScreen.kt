@@ -171,6 +171,7 @@ fun ExpensesScreen(
         ExpenseDetailScreen(
             viewModel = viewModel,
             onBack = { viewModel.closeDetail() },
+            currentUserId = currentUserId,
             onLogout = onLogout,
         )
     }
