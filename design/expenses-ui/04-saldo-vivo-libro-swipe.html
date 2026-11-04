@@ -27,7 +27,7 @@
   .stage { display: flex; gap: 40px; justify-content: center; align-items: flex-start; flex-wrap: wrap; padding: 0 24px; }
   .frame-label { font-size: 11px; font-weight: 500; font-variant: small-caps; letter-spacing: .5px; color: #3F4849; margin-bottom: 8px; }
   .frame-note { font-size: 12px; color: #3F4849; max-width: 390px; margin-top: 10px; line-height: 1.55; }
-  .phone { width: 390px; height: 844px; background: var(--surface-variant); color: var(--on-surface); display: flex; flex-direction: column; border-radius: 24px; overflow: hidden; box-shadow: 0 8px 32px rgba(0,32,34,.18); position: relative; }
+  .phone { width: 390px; height: 844px; background: var(--surface); color: var(--on-surface); display: flex; flex-direction: column; border-radius: 24px; overflow: hidden; box-shadow: 0 8px 32px rgba(0,32,34,.18); position: relative; }
   button { font-family: inherit; }
   :focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 4px; }
 
@@ -49,19 +49,18 @@
 
   .eyebrow { font-size: 11px; font-weight: 500; font-variant: small-caps; letter-spacing: .5px; color: var(--on-surface-variant); }
 
-  /* ── Saldo del vínculo: la card del 01, destacada del fondo ── */
-  .balance { position: relative; overflow: hidden; background: var(--primary-container); border: 1px solid rgba(0,32,34,.12); border-radius: 16px; padding: 14px 16px; box-shadow: 0 6px 20px rgba(0,32,34,.16); }
-  .balance::after { content: ""; position: absolute; width: 120px; height: 120px; right: -42px; top: -52px; border-radius: 50%; background: rgba(255,255,255,.35); }
-  .balance .eyebrow { position: relative; z-index: 1; color: var(--on-primary-container); font-weight: 600; }
-  .balance .amount { position: relative; z-index: 1; font-family: var(--serif); font-size: 36px; font-weight: 600; line-height: 42px; margin-top: 2px; }
+  /* ── Saldo del vínculo: misma superficie que la card de cumplimiento en Home ── */
+  .balance { background: var(--surface-variant); border-radius: 16px; padding: 14px 16px; }
+  .balance .eyebrow { color: var(--on-surface-variant); font-weight: 600; }
+  .balance .amount { font-family: var(--serif); font-size: 36px; font-weight: 600; line-height: 42px; margin-top: 2px; }
   .balance .amount.positive { color: var(--a-favor); }
   .balance .amount.negative { color: var(--en-contra); }
-  .balance .amount.neutral { color: var(--on-primary-container); }
-  .balance .hint { position: relative; z-index: 1; font-size: 12px; color: var(--on-primary-container); }
-  .balance .split { position: relative; z-index: 1; display: grid; grid-template-columns: 1fr 1fr; margin-top: 12px; padding-top: 9px; border-top: 1px solid rgba(0,32,34,.18); }
-  .balance .split div + div { border-left: 1px solid rgba(0,32,34,.18); padding-left: 12px; }
-  .balance .split .lbl { font-size: 9px; font-weight: 600; font-variant: small-caps; letter-spacing: .5px; color: var(--on-primary-container); }
-  .balance .split .val { font-family: var(--serif); font-size: 16px; font-weight: 600; margin-top: 2px; color: var(--on-primary-container); }
+  .balance .amount.neutral { color: var(--on-surface-variant); }
+  .balance .hint { font-size: 12px; color: var(--on-surface-variant); }
+  .balance .split { display: grid; grid-template-columns: 1fr 1fr; margin-top: 12px; padding-top: 9px; border-top: 1px solid var(--outline-variant); }
+  .balance .split div + div { border-left: 1px solid var(--outline-variant); padding-left: 12px; }
+  .balance .split .lbl { font-size: 9px; font-weight: 600; font-variant: small-caps; letter-spacing: .5px; color: var(--on-surface-variant); }
+  .balance .split .val { font-family: var(--serif); font-size: 16px; font-weight: 600; margin-top: 2px; color: var(--on-surface); }
 
   /* ── Filtros por estado (01) ── */
   .filters { display: flex; gap: 8px; overflow-x: auto; padding: 2px 0; scrollbar-width: none; }
@@ -231,9 +230,10 @@
       </nav>
     </div>
     <p class="frame-note">
-      El <strong>saldo del vínculo</strong> vuelve a ser una sola card, ahora destacada del fondo
-      con el tinte primario, elevación y el monto con signo y color: los dos brutos siguen debajo
-      de la hairline. Le siguen los <strong>filtros por estado</strong> del 01 y el
+      El <strong>saldo del vínculo</strong> vuelve a ser una sola card, ahora sobre la misma
+      superficie que la card de cumplimiento de Home (<code>surfaceVariant</code>): se despega
+      del fondo sin borde ni sombra, y el monto conserva su color por signo con los dos brutos
+      debajo de la hairline. Le siguen los <strong>filtros por estado</strong> del 01 y el
       <strong>libro</strong> del 02 —fecha a la izquierda, concepto, categoría con su color y sin
       ícono, y tu parte— con <strong>swipe a la izquierda</strong>: dos acciones rectangulares a
       alto completo, Aprobar al extremo. Sólo las pendientes se deslizan; una fila ya aprobada o

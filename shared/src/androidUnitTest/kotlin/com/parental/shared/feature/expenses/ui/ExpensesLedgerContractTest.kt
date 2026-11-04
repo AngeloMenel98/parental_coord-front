@@ -57,22 +57,26 @@ class ExpensesLedgerContractTest {
     }
 
     @Test
-    fun `el saldo conserva la tarjeta que el usuario eligio`() {
+    fun `la tarjeta de saldo resalta como la de cumplimiento`() {
         val screen = source("ExpensesScreen.kt")
         val balance = screen.substringAfter("private fun BalanceHeader(")
             .substringBefore("@Composable\nprivate fun BalanceFigure(")
 
         assertTrue(
-            "Surface(" in balance,
-            "🔴 S1: el saldo tiene que conservar la tarjeta elegida por el usuario, no una columna suelta.",
+            "Card(" in balance,
+            "🔴 La card de saldo usa `Card` como `ComplianceRingCard` en Home.",
+        )
+        assertTrue(
+            "MaterialTheme.colorScheme.surfaceVariant" in balance,
+            "🔴 En oscuro `surface` es el mismo #121212 del fondo: solo `surfaceVariant` separa la card.",
         )
         assertTrue(
             "shape = MaterialTheme.shapes.large" in balance,
-            "🔴 La tarjeta de saldo usa el radio grande del sistema de diseño.",
+            "🔴 La card usa el radio grande, igual que la de cumplimiento.",
         )
         assertTrue(
-            "BorderStroke(Spacing.hairline, MaterialTheme.colorScheme.outlineVariant)" in balance,
-            "🔴 La tarjeta de saldo conserva la hairline de borde del artboard.",
+            "BorderStroke" !in balance,
+            "🔴 La card de cumplimiento no lleva borde: el contraste lo da la superficie.",
         )
     }
 

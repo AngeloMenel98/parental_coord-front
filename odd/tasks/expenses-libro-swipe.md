@@ -47,6 +47,7 @@ inventado.
 | T7 | S3 | done · delegated · viewer-specific share · `412771c` |
 | T8 | S3 | done · inline · fix the compressed `sin doc.` tag · `e7d4e72` |
 | T9 | S3 | done · inline · categoría sin ícono y sin tag `sin doc.` · `f120dae` |
+| T10 | S1 | done · inline · card de saldo como la de cumplimiento · `pending` |
 
 ## Log
 
@@ -146,3 +147,13 @@ RED: los contratos nuevos fallaron (3 de 28); GREEN: focalizados, suite completa
 `:androidApp:assembleDebug` verdes. 53 suites / 494 tests, 0 fallos. Verificado en el Xiaomi
 físico: las tres filas muestran `Familiar`, `Educación` y `Salud` en color y sin ícono, y no
 aparece ningún `sin doc.`.
+
+L16 (card de saldo, pedido directo del usuario): "la tarjeta de saldo tiene que resaltar con
+respecto del fondo, usa como ejemplo el compliance card en Home screen". En oscuro `surface`
+es el mismo #121212 del fondo, asi que la card anterior era invisible. T10 copia el patron de
+`ComplianceRingCard`: `Card` con `containerColor = surfaceVariant` (#1E1E1E, la superficie de
+tarjeta del tema oscuro), `contentColor = onSurfaceVariant` y radio grande, sin borde ni
+sombra. El artboard espeja lo mismo: fondo del telefono en `surface` y card en
+`surfaceVariant`. RED: el contrato nuevo fallo; GREEN: focalizados, 53 suites / 494 tests y
+`:androidApp:assembleDebug`. Verificado en el Xiaomi fisico: la card se despega del fondo como
+la de Home y conserva monto con color, leyenda y los dos brutos.
