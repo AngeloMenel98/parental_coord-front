@@ -108,3 +108,17 @@ no lista ningún dispositivo.
 L12 (cierre): el handoff del artboard elegido queda implementado. La prueba en dispositivo
 sigue siendo la única prueba faltante y no se presenta como hecha. Work unit: `412771c`
 (`fix(expenses): align the ledger view with the approved design`).
+
+L13 (prueba en dispositivo): durante el cierre volvió a conectarse el Xiaomi físico
+(`24094RAD4G`, Android 16 / HyperOS). Se instaló el APK verificado (`adb install -r`, éxito) y
+se abrió la app ya autenticada. La pantalla real de Gastos mostró: la tarjeta de saldo con
+firma del servidor, leyenda `En contra`, `Por pagar` / `Por cobrar`, los filtros horizontales
+por estado, las filas planas con status/categoría, `Tu parte` por viewer, el FAB
+`Solicitar` y la navegación inferior. El árbol de accesibilidad confirmó `Saldo del vínculo`,
+`Por pagar`, `Por cobrar`, `Todas`, `Pendientes`, `Aprobados`, `Pagados` y `Tu parte`; al
+activar `Pendientes` (conteo 0) apareció `No hay gastos`, por lo que el filtro se ejecutó
+sobre la lista real. HyperOS bloquea `adb shell input` con `INJECT_EVENTS`; la navegación se
+logró con un script temporal de `monkey` y una sola pulsación en las coordenadas del nodo
+`Gastos`, sin cambiar ajustes de accesibilidad ni seguridad. El script y las capturas
+temporales se eliminaron; el árbol Git quedó limpio. Esta prueba cierra la verificación
+visual pendiente de L6/L11/L12.
