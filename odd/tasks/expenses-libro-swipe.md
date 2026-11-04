@@ -45,6 +45,7 @@ inventado.
 | T5 | S1-S5 | hecho · tests en los dos commits de código |
 | T6 | S1,S2,S3,S4 | done · delegated · `412771c` |
 | T7 | S3 | done · delegated · viewer-specific share · `412771c` |
+| T8 | S3 | inline · fix the compressed `sin doc.` tag · commit pending |
 
 ## Log
 
@@ -120,5 +121,15 @@ activar `Pendientes` (conteo 0) apareció `No hay gastos`, por lo que el filtro 
 sobre la lista real. HyperOS bloquea `adb shell input` con `INJECT_EVENTS`; la navegación se
 logró con un script temporal de `monkey` y una sola pulsación en las coordenadas del nodo
 `Gastos`, sin cambiar ajustes de accesibilidad ni seguridad. El script y las capturas
-temporales se eliminaron; el árbol Git quedó limpio. Esta prueba cierra la verificación
+temporales se eliminaron; el árbol Git quedó limpio. Esta prueba cerró la verificación
 visual pendiente de L6/L11/L12.
+
+L14 (defecto encontrado por la prueba en dispositivo): la captura real reveló un defecto
+que las pruebas de fuente no podían ver: `sin doc.` competía por el ancho con status y
+categoría dentro del mismo `Row` y quedaba comprimido como una tira roja vertical, deforma
+la primera fila. T8 mueve el aviso a su propia línea y fija `maxLines = 1` +
+`TextOverflow.Ellipsis` en status, categoría y aviso. RED: el contrato nuevo falló (1/12);
+GREEN: 12/12 focalizados, suite completa y `:androidApp:assembleDebug` verdes. Se reinstaló
+el APK y se volvió a capturar la pantalla: `sin doc.` aparece como chip horizontal normal,
+`Aprobado` y `Educación` permanecen en una línea y las dos filas ya no se deforman. Esta
+captura es la prueba visual final.

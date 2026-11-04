@@ -184,6 +184,30 @@ class ExpensesLedgerContractTest {
     }
 
     @Test
+    fun `los tags de la fila no pueden comprimirse en una tira vertical`() {
+        val row = source("ExpenseRow.kt")
+        val category = row.indexOf("CategoryTag(categoryMap[expense.categoryId])")
+        val missingDocument = row.indexOf("if (!expense.hasDocument)")
+
+        assertTrue(
+            category >= 0 && missingDocument > category,
+            "🔴 La fila debe seguir mostrando categoría y el aviso `sin doc.`.",
+        )
+        assertTrue(
+            "}" in row.substring(category, missingDocument),
+            "🔴 Status y categoría terminan su propia fila: `sin doc.` no puede competir con ellos por el ancho y romper verticalmente.",
+        )
+        assertTrue(
+            "maxLines = 1" in row,
+            "🔴 S3: cada tag queda en una sola línea; sin maxLines puede partirse verticalmente.",
+        )
+        assertTrue(
+            "overflow = TextOverflow.Ellipsis" in row,
+            "🔴 Un tag largo se recorta con puntos suspensivos; no deforma la altura de la fila.",
+        )
+    }
+
+    @Test
     fun `el swipe depende de los flags del servidor`() {
         val row = source("ExpenseRow.kt")
 

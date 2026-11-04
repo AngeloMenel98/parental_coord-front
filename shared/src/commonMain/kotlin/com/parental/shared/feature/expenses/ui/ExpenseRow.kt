@@ -119,9 +119,9 @@ fun ExpenseRow(
                 ) {
                     StatusBadge(status = expense.status)
                     CategoryTag(categoryMap[expense.categoryId])
-                    if (!expense.hasDocument) {
-                        MissingDocumentTag()
-                    }
+                }
+                if (!expense.hasDocument) {
+                    MissingDocumentTag()
                 }
             }
 
@@ -164,6 +164,8 @@ private fun StatusBadge(status: ExpenseStatus) {
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
             style = MaterialTheme.typography.labelSmall,
             fontWeight = FontWeight.Medium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
     }
 }
@@ -199,6 +201,8 @@ private fun CategoryTag(info: CategoryInfo?) {
             Text(
                 text = "${info?.emoji ?: ""} $name".trim(),
                 style = MaterialTheme.typography.labelSmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
         }
     }
@@ -215,6 +219,8 @@ private fun MissingDocumentTag() {
             text = "sin doc.",
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
             style = MaterialTheme.typography.labelSmall,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
     }
 }
