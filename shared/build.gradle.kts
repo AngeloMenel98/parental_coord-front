@@ -106,12 +106,30 @@ kotlin {
     }
 }
 
+// Build-time API endpoints. Override without editing this file:
+//   ./gradlew :androidApp:assembleDebug -PapiBaseUrl=https://host/api -PwsUrl=wss://host/realtime
+//   (local backend)  -PapiBaseUrl=http://192.168.0.17:3000/api -PwsUrl=ws://192.168.0.17:3000/realtime
+//
+// The default points at the deployed managed host, because an APK installed on a
+// phone outside this LAN cannot reach a 192.168.x.x address. A LAN IP baked here
+// only works on the same Wi-Fi as this machine.
+val apiBaseUrl: String = providers.gradleProperty("apiBaseUrl")
+    .getOrElse("https://parental-coord-back.onrender.com/api")
+val wsUrl: String = providers.gradleProperty("wsUrl")
+    .getOrElse("wss://parental-coord-back.onrender.com/realtime")
+
 android {
     namespace = "com.parental.shared"
     compileSdk = 35
 
     defaultConfig {
         minSdk = 26
+        buildConfigField("String", "API_BASE_URL", "\"$apiBaseUrl\"")
+        buildConfigField("String", "WS_URL", "\"$wsUrl\"")
+    }
+
+    buildFeatures {
+        buildConfig = true
     }
 
     compileOptions {

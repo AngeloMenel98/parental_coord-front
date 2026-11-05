@@ -2,6 +2,7 @@ package com.parental.shared.platform
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.parental.shared.BuildConfig
 import io.ktor.client.*
 import io.ktor.client.engine.okhttp.*
 import io.ktor.client.plugins.contentnegotiation.*
@@ -18,14 +19,18 @@ actual object Platform {
 
     // Base URL for Android.
     //
-    // `10.0.2.2` es el alias que el EMULADOR usa para llegar al host: en un teléfono
-    // físico no existe. Para un dispositivo real en la misma red que esta máquina se
-    // usa la IP LAN del host (aquí `192.168.0.17`, la de la iface `wlp4s0`).
+    // Comes from BuildConfig, injected by shared/build.gradle.kts so the same
+    // source builds for the deployed host and for a local backend:
+    //   ./gradlew :androidApp:assembleDebug -PapiBaseUrl=... -PwsUrl=...
     //
-    // ⚠ El teléfono y el(host) tienen que estar en la MISMA red, y el cleartext HTTP
-    // necesita permiso: lo da `androidApp/src/androidMain/res/xml/network_security_config.xml`.
-    actual val baseUrl: String = "http://192.168.0.17:3000/api"
-    actual val wsUrl: String = "ws://192.168.0.17:3000/realtime"
+    // The default is the deployed managed host (public HTTPS/WSS). A LAN address
+    // such as 192.168.0.17 only works on a phone joined to the same Wi-Fi, so it
+    // is no longer baked in: an APK installed elsewhere would talk to nothing.
+    // Cleartext HTTP is still permitted by
+    // androidApp/src/androidMain/res/xml/network_security_config.xml, which is
+    // what makes a LAN override usable at all.
+    actual val baseUrl: String = BuildConfig.API_BASE_URL
+    actual val wsUrl: String = BuildConfig.WS_URL
 
     private var prefs: SharedPreferences? = null
 
