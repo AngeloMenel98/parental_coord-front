@@ -3,7 +3,9 @@ package com.parental.shared.feature.admin.ui
 import com.parental.shared.core.error.ApiResult
 import com.parental.shared.feature.admin.data.remote.AdminApi
 import com.parental.shared.feature.admin.domain.model.AdminBond
+import com.parental.shared.feature.admin.domain.model.AdminBondReport
 import com.parental.shared.feature.admin.domain.model.AdminChild
+import com.parental.shared.feature.admin.domain.model.AdminReport
 import com.parental.shared.feature.admin.domain.model.AdminUser
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -11,6 +13,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
@@ -39,6 +42,26 @@ data class AdminUiState(
     val newChildLastName: String = "",
     val newChildDob: String = "",
     val isCreatingChild: Boolean = false,
+    // F1 · S1/S2 — filas con una request en vuelo (por id, no un flag global).
+    val usersInFlight: Set<String> = emptySet(),
+    val bondsInFlight: Set<String> = emptySet(),
+    // F1 · S3/S4 — edición inline de un hijo y confirmación de borrado.
+    val editingChildId: String? = null,
+    val editChildFirstName: String = "",
+    val editChildLastName: String = "",
+    /** `null` = el hijo no tiene fecha (o el admin la borró). */
+    val editChildDob: String? = null,
+    val isSavingChild: Boolean = false,
+    val childPendingDeleteId: String? = null,
+    val isDeletingChild: Boolean = false,
+    // F2 · S5-S8 — pestaña de reportes.
+    val reportBondId: String? = null,
+    val reportDateFrom: String = adminMonthStartIso(),
+    val reportDateTo: String = adminTodayIso(),
+    val report: AdminBondReport? = null,
+    val isLoadingReport: Boolean = false,
+    val requestedReport: AdminReport? = null,
+    val isRequestingReport: Boolean = false,
 )
 
 class AdminViewModel(
@@ -264,7 +287,269 @@ class AdminViewModel(
         scope.cancel()
     }
 
+    // ── F1 · Activación de usuarios y vínculos ──────────────────────
+
+    /** S1 — un cambio por fila: el switch queda bloqueado hasta la respuesta. */
+    fun toggleUserActive(user: AdminUser) {
+        if (user.id in _uiState.value.usersInFlight) return
+
+        scope.launch {
+            _uiState.value = _uiState.value.copy(
+                usersInFlight = _uiState.value.usersInFlight + user.id,
+                error = null,
+            )
+            when (val result = adminApi.setUserActive(token, user.id, !user.isActive)) {
+                is ApiResult.Success -> {
+                    _uiState.value = _uiState.value.copy(
+                        users = _uiState.value.users.map { if (it.id == user.id) result.data else it },
+                        usersInFlight = _uiState.value.usersInFlight - user.id,
+                    )
+                }
+                is ApiResult.Error -> {
+                    _uiState.value = _uiState.value.copy(
+                        error = result.message,
+                        usersInFlight = _uiState.value.usersInFlight - user.id,
+                    )
+                }
+            }
+        }
+    }
+
+    /** S2 — mismo contrato para el vínculo. */
+    fun toggleBondActive(bond: AdminBond) {
+        if (bond.id in _uiState.value.bondsInFlight) return
+
+        scope.launch {
+            _uiState.value = _uiState.value.copy(
+                bondsInFlight = _uiState.value.bondsInFlight + bond.id,
+                error = null,
+            )
+            when (val result = adminApi.setBondActive(token, bond.id, !bond.isActive)) {
+                is ApiResult.Success -> {
+                    _uiState.value = _uiState.value.copy(
+                        bonds = _uiState.value.bonds.map { if (it.id == bond.id) result.data else it },
+                        bondsInFlight = _uiState.value.bondsInFlight - bond.id,
+                    )
+                }
+                is ApiResult.Error -> {
+                    _uiState.value = _uiState.value.copy(
+                        error = result.message,
+                        bondsInFlight = _uiState.value.bondsInFlight - bond.id,
+                    )
+                }
+            }
+        }
+    }
+
+    // ── F1 · Edición y borrado de hijos ─────────────────────────────
+
+    fun startEditingChild(child: AdminChild) {
+        _uiState.value = _uiState.value.copy(
+            editingChildId = child.id,
+            editChildFirstName = child.firstName,
+            editChildLastName = child.lastName,
+            editChildDob = child.dateOfBirth,
+            error = null,
+        )
+    }
+
+    fun cancelEditingChild() {
+        _uiState.value = _uiState.value.copy(
+            editingChildId = null,
+            editChildFirstName = "",
+            editChildLastName = "",
+            editChildDob = null,
+        )
+    }
+
+    fun updateEditChildFirstName(value: String) {
+        _uiState.value = _uiState.value.copy(editChildFirstName = value)
+    }
+
+    fun updateEditChildLastName(value: String) {
+        _uiState.value = _uiState.value.copy(editChildLastName = value)
+    }
+
+    /** `null` cuando el admin elige "sin fecha". */
+    fun updateEditChildDob(value: String?) {
+        _uiState.value = _uiState.value.copy(editChildDob = value)
+    }
+
+    /** S3/S4 — manda lo que el formulario muestra; sin fecha = `dateOfBirth: null`. */
+    fun saveChild() {
+        val s = _uiState.value
+        val childId = s.editingChildId ?: return
+        if (s.editChildFirstName.isBlank() || s.editChildLastName.isBlank()) {
+            _uiState.value = s.copy(error = "Child name is required")
+            return
+        }
+
+        scope.launch {
+            _uiState.value = _uiState.value.copy(isSavingChild = true, error = null)
+            val result = adminApi.updateChild(
+                token = token,
+                childId = childId,
+                firstName = s.editChildFirstName.trim(),
+                lastName = s.editChildLastName.trim(),
+                dateOfBirth = s.editChildDob,
+                clearDateOfBirth = s.editChildDob == null,
+            )
+            when (result) {
+                is ApiResult.Success -> {
+                    _uiState.value = _uiState.value.copy(
+                        bondChildren = _uiState.value.bondChildren.map {
+                            if (it.id == childId) result.data else it
+                        },
+                        editingChildId = null,
+                        editChildFirstName = "",
+                        editChildLastName = "",
+                        editChildDob = null,
+                        isSavingChild = false,
+                    )
+                }
+                is ApiResult.Error -> {
+                    _uiState.value = _uiState.value.copy(
+                        error = result.message,
+                        isSavingChild = false,
+                    )
+                }
+            }
+        }
+    }
+
+    fun requestDeleteChild(childId: String) {
+        _uiState.value = _uiState.value.copy(childPendingDeleteId = childId, error = null)
+    }
+
+    fun cancelDeleteChild() {
+        _uiState.value = _uiState.value.copy(childPendingDeleteId = null)
+    }
+
+    /** S3 — borra de verdad y recarga la lista del vínculo seleccionado. */
+    fun confirmDeleteChild() {
+        val s = _uiState.value
+        val childId = s.childPendingDeleteId ?: return
+        val bondId = s.selectedBondId
+
+        scope.launch {
+            _uiState.value = _uiState.value.copy(isDeletingChild = true, error = null)
+            when (val result = adminApi.deleteChild(token, childId)) {
+                is ApiResult.Success -> {
+                    _uiState.value = _uiState.value.copy(
+                        bondChildren = _uiState.value.bondChildren.filterNot { it.id == childId },
+                        childPendingDeleteId = null,
+                        editingChildId = if (_uiState.value.editingChildId == childId) {
+                            null
+                        } else {
+                            _uiState.value.editingChildId
+                        },
+                        isDeletingChild = false,
+                    )
+                    bondId?.let { selectBond(it) }
+                }
+                is ApiResult.Error -> {
+                    _uiState.value = _uiState.value.copy(
+                        error = result.message,
+                        isDeletingChild = false,
+                    )
+                }
+            }
+        }
+    }
+
+    // ── F2 · Reportes ───────────────────────────────────────────────
+
+    /** S5 — sin bond elegido la pestaña explica qué falta en lugar de fallar. */
+    fun selectReportBond(bondId: String) {
+        _uiState.value = _uiState.value.copy(reportBondId = bondId, error = null)
+    }
+
+    fun updateReportFrom(iso: String) {
+        _uiState.value = _uiState.value.copy(reportDateFrom = iso)
+    }
+
+    fun updateReportTo(iso: String) {
+        _uiState.value = _uiState.value.copy(reportDateTo = iso)
+    }
+
+    /** S5/S6 — trae el JSON y lo deja listo para las cuatro secciones. */
+    fun loadReport() {
+        val s = _uiState.value
+        val bondId = s.reportBondId
+        if (bondId == null) {
+            _uiState.value = s.copy(error = "Select a bond first")
+            return
+        }
+
+        scope.launch {
+            _uiState.value = _uiState.value.copy(isLoadingReport = true, error = null)
+            when (val result = adminApi.getBondReport(token, bondId, s.reportDateFrom, s.reportDateTo)) {
+                is ApiResult.Success -> {
+                    _uiState.value = _uiState.value.copy(report = result.data, isLoadingReport = false)
+                }
+                is ApiResult.Error -> {
+                    _uiState.value = _uiState.value.copy(error = result.message, isLoadingReport = false)
+                }
+            }
+        }
+    }
+
+    /**
+     * S7 — pide el PDF y espera a que el worker lo cierre.
+     *
+     * No hay WebSocket para el reporte: se consulta `GET /admin/reports/:id` con una
+     * espera acotada (15 intentos de 2 s). Si no llega, la UI muestra el estado real
+     * y queda el botón de reintentar; nunca se inventa un `fileUrl`.
+     */
+    fun requestReportPdf() {
+        val s = _uiState.value
+        val bondId = s.reportBondId
+        if (bondId == null) {
+            _uiState.value = s.copy(error = "Select a bond first")
+            return
+        }
+
+        scope.launch {
+            _uiState.value = _uiState.value.copy(isRequestingReport = true, error = null)
+            when (val created = adminApi.requestReportPdf(token, bondId, s.reportDateFrom, s.reportDateTo)) {
+                is ApiResult.Error -> {
+                    _uiState.value = _uiState.value.copy(
+                        error = created.message,
+                        isRequestingReport = false,
+                    )
+                }
+                is ApiResult.Success -> {
+                    _uiState.value = _uiState.value.copy(requestedReport = null)
+
+                    var latest: AdminReport? = null
+                    repeat(PDF_POLL_ATTEMPTS) { attempt ->
+                        if (latest?.fileUrl != null) return@repeat
+                        if (attempt > 0) delay(PDF_POLL_DELAY_MS)
+                        when (val polled = adminApi.getReport(token, created.data.id)) {
+                            is ApiResult.Success -> latest = polled.data
+                            is ApiResult.Error -> {
+                                _uiState.value = _uiState.value.copy(
+                                    error = polled.message,
+                                    isRequestingReport = false,
+                                )
+                                return@launch
+                            }
+                        }
+                    }
+
+                    _uiState.value = _uiState.value.copy(
+                        requestedReport = latest,
+                        isRequestingReport = false,
+                    )
+                }
+            }
+        }
+    }
+
     fun clearError() {
         _uiState.value = _uiState.value.copy(error = null)
     }
 }
+
+private const val PDF_POLL_ATTEMPTS = 15
+private const val PDF_POLL_DELAY_MS = 2_000L
