@@ -2,7 +2,9 @@ package com.parental.shared.feature.admin.data.remote
 
 import com.parental.shared.core.error.ApiResult
 import com.parental.shared.feature.admin.domain.model.AdminBond
+import com.parental.shared.feature.admin.domain.model.AdminBondHealth
 import com.parental.shared.feature.admin.domain.model.AdminBondReport
+import com.parental.shared.feature.admin.domain.model.AdminBondTrend
 import com.parental.shared.feature.admin.domain.model.AdminChild
 import com.parental.shared.feature.admin.domain.model.AdminReport
 import com.parental.shared.feature.admin.domain.model.AdminReportRequest
@@ -333,6 +335,54 @@ class AdminApi(
         return try {
             val response = client.get("$baseUrl/admin/reports/$reportId") {
                 header("Authorization", "Bearer $token")
+            }
+            if (response.status.isSuccess()) {
+                ApiResult.Success(response.body())
+            } else {
+                ApiResult.Error(response.status.value, response.status.description)
+            }
+        } catch (e: Exception) {
+            ApiResult.Error(0, e.message ?: "Network error")
+        }
+    }
+
+    /**
+     * F3 · una sola llamada para las tarjetas de la lista.
+     *
+     * La salud NO usa el período del reporte: siempre mira el mes en curso, así
+     * cambiar el rango del reporte no altera lo que dice la lista.
+     */
+    suspend fun getBondsHealth(
+        token: String,
+        dateFrom: String,
+        dateTo: String,
+    ): ApiResult<List<AdminBondHealth>> {
+        return try {
+            val response = client.get("$baseUrl/admin/bonds/health") {
+                header("Authorization", "Bearer $token")
+                parameter("dateFrom", dateFrom)
+                parameter("dateTo", dateTo)
+            }
+            if (response.status.isSuccess()) {
+                ApiResult.Success(response.body())
+            } else {
+                ApiResult.Error(response.status.value, response.status.description)
+            }
+        } catch (e: Exception) {
+            ApiResult.Error(0, e.message ?: "Network error")
+        }
+    }
+
+    /** F3 · serie de cumplimiento del detalle del vínculo. */
+    suspend fun getBondTrend(
+        token: String,
+        bondId: String,
+        months: Int = 6,
+    ): ApiResult<AdminBondTrend> {
+        return try {
+            val response = client.get("$baseUrl/admin/bonds/$bondId/trend") {
+                header("Authorization", "Bearer $token")
+                parameter("months", months)
             }
             if (response.status.isSuccess()) {
                 ApiResult.Success(response.body())

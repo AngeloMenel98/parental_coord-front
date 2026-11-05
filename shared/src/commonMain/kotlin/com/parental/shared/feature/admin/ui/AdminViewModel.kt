@@ -3,7 +3,9 @@ package com.parental.shared.feature.admin.ui
 import com.parental.shared.core.error.ApiResult
 import com.parental.shared.feature.admin.data.remote.AdminApi
 import com.parental.shared.feature.admin.domain.model.AdminBond
+import com.parental.shared.feature.admin.domain.model.AdminBondHealth
 import com.parental.shared.feature.admin.domain.model.AdminBondReport
+import com.parental.shared.feature.admin.domain.model.AdminBondTrendPoint
 import com.parental.shared.feature.admin.domain.model.AdminChild
 import com.parental.shared.feature.admin.domain.model.AdminReport
 import com.parental.shared.feature.admin.domain.model.AdminUser
@@ -62,6 +64,17 @@ data class AdminUiState(
     val isLoadingReport: Boolean = false,
     val requestedReport: AdminReport? = null,
     val isRequestingReport: Boolean = false,
+    // F3 · artboard admin-ui/01 — lista con salud, detalle y vista del PDF.
+    val bondSearch: String = "",
+    val healthByBond: Map<String, AdminBondHealth> = emptyMap(),
+    val isLoadingHealth: Boolean = false,
+    val openBondId: String? = null,
+    val bondDetailTab: Int = 0, // 0 hijos · 1 miembros · 2 reporte
+    val trend: List<AdminBondTrendPoint> = emptyList(),
+    val isLoadingTrend: Boolean = false,
+    val showPdfPreview: Boolean = false,
+    val showCreateBond: Boolean = false,
+    val showAddChild: Boolean = false,
 )
 
 class AdminViewModel(
@@ -80,6 +93,112 @@ class AdminViewModel(
     fun loadData() {
         loadUsers()
         loadBonds()
+        loadHealth()
+    }
+
+    /**
+     * F3 · la salud de la lista, siempre sobre el mes en curso.
+     *
+     * Es una sola request para todos los vínculos; pedir el reporte de cada uno
+     * serían decenas de llamadas desde el teléfono.
+     */
+    fun loadHealth() {
+        scope.launch {
+            _uiState.value = _uiState.value.copy(isLoadingHealth = true)
+            val result = adminApi.getBondsHealth(token, adminMonthStartIso(), adminTodayIso())
+            _uiState.value = when (result) {
+                is ApiResult.Success -> _uiState.value.copy(
+                    healthByBond = result.data.associateBy { it.bondId },
+                    isLoadingHealth = false,
+                )
+                is ApiResult.Error -> _uiState.value.copy(
+                    error = result.message,
+                    isLoadingHealth = false,
+                )
+            }
+        }
+    }
+
+    fun startCreatingBond() {
+        _uiState.value = _uiState.value.copy(showCreateBond = true, error = null)
+    }
+
+    fun closeCreateBond() {
+        _uiState.value = _uiState.value.copy(showCreateBond = false)
+    }
+
+    fun openAddChild() {
+        _uiState.value = _uiState.value.copy(showAddChild = true, error = null)
+    }
+
+    fun closeAddChild() {
+        _uiState.value = _uiState.value.copy(showAddChild = false)
+    }
+
+    fun updateBondSearch(value: String) {
+        _uiState.value = _uiState.value.copy(bondSearch = value)
+    }
+
+    /** F3 · abre el detalle: hijos, tendencia y (al entrar a Reporte) el reporte. */
+    fun openBond(bondId: String) {
+        _uiState.value = _uiState.value.copy(
+            openBondId = bondId,
+            reportBondId = bondId,
+            bondDetailTab = 0,
+            editingChildId = null,
+            error = null,
+        )
+        selectBond(bondId)
+        loadTrend(bondId)
+    }
+
+    fun backToBondList() {
+        _uiState.value = _uiState.value.copy(
+            openBondId = null,
+            bondDetailTab = 0,
+            editingChildId = null,
+            trend = emptyList(),
+        )
+    }
+
+    fun setBondDetailTab(index: Int) {
+        val bondId = _uiState.value.openBondId
+        _uiState.value = _uiState.value.copy(bondDetailTab = index)
+        if (index == REPORT_TAB && bondId != null) {
+            val current = _uiState.value.report
+            if (current == null || current.bondId != bondId) loadReport()
+        }
+    }
+
+    private fun loadTrend(bondId: String) {
+        scope.launch {
+            _uiState.value = _uiState.value.copy(isLoadingTrend = true, trend = emptyList())
+            _uiState.value = when (val result = adminApi.getBondTrend(token, bondId)) {
+                is ApiResult.Success -> _uiState.value.copy(
+                    trend = result.data.months,
+                    isLoadingTrend = false,
+                )
+                is ApiResult.Error -> _uiState.value.copy(
+                    error = result.message,
+                    isLoadingTrend = false,
+                )
+            }
+        }
+    }
+
+    /** F3 · carga el reporte sólo si el que hay no es ya el del vínculo elegido. */
+    fun loadReportIfNeeded() {
+        val bondId = _uiState.value.reportBondId ?: return
+        val current = _uiState.value.report
+        if (current == null || current.bondId != bondId) loadReport()
+    }
+
+    fun openPdfPreview() {
+        _uiState.value = _uiState.value.copy(showPdfPreview = true)
+    }
+
+    fun closePdfPreview() {
+        _uiState.value = _uiState.value.copy(showPdfPreview = false)
     }
 
     fun selectTab(index: Int) {
@@ -209,8 +328,10 @@ class AdminViewModel(
                         newBondUser1Id = "",
                         newBondUser2Id = "",
                         isCreatingBond = false,
+                        showCreateBond = false,
                     )
                     loadBonds()
+                    loadHealth()
                 }
                 is ApiResult.Error -> {
                     _uiState.value = _uiState.value.copy(
@@ -270,8 +391,10 @@ class AdminViewModel(
                         newChildLastName = "",
                         newChildDob = "",
                         isCreatingChild = false,
+                        showAddChild = false,
                     )
                     selectBond(bondId)
+                    loadHealth()
                 }
                 is ApiResult.Error -> {
                     _uiState.value = _uiState.value.copy(
@@ -550,6 +673,9 @@ class AdminViewModel(
         _uiState.value = _uiState.value.copy(error = null)
     }
 }
+
+/** F3 · índice de la solapa Reporte dentro del detalle del vínculo. */
+const val REPORT_TAB = 2
 
 private const val PDF_POLL_ATTEMPTS = 15
 private const val PDF_POLL_DELAY_MS = 2_000L

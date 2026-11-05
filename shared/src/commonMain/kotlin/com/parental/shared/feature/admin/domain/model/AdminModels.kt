@@ -136,3 +136,33 @@ data class AdminReport(
     val generatedAt: String? = null,
     val createdAt: String? = null,
 )
+
+// ── F3 · Salud y tendencia (artboard admin-ui/01) ────────────────────
+
+/** `GET /admin/bonds/health` — una fila por vínculo, con ceros si no hay datos. */
+@Serializable
+data class AdminBondHealth(
+    val bondId: String,
+    val title: String,
+    val agreementType: String,
+    val isActive: Boolean = true,
+    val membersCount: Int = 0,
+    val childrenCount: Int = 0,
+    val activitiesTotal: Int = 0,
+    val completionRate: Double = 0.0,
+    val paidAmountPercentage: Double = 0.0,
+)
+
+/** `GET /admin/bonds/:id/trend` — serie mensual, más vieja primero. */
+@Serializable
+data class AdminBondTrendPoint(
+    val month: String,
+    val activitiesTotal: Int = 0,
+    val completionRate: Double = 0.0,
+)
+
+@Serializable
+data class AdminBondTrend(
+    val bondId: String,
+    val months: List<AdminBondTrendPoint> = emptyList(),
+)

@@ -39,6 +39,24 @@ through the existing Gradle setup.
   signed `fileUrl` returned by `GET /admin/reports/:id`.
 - **S8 — Errors.** A failed request shows the backend message in the existing error
   banner and leaves the previous data untouched.
+- **S9 — Bond console (artboard `admin-ui/01`).** The Vínculos tab opens with a summary
+  strip (users / bonds / active), a search field that filters the list by bond title, and
+  one card per bond carrying its children count, completion percentage and paid
+  percentage from `GET /admin/bonds/health` (one request for the whole list, never one
+  report per bond). The create-bond form moves into a dialog behind a FAB.
+- **S10 — Bond detail.** Tapping a card opens the detail: back link, bond title, the
+  active/inactive switch, and three sections — Hijos (editable + deletable rows, add via
+  dialog), Miembros, Reporte. The six-month completion trend
+  (`GET /admin/bonds/:bondId/trend`) is rendered as a bar chart under whichever section is
+  open, because "is this improving?" belongs to the bond, not to a tab.
+- **S11 — Report with percentages.** The report shows activities (total, completed,
+  overdue, rate), expenses as a proportion of the expense count — paid / approved /
+  pending / rejected with counts and percentages on one stacked bar — plus paid and
+  pending percentage by amount and the total, and per-member participation.
+- **S12 — PDF preview.** After the worker finishes, "Ver página" opens a preview that
+  renders the first page of the report as a paper card (serif title, monospace figures,
+  generated stamp) and "Abrir PDF" opens the signed URL. Without a generated PDF the
+  action is disabled and the screen explains why.
 
 ## Tasks
 
@@ -46,6 +64,7 @@ through the existing Gradle setup.
 | --- | --- | --- | --- | --- |
 | F1 | S1-S4 | inline | done | (single commit) |
 | F2 | S5-S8 | inline | done | (single commit) |
+| F3 | S9-S12 | inline | done | (single commit) |
 
 ## Log
 
@@ -109,3 +128,36 @@ slices of ~400. The reason is structural, not convenience: the Reports tab needs
 three files F1 edits. Splitting by hunk would produce a first commit that does not
 compile. The commit message names both specs so a reviewer can read it as two
 consecutive blocks.
+
+**L8 — design `design/admin-ui/` (nuevas vistas del panel admin).** Tres direcciones,
+cada una con las tres vistas que el admin necesita en el teléfono (panorama/lista,
+gestión de un vínculo con sus hijos, reporte con PDF):
+- `01-consola-de-vinculos.html` — el vínculo como unidad de trabajo. Tradeoff: foco
+  máximo, sin lectura agregada del sistema.
+- `02-radar-del-sistema.html` — panorama primero (anillo, métricas con delta, "requiere
+  atención"). Tradeoff: detecta un vínculo enfermo sin abrirlo; más denso y un toque más
+  para gestionar.
+- `03-expediente-del-vinculo.html` — el reporte es la pantalla, la gestión vive en una
+  hoja. Tradeoff: se lee como un papel; mucho scroll.
+
+Ninguna está elegida todavía: las tres son alternativas. Tokens y reglas de componente
+tomados de `design/system.md` (self-check hecho: todos los colores del artboard son
+tokens del sistema; las chips usan container al 15% y texto en el `dot` de la categoría,
+y las tipografías son serif/sans/mono del `Type.kt`).
+
+**L9 — handoff `admin-ui/01-consola-de-vinculos.html` → implementación.** El artboard
+elegido de `design/admin-ui/` (las otras dos siguen siendo alternativas) se implementó en
+Compose: consola de vínculos con búsqueda y salud por tarjeta, detalle con hijos,
+miembros, tendencia y reporte, reporte con gastos en porcentajes, y vista previa del PDF.
+Los formularios de alta pasaron a diálogos y la copia visible del panel quedó en español,
+igual que el artboard y el resto de la app.
+
+**L10 — lo que el artboard obligó a agregar en el backend.** Ni la salud por vínculo ni la
+tendencia existían en la API; se agregaron como B4 en
+`parental_coordination_back/odd/tasks/admin-bonds-reports.md` (S13-S14), en la misma rama
+del PR del backend. El frontend consume `GET /admin/bonds/health` y
+`GET /admin/bonds/:bondId/trend`.
+
+**L11 — evidencia.** `./gradlew :shared:compileDebugKotlinAndroid` limpio y
+`./gradlew :shared:testDebugUnitTest` → 56 suites / 512 tests, 0 fallos (los mismos que
+antes del rediseño: los cuerpos JSON siguen siendo el contrato pineado).
