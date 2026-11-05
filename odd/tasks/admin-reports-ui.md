@@ -161,3 +161,10 @@ del PR del backend. El frontend consume `GET /admin/bonds/health` y
 **L11 — evidencia.** `./gradlew :shared:compileDebugKotlinAndroid` limpio y
 `./gradlew :shared:testDebugUnitTest` → 56 suites / 512 tests, 0 fallos (los mismos que
 antes del rediseño: los cuerpos JSON siguen siendo el contrato pineado).
+
+**L12 — límite de slice declarado.** F3 entra en un commit de ~1413 líneas (5 archivos), otra
+vez por encima de las ~400. La causa es la misma que L7: el rediseño reemplaza de una sola
+pieza `AdminScreen.kt` (941 → 1180 líneas) y no existe un corte intermedio que compile,
+porque la lista, el detalle y el reporte comparten las mismas piezas (`ReportContent`,
+`StatusChip`, `EmptyHint`) y el mismo estado de `AdminUiState`. El mensaje del commit separa
+las cuatro superficies del artboard para que se pueda revisar por bloques.
