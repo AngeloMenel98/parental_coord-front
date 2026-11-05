@@ -13,6 +13,7 @@ actual object Platform {
     private const val PREFS_NAME = "parental_coordination_prefs"
 
     private var prefs: SharedPreferences? = null
+    private var secureStorage: SecureStorage? = null
     private var configuredBaseUrl: String? = null
     private var debug: Boolean = false
 
@@ -28,6 +29,7 @@ actual object Platform {
      */
     fun init(context: Context, baseUrl: String, isDebug: Boolean) {
         prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        secureStorage = SecureStorage(context)
         configuredBaseUrl = baseUrl
         debug = isDebug
     }
@@ -44,5 +46,17 @@ actual object Platform {
 
     actual fun remove(key: String) {
         prefs?.edit()?.remove(key)?.apply()
+    }
+
+    actual fun saveSecureString(key: String, value: String) {
+        secureStorage?.save(key, value)
+    }
+
+    actual fun loadSecureString(key: String): String? {
+        return secureStorage?.load(key)
+    }
+
+    actual fun removeSecureString(key: String) {
+        secureStorage?.remove(key)
     }
 }

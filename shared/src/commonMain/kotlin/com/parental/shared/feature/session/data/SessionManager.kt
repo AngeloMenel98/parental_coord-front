@@ -55,7 +55,7 @@ class SessionManager {
             it.copy(token = token, userName = userName, role = role, bondId = bondId, userId = userId)
         }
         // Persist to storage (los null se borran para no dejar datos de una sesión anterior)
-        Platform.saveString(KEY_TOKEN, token)
+        Platform.saveSecureString(KEY_TOKEN, token)
         Platform.saveString(KEY_USER_NAME, userName)
         persistOrRemove(KEY_ROLE, role)
         persistOrRemove(KEY_BOND_ID, bondId)
@@ -86,7 +86,8 @@ class SessionManager {
     fun clear() {
         _state.value = SessionState()
         // Clear from storage
-        Platform.remove(KEY_TOKEN)
+        Platform.removeSecureString(KEY_TOKEN)
+        Platform.remove(KEY_TOKEN) // token en claro de versiones anteriores, si quedó alguno
         Platform.remove(KEY_USER_NAME)
         Platform.remove(KEY_ROLE)
         Platform.remove(KEY_BOND_ID)
@@ -98,7 +99,7 @@ class SessionManager {
      * Returns true if a session was restored, false otherwise.
      */
     fun restoreFromStorage(): Boolean {
-        val savedToken = Platform.loadString(KEY_TOKEN) ?: return false
+        val savedToken = Platform.loadSecureString(KEY_TOKEN) ?: migrateLegacyToken() ?: return false
         _state.value = SessionState(
             token = savedToken,
             userName = Platform.loadString(KEY_USER_NAME).orEmpty(),
@@ -107,6 +108,14 @@ class SessionManager {
             userId = Platform.loadString(KEY_USER_ID),
         )
         return true
+    }
+
+    /** Instalaciones previas guardaban el token en claro: lo pasa al almacén seguro y lo borra. */
+    private fun migrateLegacyToken(): String? {
+        val legacyToken = Platform.loadString(KEY_TOKEN) ?: return null
+        Platform.saveSecureString(KEY_TOKEN, legacyToken)
+        Platform.remove(KEY_TOKEN)
+        return legacyToken
     }
 
     private fun persistOrRemove(key: String, value: String?) {
