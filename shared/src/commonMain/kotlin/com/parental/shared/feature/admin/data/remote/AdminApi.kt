@@ -27,11 +27,20 @@ import kotlinx.serialization.json.put
  * `serializing collection of different types is not yet supported`.
  * A concrete DTO keeps every field typed.
  */
+/** B5 · un hijo que nace junto con el vínculo. */
+@Serializable
+data class CreateBondChildRequest(
+    val firstName: String,
+    val lastName: String,
+    val dateOfBirth: String? = null,
+)
+
 @Serializable
 internal data class CreateBondRequest(
     val title: String,
     val agreementType: String,
     val userIds: List<String>,
+    val children: List<CreateBondChildRequest>,
 )
 
 /**
@@ -143,6 +152,7 @@ class AdminApi(
         title: String,
         agreementType: String,
         userIds: List<String>,
+        children: List<CreateBondChildRequest>,
     ): ApiResult<AdminBond> {
         return try {
             val response = client.post("$baseUrl/admin/bonds") {
@@ -153,6 +163,7 @@ class AdminApi(
                         title = title,
                         agreementType = agreementType,
                         userIds = userIds,
+                        children = children,
                     )
                 )
             }

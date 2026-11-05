@@ -76,7 +76,7 @@ fun AdminScreen(
             // sería un botón fuera de contexto.
             if (state.selectedTab == BONDS_TAB && state.openBondId == null) {
                 FloatingActionButton(
-                    onClick = { viewModel.startCreatingBond() },
+                    onClick = { viewModel.openBondWizard() },
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = MaterialTheme.colorScheme.onPrimary,
                 ) {
@@ -123,7 +123,8 @@ fun AdminScreen(
 
     ChildActionDialogs(state, viewModel)
     AddChildDialog(state, viewModel)
-    CreateBondDialog(state, viewModel)
+    BondWizardDialog(state, viewModel)
+    NewProgenitorDialog(state, viewModel)
 }
 
 @Composable
@@ -158,64 +159,13 @@ private fun UsersTab(state: AdminUiState, viewModel: AdminViewModel) {
         verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
         item {
-            Card(
+            // F5 · S13: el alta vive en un diálogo con validación; una tarjeta de
+            // formulario siempre visible empujaba la lista fuera del teléfono.
+            Button(
+                onClick = { viewModel.openNewUserDialog() },
                 modifier = Modifier.fillMaxWidth(),
-                shape = MaterialTheme.shapes.medium,
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
             ) {
-                Column(modifier = Modifier.padding(Spacing.lg)) {
-                    Text(
-                        "Crear progenitor",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                    )
-                    Spacer(modifier = Modifier.height(Spacing.md))
-
-                    OutlinedTextField(
-                        value = state.newUserFirstName,
-                        onValueChange = { viewModel.updateUserFirstName(it) },
-                        label = { Text("Nombre") },
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    Spacer(modifier = Modifier.height(Spacing.sm))
-                    OutlinedTextField(
-                        value = state.newUserLastName,
-                        onValueChange = { viewModel.updateUserLastName(it) },
-                        label = { Text("Apellido") },
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    Spacer(modifier = Modifier.height(Spacing.sm))
-                    OutlinedTextField(
-                        value = state.newUserEmail,
-                        onValueChange = { viewModel.updateUserEmail(it) },
-                        label = { Text("Email") },
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    Spacer(modifier = Modifier.height(Spacing.sm))
-                    OutlinedTextField(
-                        value = state.newUserPassword,
-                        onValueChange = { viewModel.updateUserPassword(it) },
-                        label = { Text("Contraseña") },
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    Spacer(modifier = Modifier.height(Spacing.md))
-
-                    Button(
-                        onClick = { viewModel.createUser() },
-                        modifier = Modifier.fillMaxWidth(),
-                        enabled = !state.isCreatingUser,
-                    ) {
-                        if (state.isCreatingUser) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(20.dp),
-                                strokeWidth = 2.dp,
-                                color = MaterialTheme.colorScheme.onPrimary,
-                            )
-                        } else {
-                            Text("Crear usuario")
-                        }
-                    }
-                }
+                Text("+ Nuevo progenitor")
             }
         }
 
@@ -1328,66 +1278,6 @@ private fun monthLabel(month: String): String {
 }
 
 // ── Diálogos ────────────────────────────────────────────────────────
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun CreateBondDialog(state: AdminUiState, viewModel: AdminViewModel) {
-    if (!state.showCreateBond) return
-
-    AlertDialog(
-        onDismissRequest = { viewModel.closeCreateBond() },
-        title = { Text("Crear vínculo") },
-        text = {
-            Column {
-                OutlinedTextField(
-                    value = state.newBondTitle,
-                    onValueChange = { viewModel.updateBondTitle(it) },
-                    label = { Text("Nombre del vínculo") },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Spacer(modifier = Modifier.height(Spacing.sm))
-                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                    listOf("formal", "informal").forEach { type ->
-                        FilterChip(
-                            selected = state.newBondAgreementType == type,
-                            onClick = { viewModel.updateBondAgreementType(type) },
-                            label = { Text(type.replaceFirstChar { it.uppercase() }) },
-                        )
-                    }
-                }
-                Spacer(modifier = Modifier.height(Spacing.sm))
-                OutlinedTextField(
-                    value = state.newBondUser1Id,
-                    onValueChange = { viewModel.updateBondUser1Id(it) },
-                    label = { Text("ID del progenitor 1") },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Spacer(modifier = Modifier.height(Spacing.sm))
-                OutlinedTextField(
-                    value = state.newBondUser2Id,
-                    onValueChange = { viewModel.updateBondUser2Id(it) },
-                    label = { Text("ID del progenitor 2") },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Spacer(modifier = Modifier.height(Spacing.xs))
-                Text(
-                    "Se necesitan exactamente dos usuarios ya creados.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = { viewModel.createBond() },
-                enabled = !state.isCreatingBond,
-            ) { Text("Crear") }
-        },
-        dismissButton = {
-            TextButton(onClick = { viewModel.closeCreateBond() }) { Text("Cancelar") }
-        },
-    )
-}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

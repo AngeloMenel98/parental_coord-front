@@ -2,6 +2,7 @@ package com.parental.shared.feature.admin.ui
 
 import com.parental.shared.core.error.ApiResult
 import com.parental.shared.feature.admin.data.remote.AdminApi
+import com.parental.shared.feature.admin.data.remote.CreateBondChildRequest
 import com.parental.shared.feature.admin.domain.model.AdminBond
 import com.parental.shared.feature.admin.domain.model.AdminBondHealth
 import com.parental.shared.feature.admin.domain.model.AdminBondReport
@@ -31,12 +32,21 @@ data class AdminUiState(
     val newUserFirstName: String = "",
     val newUserLastName: String = "",
     val isCreatingUser: Boolean = false,
-    // Form state for creating bond
+    // F5 · wizard de creación de vínculo (artboard admin-forms-ui/03)
     val newBondTitle: String = "",
     val newBondAgreementType: String = "formal",
-    val newBondUser1Id: String = "",
-    val newBondUser2Id: String = "",
     val isCreatingBond: Boolean = false,
+    val showBondWizard: Boolean = false,
+    val bondWizardStep: Int = 0,
+    val bondMemberIds: List<String> = emptyList(),
+    val bondUserQuery: String = "",
+    val bondChildrenDraft: List<BondChildDraft> = emptyList(),
+    val bondChildFirstName: String = "",
+    val bondChildLastName: String = "",
+    val bondChildDob: String = "",
+    // F5 · alta de progenitor en diálogo con validación (S13)
+    val showNewUserDialog: Boolean = false,
+    val newUserFromWizard: Boolean = false,
     // Children form
     val selectedBondId: String? = null,
     val bondChildren: List<AdminChild> = emptyList(),
@@ -73,7 +83,6 @@ data class AdminUiState(
     val trend: List<AdminBondTrendPoint> = emptyList(),
     val isLoadingTrend: Boolean = false,
     val showPdfPreview: Boolean = false,
-    val showCreateBond: Boolean = false,
     val showAddChild: Boolean = false,
 )
 
@@ -119,12 +128,167 @@ class AdminViewModel(
         }
     }
 
-    fun startCreatingBond() {
-        _uiState.value = _uiState.value.copy(showCreateBond = true, error = null)
+    // ── F5 · Wizard de creación de vínculo ──────────────────────────
+
+    fun openBondWizard() {
+        _uiState.value = _uiState.value.copy(
+            showBondWizard = true,
+            bondWizardStep = 0,
+            newBondTitle = "",
+            newBondAgreementType = "formal",
+            bondMemberIds = emptyList(),
+            bondUserQuery = "",
+            bondChildrenDraft = emptyList(),
+            bondChildFirstName = "",
+            bondChildLastName = "",
+            bondChildDob = "",
+            error = null,
+        )
     }
 
-    fun closeCreateBond() {
-        _uiState.value = _uiState.value.copy(showCreateBond = false)
+    fun closeBondWizard() {
+        _uiState.value = _uiState.value.copy(showBondWizard = false, bondWizardStep = 0, error = null)
+    }
+
+    /**
+     * F5 · el paso avanza sólo si el actual está completo.
+     *
+     * El artboard lo dibuja como un botón que se habilita; acá se deja el botón
+     * habilitado y el paso explica qué falta, que es más útil que un botón mudo.
+     */
+    fun nextBondWizardStep() {
+        val s = _uiState.value
+        when (s.bondWizardStep) {
+            0 -> _uiState.value = if (s.newBondTitle.isNotBlank()) {
+                s.copy(bondWizardStep = 1, error = null)
+            } else {
+                s.copy(error = "Ponele un nombre al vínculo para seguir")
+            }
+
+            1 -> _uiState.value = if (s.bondMemberIds.size == 2) {
+                s.copy(bondWizardStep = 2, error = null)
+            } else {
+                s.copy(error = "Se necesitan exactamente dos progenitores")
+            }
+        }
+    }
+
+    fun previousBondWizardStep() {
+        _uiState.value = _uiState.value.copy(
+            bondWizardStep = (_uiState.value.bondWizardStep - 1).coerceAtLeast(0),
+            error = null,
+        )
+    }
+
+    fun updateBondUserQuery(value: String) {
+        _uiState.value = _uiState.value.copy(bondUserQuery = value)
+    }
+
+    /** F5 · alterna un progenitor; nunca deja más de dos. */
+    fun toggleBondMember(userId: String) {
+        val s = _uiState.value
+        _uiState.value = when {
+            userId in s.bondMemberIds -> s.copy(bondMemberIds = s.bondMemberIds - userId, error = null)
+            s.bondMemberIds.size >= 2 -> s.copy(error = "Un vínculo tiene exactamente dos progenitores")
+            else -> s.copy(bondMemberIds = s.bondMemberIds + userId, error = null)
+        }
+    }
+
+    fun updateBondChildFirstName(value: String) {
+        _uiState.value = _uiState.value.copy(bondChildFirstName = value)
+    }
+
+    fun updateBondChildLastName(value: String) {
+        _uiState.value = _uiState.value.copy(bondChildLastName = value)
+    }
+
+    fun updateBondChildDob(value: String) {
+        _uiState.value = _uiState.value.copy(bondChildDob = value)
+    }
+
+    fun addBondChildDraft() {
+        val s = _uiState.value
+        if (s.bondChildFirstName.isBlank() || s.bondChildLastName.isBlank()) {
+            _uiState.value = s.copy(error = "El hijo necesita nombre y apellido")
+            return
+        }
+        _uiState.value = s.copy(
+            bondChildrenDraft = s.bondChildrenDraft + BondChildDraft(
+                firstName = s.bondChildFirstName.trim(),
+                lastName = s.bondChildLastName.trim(),
+                dateOfBirth = s.bondChildDob.ifBlank { null },
+            ),
+            bondChildFirstName = "",
+            bondChildLastName = "",
+            bondChildDob = "",
+            error = null,
+        )
+    }
+
+    fun removeBondChildDraft(index: Int) {
+        val drafts = _uiState.value.bondChildrenDraft
+        if (index !in drafts.indices) return
+        _uiState.value = _uiState.value.copy(
+            bondChildrenDraft = drafts.filterIndexed { i, _ -> i != index },
+        )
+    }
+
+    /** F5 · crea vínculo + progenitores + hijos en una sola request. */
+    fun submitBondWizard() {
+        val s = _uiState.value
+        if (s.bondChildrenDraft.isEmpty()) {
+            _uiState.value = s.copy(error = "El vínculo necesita al menos un hijo")
+            return
+        }
+
+        scope.launch {
+            _uiState.value = _uiState.value.copy(isCreatingBond = true, error = null)
+            val result = adminApi.createBond(
+                token = token,
+                title = s.newBondTitle.trim(),
+                agreementType = s.newBondAgreementType,
+                userIds = s.bondMemberIds,
+                children = s.bondChildrenDraft.map {
+                    CreateBondChildRequest(it.firstName, it.lastName, it.dateOfBirth)
+                },
+            )
+            when (result) {
+                is ApiResult.Success -> {
+                    _uiState.value = _uiState.value.copy(
+                        isCreatingBond = false,
+                        showBondWizard = false,
+                        bondWizardStep = 0,
+                        newBondTitle = "",
+                        bondMemberIds = emptyList(),
+                        bondUserQuery = "",
+                        bondChildrenDraft = emptyList(),
+                    )
+                    loadBonds()
+                    loadHealth()
+                    openBond(result.data.id)
+                }
+                is ApiResult.Error -> {
+                    _uiState.value = _uiState.value.copy(
+                        error = result.message,
+                        isCreatingBond = false,
+                    )
+                }
+            }
+        }
+    }
+
+    // ── F5 · Alta de progenitor en diálogo ──────────────────────────
+
+    fun openNewUserDialog(fromWizard: Boolean = false) {
+        _uiState.value = _uiState.value.copy(
+            showNewUserDialog = true,
+            newUserFromWizard = fromWizard,
+            error = null,
+        )
+    }
+
+    fun closeNewUserDialog() {
+        _uiState.value = _uiState.value.copy(showNewUserDialog = false, newUserFromWizard = false)
     }
 
     fun openAddChild() {
@@ -259,14 +423,27 @@ class AdminViewModel(
                 s.newUserFirstName, s.newUserLastName,
             )) {
                 is ApiResult.Success -> {
-                    _uiState.value = _uiState.value.copy(
-                        newUserEmail = "",
-                        newUserPassword = "",
-                        newUserFirstName = "",
-                        newUserLastName = "",
-                        isCreatingUser = false,
-                    )
-                    loadUsers()
+                    val created = result.data
+                    _uiState.value = _uiState.value.let { st ->
+                        // F5 · si la cuenta se creó desde el wizard, queda elegida:
+                        // el admin no tiene que volver a buscarla.
+                        val selected = if (st.newUserFromWizard && st.bondMemberIds.size < 2) {
+                            st.bondMemberIds + created.id
+                        } else {
+                            st.bondMemberIds
+                        }
+                        st.copy(
+                            bondMemberIds = selected,
+                            users = if (st.users.any { it.id == created.id }) st.users else st.users + created,
+                            newUserEmail = "",
+                            newUserPassword = "",
+                            newUserFirstName = "",
+                            newUserLastName = "",
+                            isCreatingUser = false,
+                            showNewUserDialog = false,
+                            newUserFromWizard = false,
+                        )
+                    }
                 }
                 is ApiResult.Error -> {
                     _uiState.value = _uiState.value.copy(
@@ -299,48 +476,6 @@ class AdminViewModel(
 
     fun updateBondAgreementType(value: String) {
         _uiState.value = _uiState.value.copy(newBondAgreementType = value)
-    }
-
-    fun updateBondUser1Id(value: String) {
-        _uiState.value = _uiState.value.copy(newBondUser1Id = value)
-    }
-
-    fun updateBondUser2Id(value: String) {
-        _uiState.value = _uiState.value.copy(newBondUser2Id = value)
-    }
-
-    fun createBond() {
-        val s = _uiState.value
-        if (s.newBondTitle.isBlank() || s.newBondUser1Id.isBlank() || s.newBondUser2Id.isBlank()) {
-            _uiState.value = s.copy(error = "Title and two user IDs are required")
-            return
-        }
-
-        scope.launch {
-            _uiState.value = _uiState.value.copy(isCreatingBond = true, error = null)
-            when (val result = adminApi.createBond(
-                token, s.newBondTitle, s.newBondAgreementType,
-                listOf(s.newBondUser1Id, s.newBondUser2Id),
-            )) {
-                is ApiResult.Success -> {
-                    _uiState.value = _uiState.value.copy(
-                        newBondTitle = "",
-                        newBondUser1Id = "",
-                        newBondUser2Id = "",
-                        isCreatingBond = false,
-                        showCreateBond = false,
-                    )
-                    loadBonds()
-                    loadHealth()
-                }
-                is ApiResult.Error -> {
-                    _uiState.value = _uiState.value.copy(
-                        error = result.message,
-                        isCreatingBond = false,
-                    )
-                }
-            }
-        }
     }
 
     // ── Children ─────────────────────────────────────────────────────
@@ -679,3 +814,10 @@ const val REPORT_TAB = 2
 
 private const val PDF_POLL_ATTEMPTS = 15
 private const val PDF_POLL_DELAY_MS = 2_000L
+
+/** F5 · hijo cargado dentro del wizard, antes de mandarse al backend. */
+data class BondChildDraft(
+    val firstName: String,
+    val lastName: String,
+    val dateOfBirth: String? = null,
+)

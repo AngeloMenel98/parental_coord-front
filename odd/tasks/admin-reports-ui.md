@@ -53,6 +53,29 @@ through the existing Gradle setup.
   overdue, rate), expenses as a proportion of the expense count — paid / approved /
   pending / rejected with counts and percentages on one stacked bar — plus paid and
   pending percentage by amount and the total, and per-member participation.
+- **S13 — User creation.** QUOTE: "need to improve the user creation interface for admin".
+  Creating a progenitor happens in a dialog with local validation (email format, password
+  of at least 6 characters, both names), a show/hide password control, the backend conflict
+  message rendered inside the dialog, and the created account appended to the list — the
+  list is no longer pushed off the screen by an always-visible form card.
+- **S14 — Bond members by name.** QUOTE: "also when creating the bonds, dont use the uuid
+  of users. Search by name." The bond form never asks for a user id: the admin searches
+  the already-loaded user list by name or email (accents tolerated), the chosen ones become
+  removable chips, a chosen user cannot be picked twice, and a third pick is refused. The
+  client resolves names to ids before calling `POST /admin/bonds`.
+- **S15 — Three-step bond wizard.** QUOTE: "Me gustaria que sea 3 steps Primero, Le pongo un
+  nombre boton siguiente, Agrego progenitores, boton siguiente Agrego hijos, boton crear
+  vinculo". `Crear vínculo` opens a full-screen wizard: Nombre → Progenitores → Hijos, each
+  step keeping the "Progenitores" title and a `N de 2 · obligatorio` counter, with `Atrás`
+  from step 2, nothing persisted until the last step, and the create action labelled with
+  the number of children it will create.
+- **S16 — Children are mandatory.** QUOTE: "No es Opcional. Por lo menos tiene que haber un
+  hijo creado". Step 3 requires at least one child: the create action is disabled with
+  zero children, states the rule, and the payload carries `children` in the same call so
+  the backend creates bond + members + children in one transaction.
+- **S17 — Creating a missing progenitor from the wizard.** QUOTE: "si nadie coincide se
+  ofrece crear la cuenta sin salir". When the search has no matches, the wizard offers
+  `Crear progenitor «query»`; the account is created and immediately selected as a member.
 - **S12 — PDF preview.** After the worker finishes, "Ver página" opens a preview that
   renders the first page of the report as a paper card (serif title, monospace figures,
   generated stamp) and "Abrir PDF" opens the signed URL. Without a generated PDF the
@@ -65,6 +88,7 @@ through the existing Gradle setup.
 | F1 | S1-S4 | inline | done | (single commit) |
 | F2 | S5-S8 | inline | done | (single commit) |
 | F3 | S9-S12 | inline | done | (single commit) |
+| F4 | S13-S14 | inline | done | (single commit) |
 
 ## Log
 
@@ -168,3 +192,35 @@ pieza `AdminScreen.kt` (941 → 1180 líneas) y no existe un corte intermedio qu
 porque la lista, el detalle y el reporte comparten las mismas piezas (`ReportContent`,
 `StatusChip`, `EmptyHint`) y el mismo estado de `AdminUiState`. El mensaje del commit separa
 las cuatro superficies del artboard para que se pueda revisar por bloques.
+
+**L13 — design `design/admin-forms-ui/` (alta de usuarios y de vínculos).** Tres direcciones
+para S13/S14; ninguna elegida todavía:
+- `01-alta-guiada.html` — cuenta en hoja inferior + vínculo en dos pasos (acuerdo → buscador).
+- `02-progenitores-primero.html` — el vínculo empieza por las personas y propone el nombre;
+  el alta de progenitor es pantalla completa con validación en vivo.
+- `03-un-solo-panel.html` — combobox en línea, ya elegidos deshabilitados, y oferta de crear
+  la cuenta cuando la búsqueda no encuentra a nadie.
+
+Auto-check: todos los colores de los tres artboards son tokens de `design/system.md` y el
+markup está balanceado. El backend no cambia: `POST /admin/bonds` sigue recibiendo dos
+`userIds`, el cliente resuelve los ids desde la búsqueda por nombre.
+
+**L14 — handoff `admin-forms-ui/03-un-solo-panel.html` → implementación.** Wizard de tres
+pasos con combobox en línea, alta de progenitor en diálogo con validación, y creación de la
+cuenta faltante desde el propio buscador. El paso 3 exige al menos un hijo y el payload los
+manda junto con el vínculo (B5 en el backend, `POST /admin/bonds` con `children`, en una
+transacción).
+
+**L15 — por qué sigue siendo inline.** La delegación no es una preferencia: los dos agentes
+(`gentle-ai-explore`, `gentle-ai-worker`) fallaron con error de cuota del proveedor, y además
+el frontend vive en otro repositorio fuera del root de esta sesión, así que un writer
+tampoco tendría una `Allowed edit surface` válida para tocarlo. La unidad se hizo inline y
+queda registrado acá.
+
+**L16 — evidencia.** `./gradlew :shared:compileDebugKotlinAndroid` limpio;
+`./gradlew :shared:testDebugUnitTest` → 56 suites / 513 tests, 0 fallos, incluido
+`children travel in the same body as the members` (el cuerpo del `POST /admin/bonds` lleva
+`children` y omite `dateOfBirth` cuando no hay fecha). Intento de mutación honesto: cambiar
+`children = children` por `children = emptyList()` en `AdminApi.createBond` NO rompe ese
+test, porque el test pinea el DTO serializado y no el método; la garantía del método es el
+compilador (el parámetro es obligatorio).
