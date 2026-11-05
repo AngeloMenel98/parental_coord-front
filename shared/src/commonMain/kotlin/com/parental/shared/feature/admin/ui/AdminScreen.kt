@@ -154,6 +154,13 @@ private fun ErrorBanner(state: AdminUiState, onDismiss: () -> Unit) {
 
 @Composable
 private fun UsersTab(state: AdminUiState, viewModel: AdminViewModel) {
+    val query = state.userSearch.trim()
+    val visible = if (query.isEmpty()) {
+        state.users
+    } else {
+        state.users.filter { it.matchesUserQuery(query) }
+    }
+
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(Spacing.lg),
         verticalArrangement = Arrangement.spacedBy(Spacing.md),
@@ -170,15 +177,37 @@ private fun UsersTab(state: AdminUiState, viewModel: AdminViewModel) {
         }
 
         item {
+            OutlinedTextField(
+                value = state.userSearch,
+                onValueChange = { viewModel.updateUserSearch(it) },
+                label = { Text("Buscar por nombre o email") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+
+        item {
             Text(
-                "Usuarios (${state.users.size})",
+                "Usuarios (${visible.size})",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(top = Spacing.sm),
             )
         }
 
-        items(state.users, key = { it.id }) { user ->
+        if (visible.isEmpty()) {
+            item {
+                EmptyHint(
+                    if (state.users.isEmpty()) {
+                        "Todavía no hay usuarios. Creá el primero con el botón de arriba."
+                    } else {
+                        "Ningún usuario coincide con «$query»."
+                    },
+                )
+            }
+        }
+
+        items(visible, key = { it.id }) { user ->
             UserCard(
                 user = user,
                 isBusy = user.id in state.usersInFlight,

@@ -55,6 +55,7 @@ data class AdminUiState(
     val newChildDob: String = "",
     val isCreatingChild: Boolean = false,
     // F1 · S1/S2 — filas con una request en vuelo (por id, no un flag global).
+    val userSearch: String = "",
     val usersInFlight: Set<String> = emptySet(),
     val bondsInFlight: Set<String> = emptySet(),
     // F1 · S3/S4 — edición inline de un hijo y confirmación de borrado.
@@ -303,6 +304,11 @@ class AdminViewModel(
 
     fun updateBondSearch(value: String) {
         _uiState.value = _uiState.value.copy(bondSearch = value)
+    }
+
+    /** F6 · buscador de la lista de usuarios, por nombre o email. */
+    fun updateUserSearch(value: String) {
+        _uiState.value = _uiState.value.copy(userSearch = value)
     }
 
     /** F3 · abre el detalle: hijos, tendencia y (al entrar a Reporte) el reporte. */

@@ -2,10 +2,11 @@ package com.parental.shared.feature.admin.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -78,28 +79,50 @@ fun BondWizardDialog(state: AdminUiState, viewModel: AdminViewModel) {
                     WizardStepper(state.bondWizardStep)
                 }
 
-                Box(modifier = Modifier.weight(1f).padding(horizontal = Spacing.lg)) {
-                    when (state.bondWizardStep) {
-                        STEP_NAME -> WizardStepName(state, viewModel)
-                        STEP_MEMBERS -> WizardStepMembers(state, viewModel)
-                        else -> WizardStepChildren(state, viewModel)
+                // F6 · el paso 2 lleva una lista que necesita alto acotado: ahí el
+                // botón queda anclado abajo. Los pasos 1 y 3 son cortos, así que el
+                // botón viaja pegado al último campo en vez de flotar en el vacío.
+                if (state.bondWizardStep == STEP_MEMBERS) {
+                    Box(modifier = Modifier.weight(1f).padding(horizontal = Spacing.lg)) {
+                        WizardStepMembers(state, viewModel)
                     }
-                }
-
-                Column(modifier = Modifier.padding(Spacing.lg)) {
-                    state.error?.let { error ->
-                        Text(
-                            text = error,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.error,
-                        )
-                        Spacer(modifier = Modifier.height(Spacing.sm))
+                    Column(modifier = Modifier.padding(Spacing.lg)) {
+                        WizardFooter(state, viewModel)
                     }
-
-                    WizardPrimaryAction(state, viewModel)
+                } else {
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .verticalScroll(rememberScrollState())
+                            .padding(horizontal = Spacing.lg),
+                    ) {
+                        if (state.bondWizardStep == STEP_NAME) {
+                            WizardStepName(state, viewModel)
+                        } else {
+                            WizardStepChildren(state, viewModel)
+                        }
+                        Spacer(modifier = Modifier.height(Spacing.md))
+                        WizardFooter(state, viewModel)
+                        Spacer(modifier = Modifier.height(Spacing.lg))
+                    }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun WizardFooter(state: AdminUiState, viewModel: AdminViewModel) {
+    Column {
+        state.error?.let { error ->
+            Text(
+                text = error,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+            )
+            Spacer(modifier = Modifier.height(Spacing.sm))
+        }
+        WizardPrimaryAction(state, viewModel)
     }
 }
 
@@ -251,7 +274,7 @@ private fun WizardStepMembers(state: AdminUiState, viewModel: AdminViewModel) {
     val selected = state.users.filter { it.id in state.bondMemberIds }
     val matches = state.users
         .filter { it.id !in state.bondMemberIds }
-        .filter { user -> query.isEmpty() || user.matches(query) }
+        .filter { user -> user.matchesUserQuery(query) }
 
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
         Row(verticalAlignment = Alignment.Bottom) {
@@ -440,91 +463,84 @@ private fun WizardStepChildren(state: AdminUiState, viewModel: AdminViewModel) {
                 modifier = Modifier.weight(1f),
             )
             Text(
-                text = "${state.bondChildrenDraft.size} ${if (state.bondChildrenDraft.size == 1) "cargado" else "cargados"}",
+                text = "${state.bondChildrenDraft.size} " +
+                    if (state.bondChildrenDraft.size == 1) "cargado" else "cargados",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
 
-        LazyColumn(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(Spacing.xs),
-        ) {
-            itemsIndexed(state.bondChildrenDraft) { index, child ->
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = MaterialTheme.shapes.small,
-                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        state.bondChildrenDraft.forEachIndexed { index, child ->
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.small,
+                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+            ) {
+                Row(
+                    modifier = Modifier.padding(Spacing.md),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Row(
-                        modifier = Modifier.padding(Spacing.md),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "${child.firstName} ${child.lastName}",
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.Medium,
-                            )
-                            Text(
-                                text = child.dateOfBirth?.let(::adminFormatIsoDate) ?: "Sin fecha de nacimiento",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                        TextButton(onClick = { viewModel.removeBondChildDraft(index) }) {
-                            Text("Quitar", color = MaterialTheme.colorScheme.error)
-                        }
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "${child.firstName} ${child.lastName}",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Medium,
+                        )
+                        Text(
+                            text = child.dateOfBirth?.let(::adminFormatIsoDate)
+                                ?: "Sin fecha de nacimiento",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    TextButton(onClick = { viewModel.removeBondChildDraft(index) }) {
+                        Text("Quitar", color = MaterialTheme.colorScheme.error)
                     }
                 }
             }
+        }
 
-            item {
-                Card(
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = MaterialTheme.shapes.small,
+            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        ) {
+            Column(modifier = Modifier.padding(Spacing.md)) {
+                Text(
+                    text = "Agregar un hijo",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(modifier = Modifier.height(Spacing.xs))
+                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                    OutlinedTextField(
+                        value = state.bondChildFirstName,
+                        onValueChange = { viewModel.updateBondChildFirstName(it) },
+                        label = { Text("Nombre") },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f),
+                    )
+                    OutlinedTextField(
+                        value = state.bondChildLastName,
+                        onValueChange = { viewModel.updateBondChildLastName(it) },
+                        label = { Text("Apellido") },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                Spacer(modifier = Modifier.height(Spacing.sm))
+                OutlinedButton(
+                    onClick = { showDatePicker = true },
                     modifier = Modifier.fillMaxWidth(),
-                    shape = MaterialTheme.shapes.small,
-                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
                 ) {
-                    Column(modifier = Modifier.padding(Spacing.md)) {
-                        Text(
-                            text = "Agregar un hijo",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        Spacer(modifier = Modifier.height(Spacing.xs))
-                        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                            OutlinedTextField(
-                                value = state.bondChildFirstName,
-                                onValueChange = { viewModel.updateBondChildFirstName(it) },
-                                label = { Text("Nombre") },
-                                singleLine = true,
-                                modifier = Modifier.weight(1f),
-                            )
-                            OutlinedTextField(
-                                value = state.bondChildLastName,
-                                onValueChange = { viewModel.updateBondChildLastName(it) },
-                                label = { Text("Apellido") },
-                                singleLine = true,
-                                modifier = Modifier.weight(1f),
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(Spacing.sm))
-                        OutlinedButton(
-                            onClick = { showDatePicker = true },
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Text(
-                                "Nacimiento: ${adminFormatIsoDate(state.bondChildDob.ifBlank { null })}",
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(Spacing.sm))
-                        OutlinedButton(
-                            onClick = { viewModel.addBondChildDraft() },
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Text("+ Agregar hijo")
-                        }
-                    }
+                    Text("Nacimiento: ${adminFormatIsoDate(state.bondChildDob.ifBlank { null })}")
+                }
+                Spacer(modifier = Modifier.height(Spacing.sm))
+                OutlinedButton(
+                    onClick = { viewModel.addBondChildDraft() },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text("+ Agregar hijo")
                 }
             }
         }
@@ -576,16 +592,3 @@ private fun initialsOf(user: AdminUser): String {
         else -> user.email.first().uppercase()
     }
 }
-
-/** Búsqueda por nombre completo o email, sin distinguir mayúsculas ni acentos. */
-private fun AdminUser.matches(query: String): Boolean {
-    val haystack = "${firstName.orEmpty()} ${lastName.orEmpty()} $email".lowercase()
-    val needle = query.lowercase()
-    return haystack.contains(needle) || haystack.sanitize().contains(needle.sanitize())
-}
-
-private fun String.sanitize(): String =
-    lowercase()
-        .replace("á", "a").replace("é", "e").replace("í", "i")
-        .replace("ó", "o").replace("ú", "u").replace("ü", "u")
-        .replace("ñ", "n")

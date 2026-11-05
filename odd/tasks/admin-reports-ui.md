@@ -39,6 +39,10 @@ through the existing Gradle setup.
   signed `fileUrl` returned by `GET /admin/reports/:id`.
 - **S8 — Errors.** A failed request shows the backend message in the existing error
   banner and leaves the previous data untouched.
+- **S18 — User search.** QUOTE: "Agregame un buscador por nombre de usuario". The Users tab
+  filters by first name, last name or email, case- and accent-insensitive, with the same
+  empty-state copy the bond list uses. One rule shared with the wizard's member picker
+  (`AdminSearch.kt`), so the two searches cannot drift.
 - **S9 — Bond console (artboard `admin-ui/01`).** The Vínculos tab opens with a summary
   strip (users / bonds / active), a search field that filters the list by bond title, and
   one card per bond carrying its children count, completion percentage and paid
@@ -89,6 +93,8 @@ through the existing Gradle setup.
 | F2 | S5-S8 | inline | done | (single commit) |
 | F3 | S9-S12 | inline | done | (single commit) |
 | F4 | S13-S14 | inline | done | (single commit) |
+| F5 | S15-S17 | inline | done | e14c1a9, c1e6079 |
+| F6 | S9, S13, S18 | inline | done | (single commit) |
 
 ## Log
 
@@ -224,3 +230,14 @@ queda registrado acá.
 `children = children` por `children = emptyList()` en `AdminApi.createBond` NO rompe ese
 test, porque el test pinea el DTO serializado y no el método; la garantía del método es el
 compilador (el parámetro es obligatorio).
+
+**L17 — feedback aplicado sobre lo implementado.** QUOTE: "El boton de siguiente en el
+vinculo esta muy abajo." El paso 1 y el paso 3 del wizard son cortos: el botón anclado al
+pie flotaba sobre el vacío. Ahora esos dos pasos van en una columna con scroll y el botón
+viaja pegado al último campo; el paso 2 conserva el botón anclado porque su lista necesita
+alto acotado. El artboard se actualizó igual (frames 1 y 4) para que diseño y app no
+divergan.
+
+**L18 — evidencia.** `./gradlew :shared:testDebugUnitTest` → 56 suites / **518 tests**, 0
+fallos, incluidos los 5 nuevos de `AdminUserSearchTest` (nombre con acento, mayúsculas,
+apellido, email, consulta vacía y no-coincidencia). APK reinstalado en el dispositivo.
