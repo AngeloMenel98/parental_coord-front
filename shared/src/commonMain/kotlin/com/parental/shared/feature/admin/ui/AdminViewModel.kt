@@ -263,9 +263,11 @@ class AdminViewModel(
                         bondUserQuery = "",
                         bondChildrenDraft = emptyList(),
                     )
+                    // Se vuelve a la lista, no al detalle: el vínculo recién creado
+                    // todavía no está en `bonds`, así que abrirlo dejaría la pantalla
+                    // en blanco hasta que termine la recarga.
                     loadBonds()
                     loadHealth()
-                    openBond(result.data.id)
                 }
                 is ApiResult.Error -> {
                     _uiState.value = _uiState.value.copy(
