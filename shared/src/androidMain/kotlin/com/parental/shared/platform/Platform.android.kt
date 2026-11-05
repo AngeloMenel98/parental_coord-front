@@ -3,12 +3,8 @@ package com.parental.shared.platform
 import android.content.Context
 import android.content.SharedPreferences
 import com.parental.shared.BuildConfig
-import io.ktor.client.*
-import io.ktor.client.engine.okhttp.*
-import io.ktor.client.plugins.contentnegotiation.*
-import io.ktor.client.plugins.HttpTimeout
-import io.ktor.serialization.kotlinx.json.*
-import kotlinx.serialization.json.Json
+import io.ktor.client.engine.HttpClientEngine
+import io.ktor.client.engine.okhttp.OkHttp
 
 /**
  * Android actual implementation using SharedPreferences for persistent storage
@@ -17,45 +13,33 @@ import kotlinx.serialization.json.Json
 actual object Platform {
     private const val PREFS_NAME = "parental_coordination_prefs"
 
-    // Base URL for Android.
-    //
-    // Comes from BuildConfig, injected by shared/build.gradle.kts so the same
-    // source builds for the deployed host and for a local backend:
-    //   ./gradlew :androidApp:assembleDebug -PapiBaseUrl=... -PwsUrl=...
-    //
-    // The default is the deployed managed host (public HTTPS/WSS). A LAN address
-    // such as 192.168.0.17 only works on a phone joined to the same Wi-Fi, so it
-    // is no longer baked in: an APK installed elsewhere would talk to nothing.
-    // Cleartext HTTP is still permitted by
-    // androidApp/src/androidMain/res/xml/network_security_config.xml, which is
-    // what makes a LAN override usable at all.
-    actual val baseUrl: String = BuildConfig.API_BASE_URL
+    // WS endpoint comes from the shared module's BuildConfig (buildConfigField
+    // WS_URL in shared/build.gradle.kts, wired with -PwsUrl per build type).
+    // baseUrl stays init-injected from androidApp's BuildConfig, as the refactor
+    // wired it via ParentalApplication.onCreate.
     actual val wsUrl: String = BuildConfig.WS_URL
 
     private var prefs: SharedPreferences? = null
+    private var configuredBaseUrl: String? = null
+    private var debug: Boolean = false
+
+    /** Base URL inyectada desde BuildConfig del módulo app (varía por build type). */
+    actual val baseUrl: String
+        get() = checkNotNull(configuredBaseUrl) { "Platform.init() must be called before using the API" }
+
+    actual val isDebug: Boolean get() = debug
 
     /**
-     * Initialize with Android Context. Must be called before any storage operations.
+     * Initialize with Android Context and build config. Must be called before
+     * any storage or network operation (ParentalApplication.onCreate).
      */
-    fun init(context: Context) {
+    fun init(context: Context, baseUrl: String, isDebug: Boolean) {
         prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        configuredBaseUrl = baseUrl
+        debug = isDebug
     }
 
-    actual fun createHttpClient(): HttpClient = HttpClient(OkHttp) {
-        install(io.ktor.client.plugins.websocket.WebSockets)
-        install(ContentNegotiation) {
-            json(Json {
-                ignoreUnknownKeys = true
-                isLenient = false
-                encodeDefaults = true
-            })
-        }
-        install(HttpTimeout) {
-            requestTimeoutMillis = 20_000
-            connectTimeoutMillis = 10_000
-            socketTimeoutMillis = 20_000
-        }
-    }
+    actual fun createHttpEngine(): HttpClientEngine = OkHttp.create()
 
     actual fun saveString(key: String, value: String) {
         prefs?.edit()?.putString(key, value)?.apply()

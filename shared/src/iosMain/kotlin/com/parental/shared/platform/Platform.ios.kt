@@ -1,13 +1,10 @@
 package com.parental.shared.platform
 
-import io.ktor.client.*
-import io.ktor.client.engine.darwin.*
-import io.ktor.client.plugins.contentnegotiation.*
-import io.ktor.client.plugins.HttpTimeout
-import io.ktor.serialization.kotlinx.json.*
-import kotlinx.serialization.json.Json
+import io.ktor.client.engine.HttpClientEngine
+import io.ktor.client.engine.darwin.Darwin
 import platform.Foundation.NSUserDefaults
 import platform.Foundation.standardUserDefaults
+import kotlin.experimental.ExperimentalNativeApi
 
 /**
  * iOS actual implementation using NSUserDefaults for persistent storage
@@ -16,28 +13,22 @@ import platform.Foundation.standardUserDefaults
 actual object Platform {
     private const val PREFS_PREFIX = "parental_coord_"
 
-    // Base URL for iOS: adjust for your environment
-    // - iOS Simulator: http://127.0.0.1:3000/api (or http://localhost:3000/api)
+    // - iOS Simulator (debug): http://127.0.0.1:3000/api
     // - Real device: use your machine's IP (e.g., http://192.168.1.x:3000/api)
-    // - Production: https://api.yourdomain.com/api
-    actual val baseUrl: String = "http://127.0.0.1:3000/api"
-    actual val wsUrl: String = "ws://127.0.0.1:3000/realtime"
+    private const val DEBUG_BASE_URL = "http://127.0.0.1:3000/api"
+    private const val DEBUG_WS_URL = "ws://127.0.0.1:3000/realtime"
 
-    actual fun createHttpClient(): HttpClient = HttpClient(Darwin) {
-        install(io.ktor.client.plugins.websocket.WebSockets)
-        install(ContentNegotiation) {
-            json(Json {
-                ignoreUnknownKeys = true
-                isLenient = false
-                encodeDefaults = true
-            })
-        }
-        install(HttpTimeout) {
-            requestTimeoutMillis = 20_000
-            connectTimeoutMillis = 10_000
-            socketTimeoutMillis = 20_000
-        }
-    }
+    // TODO: reemplazar por la URL HTTPS real de producción.
+    private const val RELEASE_BASE_URL = "https://api.parental-coord.example/api"
+    private const val RELEASE_WS_URL = "wss://api.parental-coord.example/realtime"
+
+    @OptIn(ExperimentalNativeApi::class)
+    actual val isDebug: Boolean = kotlin.native.Platform.isDebugBinary
+
+    actual val baseUrl: String = if (isDebug) DEBUG_BASE_URL else RELEASE_BASE_URL
+    actual val wsUrl: String = if (isDebug) DEBUG_WS_URL else RELEASE_WS_URL
+
+    actual fun createHttpEngine(): HttpClientEngine = Darwin.create()
 
     actual fun saveString(key: String, value: String) {
         NSUserDefaults.standardUserDefaults.setObject(value, forKey = PREFS_PREFIX + key)

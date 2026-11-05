@@ -1,12 +1,11 @@
 package com.parental.shared.feature.expenses.di
 
-/**
- * Koin DI module placeholder.
- *
- * The real composition is manual in [com.parental.shared.App.kt]; Koin is not
- * started in this app. This file exists only to keep the feature module shape
- * consistent with the other features.
- */
-object ExpensesModule {
-    // TODO: wire expenses use-cases here if Koin is ever started.
+import com.parental.shared.feature.expenses.data.remote.ExpensesApi
+import com.parental.shared.platform.Platform
+import org.koin.dsl.module
+
+// ExpensesApi mantiene la forma vieja de origin/main (cliente + baseUrl por
+// instancia, token por llamada): se instancia sobre el HttpClient único de Koin.
+val expensesModule = module {
+    single { ExpensesApi(get(), Platform.baseUrl) }
 }

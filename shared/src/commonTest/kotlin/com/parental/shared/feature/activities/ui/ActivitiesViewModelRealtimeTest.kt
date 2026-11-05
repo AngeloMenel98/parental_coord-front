@@ -30,23 +30,23 @@ class ActivitiesViewModelRealtimeTest {
     private val bondId = "b-1"
     private val userId = "u-self"
 
-    private class FakeActivitiesApi : ActivitiesApi(UNUSED_CLIENT, "http://unused") {
+    private class FakeActivitiesApi : ActivitiesApi(UNUSED_CLIENT) {
         var listCalls = 0
         var gate: CompletableDeferred<Unit>? = null
-        override suspend fun listActividades(token: String, bondId: String): ApiResult<List<Actividad>> {
+        override suspend fun listActividades(bondId: String): ApiResult<List<Actividad>> {
             listCalls++
             gate?.await()
             return ApiResult.Success(emptyList())
         }
     }
 
-    private class FakeCategoriesApi : CategoriesApi(UNUSED_CLIENT, "http://unused") {
+    private class FakeCategoriesApi : CategoriesApi(UNUSED_CLIENT) {
         override suspend fun getCategories(): ApiResult<List<CategoryDto>> =
             ApiResult.Success(listOf(CategoryDto(id = "cat", name = "Salud", criticality = "medium")))
     }
 
-    private class FakeBondsApi : BondsApi(UNUSED_CLIENT, "http://unused") {
-        override suspend fun getMyBonds(token: String): ApiResult<List<Vinculo>> =
+    private class FakeBondsApi : BondsApi(UNUSED_CLIENT) {
+        override suspend fun getMyBonds(): ApiResult<List<Vinculo>> =
             ApiResult.Success(
                 listOf(
                     Vinculo(

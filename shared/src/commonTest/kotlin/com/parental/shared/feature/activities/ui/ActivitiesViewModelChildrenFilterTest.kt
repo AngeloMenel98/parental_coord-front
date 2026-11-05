@@ -26,24 +26,18 @@ class ActivitiesViewModelChildrenFilterTest {
     private val bondId = "b-1"
     private val userId = "u-self"
 
-    private class FakeActivitiesApi : ActivitiesApi(UNUSED_CLIENT, "http://unused") {
-        override suspend fun listActividades(
-            token: String,
-            bondId: String,
+    private class FakeActivitiesApi : ActivitiesApi(UNUSED_CLIENT) {
+        override suspend fun listActividades(bondId: String,
         ): ApiResult<List<Actividad>> = ApiResult.Success(emptyList())
 
-        override suspend fun getActividad(
-            token: String,
-            id: String,
+        override suspend fun getActividad(id: String,
         ): ApiResult<ActividadDetalle> = throw NotImplementedError()
 
-        override suspend fun confirmAssignment(
-            token: String,
-            activityId: String,
+        override suspend fun confirmAssignment(activityId: String,
         ): ApiResult<ConfirmAssignmentResponse> = throw NotImplementedError()
     }
 
-    private class FakeCategoriesApi : CategoriesApi(UNUSED_CLIENT, "http://unused") {
+    private class FakeCategoriesApi : CategoriesApi(UNUSED_CLIENT) {
         override suspend fun getCategories(): ApiResult<List<CategoryDto>> =
             ApiResult.Success(emptyList())
     }
@@ -51,8 +45,8 @@ class ActivitiesViewModelChildrenFilterTest {
     private class FakeBondsApi(
         private val children: List<VinculoChild>,
         private val bondId: String,
-    ) : BondsApi(UNUSED_CLIENT, "http://unused") {
-        override suspend fun getMyBonds(token: String): ApiResult<List<Vinculo>> =
+    ) : BondsApi(UNUSED_CLIENT) {
+        override suspend fun getMyBonds(): ApiResult<List<Vinculo>> =
             ApiResult.Success(
                 listOf(
                     Vinculo(

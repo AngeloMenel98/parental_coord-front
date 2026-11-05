@@ -77,7 +77,7 @@ class ActivitiesViewModelCreateTest {
     private class FakeActivitiesApi(
         private val actividades: List<Actividad> = emptyList(),
         private val detalle: ActividadDetalle? = null,
-    ) : ActivitiesApi(UNUSED_CLIENT, "http://unused") {
+    ) : ActivitiesApi(UNUSED_CLIENT) {
 
         var listCalls = 0
         var createCalls = 0
@@ -100,18 +100,17 @@ class ActivitiesViewModelCreateTest {
         var completeResult: ApiResult<CompleteActivityResponse> =
             ApiResult.Success(CompleteActivityResponse(id = "act-1", status = "done", completedAt = "2026-10-01T12:00:00.000Z"))
 
-        override suspend fun listActividades(token: String, bondId: String): ApiResult<List<Actividad>> {
+        override suspend fun listActividades(bondId: String): ApiResult<List<Actividad>> {
             listCalls++
             return ApiResult.Success(actividades)
         }
 
-        override suspend fun getActividad(token: String, id: String): ApiResult<ActividadDetalle> {
+        override suspend fun getActividad(id: String): ApiResult<ActividadDetalle> {
             val found = detalle ?: return ApiResult.Error(404, "not found")
             return ApiResult.Success(found)
         }
 
         override suspend fun createActividad(
-            token: String,
             bondId: String,
             request: CreateActividadRequest,
         ): ApiResult<CreatedActividad> {
@@ -122,7 +121,6 @@ class ActivitiesViewModelCreateTest {
         }
 
         override suspend fun completeActivity(
-            token: String,
             id: String,
         ): ApiResult<CompleteActivityResponse> {
             completeCalls++
@@ -132,14 +130,14 @@ class ActivitiesViewModelCreateTest {
     }
 
     private class FakeCategoriesApi(private val categories: List<CategoryDto>) :
-        CategoriesApi(UNUSED_CLIENT, "http://unused") {
+        CategoriesApi(UNUSED_CLIENT) {
         override suspend fun getCategories(): ApiResult<List<CategoryDto>> =
             ApiResult.Success(categories)
     }
 
     private class FakeBondsApi(private val vinculo: Vinculo) :
-        BondsApi(UNUSED_CLIENT, "http://unused") {
-        override suspend fun getMyBonds(token: String): ApiResult<List<Vinculo>> =
+        BondsApi(UNUSED_CLIENT) {
+        override suspend fun getMyBonds(): ApiResult<List<Vinculo>> =
             ApiResult.Success(listOf(vinculo))
     }
 

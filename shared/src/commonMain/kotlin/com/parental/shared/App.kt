@@ -12,35 +12,52 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelStore
+import androidx.lifecycle.ViewModelStoreOwner
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.parental.shared.core.error.ApiResult
-import com.parental.shared.core.network.ApiClient
+import com.parental.shared.core.network.CategoriesApi
+import com.parental.shared.core.network.realtime.RealtimeConnectionManager
 import com.parental.shared.core.ui.components.BottomNavBar
 import com.parental.shared.core.ui.theme.ParentalCoordinationTheme
 import com.parental.shared.core.ui.theme.ThemeController
+import com.parental.shared.feature.activities.data.remote.ActivitiesApi
 import com.parental.shared.feature.activities.ui.ActividadesScreen
 import com.parental.shared.feature.activities.ui.ActividadesViewModel
-import com.parental.shared.feature.expenses.ui.ExpensesScreen
-import com.parental.shared.feature.expenses.ui.ExpensesViewModel
-import com.parental.shared.feature.auth.data.repository.AuthRepository
-import com.parental.shared.feature.auth.ui.LoginScreen
-import com.parental.shared.feature.auth.ui.LoginViewModel
+import com.parental.shared.feature.admin.data.remote.AdminApi
 import com.parental.shared.feature.admin.ui.AdminScreen
 import com.parental.shared.feature.admin.ui.AdminViewModel
+import com.parental.shared.feature.auth.data.remote.AuthApi
+import com.parental.shared.feature.auth.domain.repository.IAuthRepository
+import com.parental.shared.feature.auth.ui.LoginScreen
+import com.parental.shared.feature.auth.ui.LoginViewModel
+import com.parental.shared.feature.bonds.data.remote.BondsApi
+import com.parental.shared.feature.expenses.data.remote.ExpensesApi
+import com.parental.shared.feature.expenses.ui.ExpensesScreen
+import com.parental.shared.feature.expenses.ui.ExpensesViewModel
 import com.parental.shared.feature.home.ui.HomeScreen
 import com.parental.shared.feature.home.ui.HomeViewModel
+import com.parental.shared.feature.notifications.data.remote.NotificationsApi
 import com.parental.shared.feature.notifications.ui.NotificationsScreen
 import com.parental.shared.feature.notifications.ui.NotificationsViewModel
 import com.parental.shared.feature.notifications.ui.UnreadBadge
 import com.parental.shared.feature.notifications.ui.UnreadCountPoller
 import com.parental.shared.feature.session.data.SessionManager
 import com.parental.shared.feature.thirdparty.ui.ThirdPartyRoot
-import com.parental.shared.core.network.realtime.RealtimeConnectionManager
 import com.parental.shared.platform.Platform
+import io.ktor.client.HttpClient
+import org.koin.compose.KoinContext
+import org.koin.compose.koinInject
+import org.koin.compose.viewmodel.koinViewModel
 
 private sealed class Screen(val route: String) {
     data object Login : Screen("login")
@@ -49,58 +66,77 @@ private sealed class Screen(val route: String) {
     data object ThirdParty : Screen("third_party")
 }
 
+/**
+ * Dueño de los ViewModels de la sesión actual. Vive como ViewModel de la
+ * Activity (sobrevive a rotaciones) y se vacía en el logout para que el
+ * próximo usuario no herede VMs ni datos del anterior.
+ */
+private class SessionViewModelStoreOwner : ViewModel(), ViewModelStoreOwner {
+    override val viewModelStore = ViewModelStore()
+
+    fun reset() = viewModelStore.clear()
+
+    override fun onCleared() = viewModelStore.clear()
+}
+
 @Composable
 fun App() {
-    val authRepository = remember { AuthRepository() }
-    val sessionManager = remember { SessionManager() }
+    KoinContext {
+        // Singletons de Koin: la sesión ya viene restaurada desde el storage.
+        val sessionManager = koinInject<SessionManager>()
+        val authApi = koinInject<AuthApi>()
+        val bondsApi = koinInject<BondsApi>()
 
-    LaunchedEffect(Unit) {
-        sessionManager.restoreFromStorage()
-        // Legacy sessions (pre userId) — backfill via GET /auth/me so the
-        // activities confirm-affordance visibility rule can evaluate.
-        val token = sessionManager.token
-        if (token != null && sessionManager.userId == null) {
-            when (val me = ApiClient.authApi().me(token)) {
-                is ApiResult.Success -> sessionManager.updateUserId(me.data.id)
-                is ApiResult.Error -> Unit // degrade safely: no confirm affordance until re-login
-            }
-        }
-        // El rol en el vínculo se deriva al loguear, pero una sesión restaurada de una
-        // versión anterior no lo tiene; sin él la app caería en el Home de los
-        // progenitores con los datos de todo el vínculo (S5). Se deriva del vínculo
-        // guardado y, si no hay ninguno, queda `null`: el `else` ya es el Home de siempre,
-        // que es la degradación segura.
-        val restoredToken = sessionManager.token
-        if (restoredToken != null && sessionManager.bondRole == null && sessionManager.userId != null) {
-            when (val bonds = ApiClient.bondsApi().getMyBonds(restoredToken)) {
-                is ApiResult.Success -> {
-                    val bond = bonds.data.firstOrNull { it.id == sessionManager.bondId }
-                        ?: bonds.data.firstOrNull()
-                    val role = bond?.members
-                        ?.firstOrNull { it.user?.id == sessionManager.userId }
-                        ?.role
-                    if (role != null) sessionManager.updateBondRole(role)
+        LaunchedEffect(Unit) {
+            // Legacy sessions (pre userId) — backfill via GET /auth/me so the
+            // activities confirm-affordance visibility rule can evaluate.
+            if (sessionManager.token != null && sessionManager.userId == null) {
+                when (val me = authApi.me()) {
+                    is ApiResult.Success -> sessionManager.updateUserId(me.data.id)
+                    is ApiResult.Error -> Unit // degrade safely: no confirm affordance until re-login
                 }
-                is ApiResult.Error -> Unit
+            }
+            // El rol en el vínculo se deriva al loguear, pero una sesión restaurada de una
+            // versión anterior no lo tiene; sin él la app caería en el Home de los
+            // progenitores con los datos de todo el vínculo (S5). Se deriva del vínculo
+            // guardado y, si no hay ninguno, queda `null`: el `else` ya es el Home de siempre,
+            // que es la degradación segura.
+            val restoredToken = sessionManager.token
+            if (restoredToken != null && sessionManager.bondRole == null && sessionManager.userId != null) {
+                when (val bonds = bondsApi.getMyBonds()) {
+                    is ApiResult.Success -> {
+                        val bond = bonds.data.firstOrNull { it.id == sessionManager.bondId }
+                            ?: bonds.data.firstOrNull()
+                        val role = bond?.members
+                            ?.firstOrNull { it.user?.id == sessionManager.userId }
+                            ?.role
+                        if (role != null) sessionManager.updateBondRole(role)
+                    }
+                    is ApiResult.Error -> Unit
+                }
             }
         }
-    }
 
-    // El interruptor sol/luna del Inicio elige el tema; sin decisión explícita manda el
-    // sistema. El controlador guarda la DECISIÓN y se resuelve en cada composición, así
-    // que un cambio de tema del sistema se refleja sin recrear nada.
-    val themeController = remember { ThemeController() }
-    val systemDark = isSystemInDarkTheme()
-    val darkTheme = themeController.resolve(systemDark)
+        val sessionOwner = viewModel { SessionViewModelStoreOwner() }
 
-    // ADR-10: un único wrap del tema en commonMain — Android hoy, iOS hereda.
-    ParentalCoordinationTheme(darkTheme = darkTheme) {
-        AppContent(
-            authRepository = authRepository,
-            sessionManager = sessionManager,
-            isDarkTheme = darkTheme,
-            onToggleTheme = { themeController.toggle(systemDark) },
-        )
+        // El interruptor sol/luna del Inicio elige el tema; sin decisión explícita manda el
+        // sistema. El controlador guarda la DECISIÓN y se resuelve en cada composición, así
+        // que un cambio de tema del sistema se refleja sin recrear nada.
+        val themeController = remember { ThemeController() }
+        val systemDark = isSystemInDarkTheme()
+        val darkTheme = themeController.resolve(systemDark)
+
+        // ADR-10: un único wrap del tema en commonMain — Android hoy, iOS hereda.
+        ParentalCoordinationTheme(darkTheme = darkTheme) {
+            CompositionLocalProvider(LocalViewModelStoreOwner provides sessionOwner) {
+                AppContent(
+                    sessionManager = sessionManager,
+                    isDarkTheme = darkTheme,
+                    onToggleTheme = { themeController.toggle(systemDark) },
+                    onSessionEnded = sessionOwner::reset,
+                )
+            }
+        }
     }
 }
 
@@ -111,26 +147,40 @@ fun App() {
  */
 @Composable
 private fun AppContent(
-    authRepository: AuthRepository,
     sessionManager: SessionManager,
     isDarkTheme: Boolean = false,
     onToggleTheme: (() -> Unit)? = null,
+    onSessionEnded: () -> Unit,
 ) {
+    val authRepository = koinInject<IAuthRepository>()
+
     // S12 · G-3 — la salida vive en la barra global de todas las vistas, así que el
     // efecto es UNO solo: no hay dos lambdas que puedan divergir.
-    val logout: () -> Unit = {
+    val onLogout: () -> Unit = {
         authRepository.logout()
         sessionManager.clear()
+        onSessionEnded()
     }
 
-    val currentScreen = if (sessionManager.loginPending) {
+    // Token vencido/revocado (401 en un request autenticado) → mismo camino que el logout manual.
+    LaunchedEffect(sessionManager) {
+        sessionManager.sessionExpired.collect {
+            if (sessionManager.isLoggedIn) onLogout()
+        }
+    }
+
+    // Snapshot reactivo de la sesión: cualquier cambio (login, backfill, logout) recompone.
+    val session by sessionManager.state.collectAsStateWithLifecycle()
+
+    val currentScreen = if (session.loginPending) {
+        // Login in progress (bonds fetch pending) — keep on Login screen
         Screen.Login
-    } else if (sessionManager.isLoggedIn) {
+    } else if (session.isLoggedIn) {
         when {
-            sessionManager.role == "admin" -> Screen.Admin
+            session.role == "admin" -> Screen.Admin
             // S1/S5: el tercero temporal tiene su propio árbol. El `systemRole` sigue
             // siendo `user`; lo que decide acá es el rol DENTRO del vínculo.
-            sessionManager.bondRole == "third_party" -> Screen.ThirdParty
+            session.bondRole == "third_party" -> Screen.ThirdParty
             else -> Screen.Home
         }
     } else {
@@ -139,65 +189,19 @@ private fun AppContent(
 
     when (currentScreen) {
         Screen.Login -> {
-            val viewModel = remember { LoginViewModel(authRepository) }
-            DisposableEffect(Unit) {
-                onDispose { viewModel.destroy() }
-            }
-            LoginScreen(
-                viewModel = viewModel,
-                onLoginSuccess = { response ->
-                    val name = response.user.firstName ?: response.user.email
-
-                    sessionManager.beginLogin()
-
-                    sessionManager.setSession(
-                        token = response.access_token,
-                        userName = name,
-                        role = response.user.systemRole,
-                        userId = response.user.id,
-                    )
-
-                    val bondsApi = ApiClient.bondsApi()
-                    try {
-                        val result = bondsApi.getMyBonds(response.access_token)
-                        when (result) {
-                            is ApiResult.Success -> {
-                                if (result.data.isNotEmpty()) {
-                                    val firstBond = result.data.first()
-                                    sessionManager.updateBondId(firstBond.id)
-                                    // D2/F7: el rol vive en el miembro del vínculo, no en
-                                    // el JWT ni en `system_role`.
-                                    sessionManager.updateBondRole(
-                                        firstBond.members
-                                            .firstOrNull { it.user?.id == response.user.id }
-                                            ?.role,
-                                    )
-                                } else {
-                                    // No bonds found for this user
-                                }
-                            }
-                            is ApiResult.Error -> {
-                                // Failed to fetch bonds
-                            }
-                        }
-                    } catch (e: Exception) {
-                        // Exception fetching bonds
-                    } finally {
-                        // Complete login — now safe to navigate to Home/Admin
-                        sessionManager.completeLogin()
-                    }
-                },
-            )
+            // El flujo de login vive en el VM (sobrevive a rotaciones); al
+            // completarse, el cambio de sesión recompone hacia Home/Admin.
+            LoginScreen(viewModel = koinViewModel<LoginViewModel>())
         }
 
         Screen.Admin -> {
-            val adminApi = remember { ApiClient.adminApi() }
+            val adminApi = koinInject<AdminApi>()
             val token = sessionManager.token
             if (token == null) {
                 sessionManager.clear()
                 return
             }
-            val viewModel = remember {
+            val viewModel = remember(adminApi, token) {
                 AdminViewModel(
                     adminApi = adminApi,
                     token = token,
@@ -208,7 +212,7 @@ private fun AppContent(
             }
             AdminScreen(
                 viewModel = viewModel,
-                onLogout = logout,
+                onLogout = onLogout,
             )
         }
 
@@ -223,12 +227,12 @@ private fun AppContent(
                 userName = sessionManager.userName.orEmpty(),
                 bondId = sessionManager.bondId,
                 currentUserId = sessionManager.userId,
-                onLogout = logout,
+                onLogout = onLogout,
             )
         }
 
         Screen.Home -> {
-            var bottomRoute by remember { mutableStateOf("home") }
+            var bottomRoute by rememberSaveable { mutableStateOf("home") }
             var showNotifications by remember { mutableStateOf(false) }
             var expenseAttachmentDraft by remember { mutableStateOf<Pair<String, String>?>(null) }
             val token = sessionManager.token
@@ -254,9 +258,10 @@ private fun AppContent(
             // cerraría 4403 en bucle de reconexión), así que sólo corre con bondId.
             val bondId = sessionManager.bondId
             val currentUserId = sessionManager.userId
-            val realtimeManager = remember(token) {
+            val httpClient = koinInject<HttpClient>()
+            val realtimeManager = remember(token, httpClient) {
                 RealtimeConnectionManager(
-                    http = ApiClient.httpClient,
+                    http = httpClient,
                     url = Platform.wsUrl,
                     tokenProvider = { sessionManager.token },
                 )
@@ -272,7 +277,7 @@ private fun AppContent(
             // Notificaciones (slice 4): el contador vive acá porque lo leen DOS
             // superficies (la campana de Home y la lista) y lo escriben TRES
             // (el poller, markRead, markAllRead). Una sola fuente de verdad.
-            val notificationsApi = remember { ApiClient.notificationsApi() }
+            val notificationsApi = koinInject<NotificationsApi>()
             val unreadBadge = remember(token) { UnreadBadge() }
             val unreadPoller = remember(token) {
                 UnreadCountPoller(
@@ -326,19 +331,22 @@ private fun AppContent(
                 NotificationsScreen(
                     viewModel = notificationsViewModel,
                     onBack = { showNotifications = false },
-                    onLogout = logout,
+                    onLogout = onLogout,
                 )
             } else if (bottomRoute == "activities") {
                 when {
                     bondId == null -> SinVinculoScreen(onGoHome = { bottomRoute = "home" })
                     else -> {
+                        val activitiesApi = koinInject<ActivitiesApi>()
+                        val categoriesApi = koinInject<CategoriesApi>()
+                        val bondsApi = koinInject<BondsApi>()
                         // userId: login lo provee; sesiones legacy → backfill vía /auth/me.
                         // keyed on userId para que el VM se reconstruya si el backfill llega tarde.
                         val activitiesViewModel = remember(currentUserId) {
                             ActividadesViewModel(
-                                activitiesApi = ApiClient.activitiesApi(),
-                                categoriesApi = ApiClient.categoriesApi(),
-                                bondsApi = ApiClient.bondsApi(),
+                                activitiesApi = activitiesApi,
+                                categoriesApi = categoriesApi,
+                                bondsApi = bondsApi,
                                 token = token,
                                 bondId = bondId,
                                 currentUserId = currentUserId ?: "",
@@ -365,7 +373,7 @@ private fun AppContent(
                             // vive en esta rama de Home; el contador es el mismo.
                             unreadCount = unreadCount,
                             onOpenNotifications = { showNotifications = true },
-                            onLogout = logout,
+                            onLogout = onLogout,
                         )
                     }
                 }
@@ -373,11 +381,14 @@ private fun AppContent(
                 when {
                     bondId == null -> SinVinculoScreen(onGoHome = { bottomRoute = "home" })
                     else -> {
+                        val expensesApi = koinInject<ExpensesApi>()
+                        val expensesCategoriesApi = koinInject<CategoriesApi>()
                         val expensesViewModel = remember(currentUserId) {
                             ExpensesViewModel(
-                                api = ApiClient.expensesApi(),
+                                api = expensesApi,
                                 token = token,
                                 bondId = bondId,
+                                categoriesApi = expensesCategoriesApi,
                                 realtime = realtimeManager,
                             )
                         }
@@ -387,7 +398,7 @@ private fun AppContent(
                         ExpensesScreen(
                             viewModel = expensesViewModel,
                             currentUserId = currentUserId,
-                            onLogout = logout,
+                            onLogout = onLogout,
                             onNavigateBottom = onNavigateBottom,
                             unreadCount = unreadCount,
                             onOpenNotifications = { showNotifications = true },
@@ -398,21 +409,9 @@ private fun AppContent(
                     }
                 }
             } else {
-                val homeApi = remember { ApiClient.homeApi() }
-                val viewModel = remember {
-                    HomeViewModel(
-                        homeApi = homeApi,
-                        token = token,
-                        userName = userName,
-                        currentUserId = sessionManager.userId,
-                    )
-                }
-                DisposableEffect(Unit) {
-                    onDispose { viewModel.destroy() }
-                }
                 HomeScreen(
-                    viewModel = viewModel,
-                    onLogout = logout,
+                    viewModel = koinViewModel<HomeViewModel>(),
+                    onLogout = onLogout,
                     onNavigateBottom = onNavigateBottom,
                     unreadCount = unreadCount,
                     onOpenNotifications = { showNotifications = true },

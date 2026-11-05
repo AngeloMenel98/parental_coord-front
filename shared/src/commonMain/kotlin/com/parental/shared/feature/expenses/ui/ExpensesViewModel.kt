@@ -16,6 +16,7 @@ import com.parental.shared.feature.expenses.domain.model.ExpenseSummaryDto
 import com.parental.shared.feature.expenses.domain.model.ExpenseUpdateRequest
 import com.parental.shared.feature.expenses.domain.model.PaginatedExpensesDto
 import com.parental.shared.feature.expenses.domain.model.attachments.ConvertExpenseAttachmentReq
+import io.ktor.client.HttpClient
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -27,7 +28,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import io.ktor.client.HttpClient
+import com.parental.shared.platform.Platform
 import io.ktor.client.request.put
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
@@ -64,6 +65,11 @@ sealed class DetailUiState {
     data class Content(val expense: ExpenseResponseDto) : DetailUiState()
 }
 
+// Uploads a URLs presignadas de S3 (NO llevan Authorization: la firma del PUT es el
+// permiso) y resolución de categorías para tests: cliente dedicado sin el plugin
+// SessionAuth del shared HttpClient. Lazy: el VM puede vivir sin engine hasta usarlo.
+private val standaloneHttpClient: HttpClient by lazy { HttpClient(Platform.createHttpEngine()) }
+
 /**
  * ViewModel de la pantalla de gastos (S4/T29 + S5/T19).
  *
@@ -75,10 +81,10 @@ class ExpensesViewModel(
     private val token: String,
     private val bondId: String,
     private val dispatcher: CoroutineDispatcher = Dispatchers.Main,
-    private val categoriesApi: CategoriesApi = com.parental.shared.core.network.ApiClient.categoriesApi(),
+    private val categoriesApi: CategoriesApi = CategoriesApi(standaloneHttpClient),
     private val realtime: RealtimeConnectionManager? = null,
     /** Cliente HTTP para el PUT del comprobante a la URL firmada. */
-    private val httpClient: HttpClient = com.parental.shared.core.network.ApiClient.httpClient,
+    private val httpClient: HttpClient = standaloneHttpClient,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + dispatcher)
 

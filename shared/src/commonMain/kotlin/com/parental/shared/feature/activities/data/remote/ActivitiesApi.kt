@@ -65,45 +65,39 @@ private suspend fun io.ktor.client.statement.HttpResponse.toApiError(): ApiResul
 
 open class ActivitiesApi(
     private val client: HttpClient,
-    private val baseUrl: String,
 ) {
     /**
      * GET /activities/bond/:bondId — lista de actividades del vínculo activo,
      * ordenadas scheduledStart → deadline → createdAt (nulls last).
      */
     open suspend fun listActividades(
-        token: String,
         bondId: String,
     ): ApiResult<List<Actividad>> {
         return try {
-            val response = client.get("$baseUrl/activities/bond/$bondId") {
-                header("Authorization", "Bearer $token")
-            }
+            val response = client.get("activities/bond/$bondId")
             if (response.status.isSuccess()) {
                 ApiResult.Success(response.body())
             } else {
                 response.toApiError()
             }
         } catch (e: Exception) {
-            ApiResult.Error(0, "GET $baseUrl/activities/bond/$bondId failed: ${e.message}")
+            ApiResult.Error(0, "GET activities/bond/$bondId failed: ${e.message}")
         }
     }
 
     /**
      * GET /activities/:id — detalle completo de una actividad.
      */
-    open suspend fun getActividad(token: String, id: String): ApiResult<ActividadDetalle> {
+    open suspend fun getActividad(id: String): ApiResult<ActividadDetalle> {
         return try {
-            val response = client.get("$baseUrl/activities/$id") {
-                header("Authorization", "Bearer $token")
-            }
+            val response = client.get("activities/$id")
             if (response.status.isSuccess()) {
                 ApiResult.Success(response.body())
             } else {
                 response.toApiError()
             }
         } catch (e: Exception) {
-            ApiResult.Error(0, "GET $baseUrl/activities/$id failed: ${e.message}")
+            ApiResult.Error(0, "GET activities/$id failed: ${e.message}")
         }
     }
 
@@ -113,20 +107,17 @@ open class ActivitiesApi(
      * cuando el backend responde JSON; si no, status.description.
      */
     open suspend fun confirmAssignment(
-        token: String,
         id: String,
     ): ApiResult<ConfirmAssignmentResponse> {
         return try {
-            val response = client.post("$baseUrl/activities/$id/confirm") {
-                header("Authorization", "Bearer $token")
-            }
+            val response = client.post("activities/$id/confirm")
             if (response.status.isSuccess()) {
                 ApiResult.Success(response.body())
             } else {
                 response.toApiError()
             }
         } catch (e: Exception) {
-            ApiResult.Error(0, "POST $baseUrl/activities/$id/confirm failed: ${e.message}")
+            ApiResult.Error(0, "POST activities/$id/confirm failed: ${e.message}")
         }
     }
 
@@ -134,13 +125,11 @@ open class ActivitiesApi(
      * POST /activities/:bondId/create — crea una actividad nueva.
      */
     open suspend fun createActividad(
-        token: String,
         bondId: String,
         request: CreateActividadRequest,
     ): ApiResult<CreatedActividad> {
         return try {
-            val response = client.post("$baseUrl/activities/$bondId/create") {
-                header("Authorization", "Bearer $token")
+            val response = client.post("activities/$bondId/create") {
                 contentType(ContentType.Application.Json)
                 setBody(request)
             }
@@ -150,7 +139,7 @@ open class ActivitiesApi(
                 response.toApiError()
             }
         } catch (e: Exception) {
-            ApiResult.Error(0, "POST $baseUrl/activities/$bondId/create failed: ${e.message}")
+            ApiResult.Error(0, "POST activities/$bondId/create failed: ${e.message}")
         }
     }
 
@@ -158,20 +147,17 @@ open class ActivitiesApi(
      * POST /activities/:id/complete — marca la actividad como completada.
      */
     open suspend fun completeActivity(
-        token: String,
         id: String,
     ): ApiResult<CompleteActivityResponse> {
         return try {
-            val response = client.post("$baseUrl/activities/$id/complete") {
-                header("Authorization", "Bearer $token")
-            }
+            val response = client.post("activities/$id/complete")
             if (response.status.isSuccess()) {
                 ApiResult.Success(response.body())
             } else {
                 response.toApiError()
             }
         } catch (e: Exception) {
-            ApiResult.Error(0, "POST $baseUrl/activities/$id/complete failed: ${e.message}")
+            ApiResult.Error(0, "POST activities/$id/complete failed: ${e.message}")
         }
     }
 
@@ -192,13 +178,11 @@ open class ActivitiesApi(
      * POST /activities/:id/assign — "Asignar" (T21).
      */
     open suspend fun assignActivity(
-        token: String,
         id: String,
         assignedTo: String?,
     ): ApiResult<AssignActivityResponse> {
         return try {
-            val response = client.post("$baseUrl/activities/$id/assign") {
-                header("Authorization", "Bearer $token")
+            val response = client.post("activities/$id/assign") {
                 contentType(ContentType.Application.Json)
                 setBody(assignBody(assignedTo))
             }
@@ -208,7 +192,7 @@ open class ActivitiesApi(
                 response.toApiError()
             }
         } catch (e: Exception) {
-            ApiResult.Error(0, "POST $baseUrl/activities/$id/assign failed: ${e.message}")
+            ApiResult.Error(0, "POST activities/$id/assign failed: ${e.message}")
         }
     }
 
@@ -219,13 +203,11 @@ open class ActivitiesApi(
      * `null` explícito, para que el backend no reciba propiedades que no declara.
      */
     open suspend fun reassignActivity(
-        token: String,
         id: String,
         assignedTo: String?,
     ): ApiResult<ReassignActivityResponse> {
         return try {
-            val response = client.post("$baseUrl/activities/$id/reassign") {
-                header("Authorization", "Bearer $token")
+            val response = client.post("activities/$id/reassign") {
                 contentType(ContentType.Application.Json)
                 setBody(assignBody(assignedTo))
             }
@@ -235,7 +217,7 @@ open class ActivitiesApi(
                 response.toApiError()
             }
         } catch (e: Exception) {
-            ApiResult.Error(0, "POST $baseUrl/activities/$id/reassign failed: ${e.message}")
+            ApiResult.Error(0, "POST activities/$id/reassign failed: ${e.message}")
         }
     }
 
@@ -256,20 +238,17 @@ open class ActivitiesApi(
      * pueda mostrar "Deshacer" durante la ventana de 5000 ms.
      */
     open suspend fun deleteActivity(
-        token: String,
         id: String,
     ): ApiResult<DeleteActivityResponse> {
         return try {
-            val response = client.delete("$baseUrl/activities/$id") {
-                header("Authorization", "Bearer $token")
-            }
+            val response = client.delete("activities/$id")
             if (response.status.isSuccess()) {
                 ApiResult.Success(response.body())
             } else {
                 response.toApiError()
             }
         } catch (e: Exception) {
-            ApiResult.Error(0, "DELETE $baseUrl/activities/$id failed: ${e.message}")
+            ApiResult.Error(0, "DELETE activities/$id failed: ${e.message}")
         }
     }
 
@@ -282,20 +261,17 @@ open class ActivitiesApi(
      * refetchear, no que se puede reintentar.
      */
     open suspend fun restoreActivity(
-        token: String,
         id: String,
     ): ApiResult<RestoreActivityResponse> {
         return try {
-            val response = client.post("$baseUrl/activities/$id/restore") {
-                header("Authorization", "Bearer $token")
-            }
+            val response = client.post("activities/$id/restore")
             if (response.status.isSuccess()) {
                 ApiResult.Success(response.body())
             } else {
                 response.toApiError()
             }
         } catch (e: Exception) {
-            ApiResult.Error(0, "POST $baseUrl/activities/$id/restore failed: ${e.message}")
+            ApiResult.Error(0, "POST activities/$id/restore failed: ${e.message}")
         }
     }
 
@@ -304,13 +280,11 @@ open class ActivitiesApi(
      * lo valida el servidor (3–200) devolviendo 422 `VALIDATION_FAILED`.
      */
     open suspend fun cancelActivity(
-        token: String,
         id: String,
         request: ActivityReasonRequest,
     ): ApiResult<CancelActivityResponse> {
         return try {
-            val response = client.post("$baseUrl/activities/$id/cancel") {
-                header("Authorization", "Bearer $token")
+            val response = client.post("activities/$id/cancel") {
                 contentType(ContentType.Application.Json)
                 setBody(request)
             }
@@ -320,7 +294,7 @@ open class ActivitiesApi(
                 response.toApiError()
             }
         } catch (e: Exception) {
-            ApiResult.Error(0, "POST $baseUrl/activities/$id/cancel failed: ${e.message}")
+            ApiResult.Error(0, "POST activities/$id/cancel failed: ${e.message}")
         }
     }
 
@@ -329,13 +303,11 @@ open class ActivitiesApi(
      * Sólo el asignado (R3); el resto recibe 403.
      */
     open suspend fun declineActivity(
-        token: String,
         id: String,
         request: ActivityReasonRequest,
     ): ApiResult<DeclineActivityResponse> {
         return try {
-            val response = client.post("$baseUrl/activities/$id/decline") {
-                header("Authorization", "Bearer $token")
+            val response = client.post("activities/$id/decline") {
                 contentType(ContentType.Application.Json)
                 setBody(request)
             }
@@ -345,7 +317,7 @@ open class ActivitiesApi(
                 response.toApiError()
             }
         } catch (e: Exception) {
-            ApiResult.Error(0, "POST $baseUrl/activities/$id/decline failed: ${e.message}")
+            ApiResult.Error(0, "POST activities/$id/decline failed: ${e.message}")
         }
     }
 
@@ -357,32 +329,27 @@ open class ActivitiesApi(
      * cliente eligiera a qué estado retroceder.
      */
     open suspend fun undoDeclineActivity(
-        token: String,
         id: String,
     ): ApiResult<UndoDeclineResponse> {
         return try {
-            val response = client.post("$baseUrl/activities/$id/undo-decline") {
-                header("Authorization", "Bearer $token")
-            }
+            val response = client.post("activities/$id/undo-decline")
             if (response.status.isSuccess()) {
                 ApiResult.Success(response.body())
             } else {
                 response.toApiError()
             }
         } catch (e: Exception) {
-            ApiResult.Error(0, "POST $baseUrl/activities/$id/undo-decline failed: ${e.message}")
+            ApiResult.Error(0, "POST activities/$id/undo-decline failed: ${e.message}")
         }
     }
 
     // --- Attachments ---
     open suspend fun presignAttachment(
-        token: String,
         activityId: String,
         req: com.parental.shared.feature.activities.domain.model.attachments.PresignAttachmentReq,
     ): ApiResult<com.parental.shared.feature.activities.domain.model.attachments.PresignAttachmentRes> {
         return try {
-            val response = client.post("$baseUrl/activities/$activityId/attachments/presign") {
-                header("Authorization", "Bearer $token")
+            val response = client.post("activities/$activityId/attachments/presign") {
                 contentType(ContentType.Application.Json)
                 setBody(req)
             }
@@ -392,18 +359,16 @@ open class ActivitiesApi(
                 response.toApiError()
             }
         } catch (e: Exception) {
-            ApiResult.Error(0, "POST $baseUrl/activities/$activityId/attachments/presign failed: ${e.message}")
+            ApiResult.Error(0, "POST activities/$activityId/attachments/presign failed: ${e.message}")
         }
     }
 
     open suspend fun confirmAttachment(
-        token: String,
         activityId: String,
         req: com.parental.shared.feature.activities.domain.model.attachments.ConfirmAttachmentReq,
     ): ApiResult<com.parental.shared.feature.activities.domain.model.attachments.ActivityAttachmentDto> {
         return try {
-            val response = client.post("$baseUrl/activities/$activityId/attachments/confirm") {
-                header("Authorization", "Bearer $token")
+            val response = client.post("activities/$activityId/attachments/confirm") {
                 contentType(ContentType.Application.Json)
                 setBody(req)
             }
@@ -413,37 +378,32 @@ open class ActivitiesApi(
                 response.toApiError()
             }
         } catch (e: Exception) {
-            ApiResult.Error(0, "POST $baseUrl/activities/$activityId/attachments/confirm failed: ${e.message}")
+            ApiResult.Error(0, "POST activities/$activityId/attachments/confirm failed: ${e.message}")
         }
     }
 
     open suspend fun listAttachments(
-        token: String,
         activityId: String,
     ): ApiResult<List<com.parental.shared.feature.activities.domain.model.attachments.ActivityAttachmentDto>> {
         return try {
-            val response = client.get("$baseUrl/activities/$activityId/attachments") {
-                header("Authorization", "Bearer $token")
-            }
+            val response = client.get("activities/$activityId/attachments")
             if (response.status.isSuccess()) {
                 ApiResult.Success(response.body())
             } else {
                 response.toApiError()
             }
         } catch (e: Exception) {
-            ApiResult.Error(0, "GET $baseUrl/activities/$activityId/attachments failed: ${e.message}")
+            ApiResult.Error(0, "GET activities/$activityId/attachments failed: ${e.message}")
         }
     }
 
     open suspend fun renameAttachment(
-        token: String,
         activityId: String,
         attachmentId: String,
         req: com.parental.shared.feature.activities.domain.model.attachments.RenameAttachmentReq,
     ): ApiResult<com.parental.shared.feature.activities.domain.model.attachments.ActivityAttachmentDto> {
         return try {
-            val response = client.patch("$baseUrl/activities/$activityId/attachments/$attachmentId") {
-                header("Authorization", "Bearer $token")
+            val response = client.patch("activities/$activityId/attachments/$attachmentId") {
                 contentType(ContentType.Application.Json)
                 setBody(req)
             }
@@ -453,19 +413,17 @@ open class ActivitiesApi(
                 response.toApiError()
             }
         } catch (e: Exception) {
-            ApiResult.Error(0, "PATCH $baseUrl/activities/$activityId/attachments/$attachmentId failed: ${e.message}")
+            ApiResult.Error(0, "PATCH activities/$activityId/attachments/$attachmentId failed: ${e.message}")
         }
     }
 
     open suspend fun replaceAttachment(
-        token: String,
         activityId: String,
         attachmentId: String,
         req: com.parental.shared.feature.activities.domain.model.attachments.ReplaceAttachmentReq,
     ): ApiResult<com.parental.shared.feature.activities.domain.model.attachments.ActivityAttachmentDto> {
         return try {
-            val response = client.post("$baseUrl/activities/$activityId/attachments/$attachmentId/replace") {
-                header("Authorization", "Bearer $token")
+            val response = client.post("activities/$activityId/attachments/$attachmentId/replace") {
                 contentType(ContentType.Application.Json)
                 setBody(req)
             }
@@ -475,26 +433,23 @@ open class ActivitiesApi(
                 response.toApiError()
             }
         } catch (e: Exception) {
-            ApiResult.Error(0, "POST $baseUrl/activities/$activityId/attachments/$attachmentId/replace failed: ${e.message}")
+            ApiResult.Error(0, "POST activities/$activityId/attachments/$attachmentId/replace failed: ${e.message}")
         }
     }
 
     open suspend fun deleteAttachment(
-        token: String,
         activityId: String,
         attachmentId: String,
     ): ApiResult<Unit> {
         return try {
-            val response = client.delete("$baseUrl/activities/$activityId/attachments/$attachmentId") {
-                header("Authorization", "Bearer $token")
-            }
+            val response = client.delete("activities/$activityId/attachments/$attachmentId")
             if (response.status.isSuccess()) {
                 ApiResult.Success(Unit)
             } else {
                 response.toApiError()
             }
         } catch (e: Exception) {
-            ApiResult.Error(0, "DELETE $baseUrl/activities/$activityId/attachments/$attachmentId failed: ${e.message}")
+            ApiResult.Error(0, "DELETE activities/$activityId/attachments/$attachmentId failed: ${e.message}")
         }
     }
 }

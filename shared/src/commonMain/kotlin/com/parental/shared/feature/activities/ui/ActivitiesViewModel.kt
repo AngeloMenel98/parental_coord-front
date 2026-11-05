@@ -24,7 +24,9 @@ import com.parental.shared.feature.activities.ui.swipe.validateSwipeReason
 import com.parental.shared.feature.bonds.data.remote.BondsApi
 import com.parental.shared.feature.bonds.domain.model.VinculoChild
 import com.parental.shared.core.network.realtime.RealtimeConnectionManager
+import com.parental.shared.platform.Platform
 import com.parental.shared.feature.activities.domain.model.attachments.*
+import io.ktor.client.HttpClient
 import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.http.content.ByteArrayContent
@@ -40,6 +42,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.datetime.LocalDate
@@ -210,7 +213,10 @@ class ActividadesViewModel(
     val attachments: StateFlow<List<ActivityAttachmentDto>> = _attachments.asStateFlow()
     private val _attachmentsLoading = MutableStateFlow(false)
     val attachmentsLoading: StateFlow<Boolean> = _attachmentsLoading.asStateFlow()
-    private val httpClient = com.parental.shared.core.network.ApiClient.httpClient
+    // Uploads a URLs presignadas de S3: NO llevan Authorization (la firma del GET/PUT
+// es el permiso), así que usan un cliente dedicado sin el plugin SessionAuth del
+// shared HttpClient. Lazy: el VM puede vivir sin engine hasta que haya un upload.
+private val httpClient: HttpClient by lazy { HttpClient(Platform.createHttpEngine()) }
     private val scope = CoroutineScope(SupervisorJob() + dispatcher)
 
     private val _uiState = MutableStateFlow(ActivitiesUiState())
@@ -310,9 +316,9 @@ class ActividadesViewModel(
         _uiState.value = _uiState.value.copy(isLoading = true, listError = null)
 
         coroutineScope {
-            val listDeferred = async { activitiesApi.listActividades(token, bondId) }
+            val listDeferred = async { activitiesApi.listActividades(bondId) }
             val categoriesDeferred = async { categoriesApi.getCategories() }
-            val bondsDeferred = async { bondsApi.getMyBonds(token) }
+            val bondsDeferred = async { bondsApi.getMyBonds() }
 
             val listResult = listDeferred.await()
             val categoriesResult = categoriesDeferred.await()
@@ -402,7 +408,7 @@ class ActividadesViewModel(
 
     /** Filtro puramente client-side sobre la lista ya cargada (sin refetch). */
     fun selectTab(tab: ActivityTab) {
-        _uiState.value = _uiState.value.copy(selectedTab = tab)
+        _uiState.update { it.copy(selectedTab = tab) }
     }
 
     /** S11 · Toggle multi-select de un hijo en el filtro. */
@@ -431,7 +437,7 @@ class ActividadesViewModel(
         _uiState.value = _uiState.value.copy(detail = DetailUiState.Loading(id))
         detailJob?.cancel()
         detailJob = scope.launch {
-            val result = activitiesApi.getActividad(token, id)
+            val result = activitiesApi.getActividad(id)
             // ⚠ Comparación y escritura en el hilo de ESCRITURA —que es donde vive
             // [detailGeneration]: la carrera entre hilos desaparece por construcción (R-1).
             withContext(dispatcher) {
@@ -467,7 +473,7 @@ class ActividadesViewModel(
 
     /** Dispara el snackbar para un acción inerte (placeholders). */
     fun onInertAction(message: String) {
-        _uiState.value = _uiState.value.copy(snackbarMessage = message)
+        _uiState.update { it.copy(snackbarMessage = message) }
     }
 
     /**
@@ -488,9 +494,10 @@ class ActividadesViewModel(
      */
     fun confirmAssignment(activityId: String) {
         if (_uiState.value.isConfirming) return
+        // Se marca antes de lanzar: el flag queda puesto aunque el launch no corra inmediato.
+        _uiState.update { it.copy(isConfirming = true) }
         scope.launch {
-            _uiState.value = _uiState.value.copy(isConfirming = true)
-            when (val result = activitiesApi.confirmAssignment(token, activityId)) {
+            when (val result = activitiesApi.confirmAssignment(activityId)) {
                 is ApiResult.Success -> {
                     val r = result.data
                     val detail = _uiState.value.detail
@@ -528,10 +535,12 @@ class ActividadesViewModel(
                     } else {
                         result.message
                     }
-                    _uiState.value = _uiState.value.copy(
-                        isConfirming = false,
-                        snackbarMessage = text,
-                    )
+                    _uiState.update {
+                        it.copy(
+                            isConfirming = false,
+                            snackbarMessage = text,
+                        )
+                    }
                 }
             }
         }
@@ -649,7 +658,7 @@ class ActividadesViewModel(
         createJob?.cancel()
         _uiState.value = _uiState.value.copy(create = CreateUiState.Loading)
         createJob = scope.launch {
-            val result = activitiesApi.createActividad(token, bondId, form.toRequest())
+            val result = activitiesApi.createActividad(bondId, form.toRequest())
             withContext(dispatcher) {
                 // Obsoleta (descarte con el POST en vuelo, o doble submit ya resuelto): no escribe.
                 if (gen != createGeneration) return@withContext
@@ -695,7 +704,7 @@ class ActividadesViewModel(
         _uiState.value = _uiState.value.copy(isCompleting = true)
         completeJob?.cancel()
         completeJob = scope.launch {
-            when (val result = activitiesApi.completeActivity(token, activityId)) {
+            when (val result = activitiesApi.completeActivity(activityId)) {
                 is ApiResult.Success -> withContext(dispatcher) {
                     if (gen != completeGeneration) return@withContext
                     val body = result.data
@@ -758,7 +767,7 @@ class ActividadesViewModel(
         _uiState.value = _uiState.value.copy(isAssigning = true)
         assignJob?.cancel()
         assignJob = scope.launch {
-            when (val result = activitiesApi.assignActivity(token, activityId, assignedTo)) {
+            when (val result = activitiesApi.assignActivity(activityId, assignedTo)) {
                 is ApiResult.Success -> withContext(dispatcher) {
                     if (gen != assignGeneration) return@withContext
                     _uiState.value = _uiState.value.copy(
@@ -791,7 +800,7 @@ class ActividadesViewModel(
         _uiState.value = _uiState.value.copy(isReassigning = true)
         reassignJob?.cancel()
         reassignJob = scope.launch {
-            when (val result = activitiesApi.reassignActivity(token, activityId, assignedTo)) {
+            when (val result = activitiesApi.reassignActivity(activityId, assignedTo)) {
                 is ApiResult.Success -> withContext(dispatcher) {
                     if (gen != reassignGeneration) return@withContext
                     _uiState.value = _uiState.value.copy(
@@ -835,7 +844,7 @@ class ActividadesViewModel(
         val gen = ++detailGeneration
         detailJob?.cancel()
         detailJob = scope.launch {
-            val result = activitiesApi.getActividad(token, activityId)
+            val result = activitiesApi.getActividad(activityId)
             withContext(dispatcher) {
                 // Obsoleta (la hoja se cerró, o se abrió otra): no escribe NADA.
                 if (gen != detailGeneration) return@withContext
@@ -982,14 +991,14 @@ class ActividadesViewModel(
         )
         swipeJobs[id] = scope.launch {
             val result = when (action) {
-                SwipeAction.DELETE -> activitiesApi.deleteActivity(token, id)
+                SwipeAction.DELETE -> activitiesApi.deleteActivity(id)
                 SwipeAction.CANCEL -> activitiesApi.cancelActivity(
-                    token, id,
+                    id,
                     ActivityReasonRequest(reason!!),
                 )
 
                 SwipeAction.DECLINE -> activitiesApi.declineActivity(
-                    token, id,
+                    id,
                     ActivityReasonRequest(reason!!),
                 )
             }
@@ -1088,8 +1097,8 @@ class ActividadesViewModel(
         pendingUndoable = null
         swipeJobs[id] = scope.launch {
             val result = when (action) {
-                SwipeAction.DELETE -> activitiesApi.restoreActivity(token, id)
-                SwipeAction.DECLINE -> activitiesApi.undoDeclineActivity(token, id)
+                SwipeAction.DELETE -> activitiesApi.restoreActivity(id)
+                SwipeAction.DECLINE -> activitiesApi.undoDeclineActivity(id)
                 SwipeAction.CANCEL -> return@launch
             }
             withContext(dispatcher) {
@@ -1140,7 +1149,7 @@ class ActividadesViewModel(
     fun loadAttachments(activityId: String) {
         _attachmentsLoading.value = true
         scope.launch {
-            val res = activitiesApi.listAttachments(token, activityId)
+            val res = activitiesApi.listAttachments(activityId)
             withContext(dispatcher) {
                 _attachmentsLoading.value = false
                 _attachments.value = when (res) {
@@ -1181,7 +1190,6 @@ class ActividadesViewModel(
     ): PresignAttachmentRes? =
         when (
             val res = activitiesApi.presignAttachment(
-                token,
                 activityId,
                 PresignAttachmentReq(fileName, compressed.mimeType, compressed.bytes.size.toLong()),
             )
@@ -1216,7 +1224,6 @@ class ActividadesViewModel(
             if (!uploadOrReport(upload, compressed)) return@launchAttachmentOp
             when (
                 val confirm = activitiesApi.confirmAttachment(
-                    token,
                     activityId,
                     ConfirmAttachmentReq(upload.path, fileName, compressed.mimeType, compressed.bytes.size.toLong()),
                 )
@@ -1231,7 +1238,7 @@ class ActividadesViewModel(
 
     fun renameAttachment(activityId: String, attachmentId: String, fileName: String) =
         launchAttachmentOp("No se pudo renombrar el archivo") {
-            when (val res = activitiesApi.renameAttachment(token, activityId, attachmentId, RenameAttachmentReq(fileName))) {
+            when (val res = activitiesApi.renameAttachment(activityId, attachmentId, RenameAttachmentReq(fileName))) {
                 is ApiResult.Success ->
                     _attachments.value = _attachments.value.map { if (it.id == attachmentId) res.data else it }
                 is ApiResult.Error -> reportAttachmentFailure(res.message)
@@ -1245,7 +1252,6 @@ class ActividadesViewModel(
             if (!uploadOrReport(upload, compressed)) return@launchAttachmentOp
             when (
                 val replace = activitiesApi.replaceAttachment(
-                    token,
                     activityId,
                     attachmentId,
                     ReplaceAttachmentReq(upload.path, fileName, compressed.mimeType, compressed.bytes.size.toLong()),
@@ -1259,7 +1265,7 @@ class ActividadesViewModel(
 
     fun deleteAttachment(activityId: String, attachmentId: String) =
         launchAttachmentOp("No se pudo eliminar el archivo") {
-            when (val res = activitiesApi.deleteAttachment(token, activityId, attachmentId)) {
+            when (val res = activitiesApi.deleteAttachment(activityId, attachmentId)) {
                 is ApiResult.Success ->
                     _attachments.value = _attachments.value.filter { it.id != attachmentId }
                 is ApiResult.Error -> reportAttachmentFailure(res.message)

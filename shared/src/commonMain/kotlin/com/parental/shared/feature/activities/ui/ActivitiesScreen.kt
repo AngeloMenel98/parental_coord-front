@@ -21,6 +21,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.parental.shared.core.ui.components.AppTopBar
 import com.parental.shared.core.ui.components.BottomNavBar
 import com.parental.shared.core.ui.components.CategoryInfo
@@ -88,7 +89,7 @@ fun ActividadesScreen(
     /** S12 · G-3 — salida con confirmación, igual que en el resto de las vistas. */
     onLogout: () -> Unit = {},
 ) {
-    val uiState by viewModel.uiState.collectAsState()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val initialToday = remember { currentDate() }
     // R4-T1-2 · id → `FocusRequester` del bloque del riel que lo pintó; T7 lo lee al cerrar la
