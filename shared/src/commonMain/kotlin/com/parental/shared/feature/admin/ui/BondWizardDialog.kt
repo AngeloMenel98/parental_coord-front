@@ -3,6 +3,7 @@ package com.parental.shared.feature.admin.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -45,7 +46,10 @@ fun BondWizardDialog(state: AdminUiState, viewModel: AdminViewModel) {
         properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
         Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
-            Column(modifier = Modifier.fillMaxSize()) {
+            // F7 · `safeDrawingPadding` mantiene el contenido fuera de la barra de estado y
+            // de los botones/gesto de navegación del teléfono. Sin esto, un botón anclado
+            // al pie queda literalmente debajo del botón "atrás" del sistema.
+            Column(modifier = Modifier.fillMaxSize().safeDrawingPadding()) {
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.sm, vertical = Spacing.sm),
                     verticalAlignment = Alignment.CenterVertically,
@@ -79,32 +83,33 @@ fun BondWizardDialog(state: AdminUiState, viewModel: AdminViewModel) {
                     WizardStepper(state.bondWizardStep)
                 }
 
-                // F6 · el paso 2 lleva una lista que necesita alto acotado: ahí el
-                // botón queda anclado abajo. Los pasos 1 y 3 son cortos, así que el
-                // botón viaja pegado al último campo en vez de flotar en el vacío.
-                if (state.bondWizardStep == STEP_MEMBERS) {
-                    Box(modifier = Modifier.weight(1f).padding(horizontal = Spacing.lg)) {
-                        WizardStepMembers(state, viewModel)
-                    }
-                    Column(modifier = Modifier.padding(Spacing.lg)) {
-                        WizardFooter(state, viewModel)
-                    }
-                } else {
-                    Column(
-                        modifier = Modifier
-                            .weight(1f)
-                            .verticalScroll(rememberScrollState())
-                            .padding(horizontal = Spacing.lg),
-                    ) {
-                        if (state.bondWizardStep == STEP_NAME) {
+                // F7 · el botón vuelve a estar anclado al pie (el usuario lo quiere
+                // abajo), pero el pie suma el inset de navegación del dispositivo:
+                // queda en el borde útil de la pantalla, no debajo de los botones del
+                // teléfono. El contenido de cada paso se scrollea por su cuenta.
+                Box(modifier = Modifier.weight(1f).padding(horizontal = Spacing.lg)) {
+                    when (state.bondWizardStep) {
+                        STEP_NAME -> Column(Modifier.verticalScroll(rememberScrollState())) {
                             WizardStepName(state, viewModel)
-                        } else {
+                        }
+                        STEP_MEMBERS -> WizardStepMembers(state, viewModel)
+                        else -> Column(Modifier.verticalScroll(rememberScrollState())) {
                             WizardStepChildren(state, viewModel)
                         }
-                        Spacer(modifier = Modifier.height(Spacing.md))
-                        WizardFooter(state, viewModel)
-                        Spacer(modifier = Modifier.height(Spacing.lg))
                     }
+                }
+
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(
+                            start = Spacing.lg,
+                            end = Spacing.lg,
+                            top = Spacing.md,
+                            bottom = Spacing.md,
+                        ),
+                ) {
+                    WizardFooter(state, viewModel)
                 }
             }
         }
