@@ -12,6 +12,7 @@ import kotlin.experimental.ExperimentalNativeApi
  */
 actual object Platform {
     private const val PREFS_PREFIX = "parental_coord_"
+    private const val SECRET_MARKER_PREFIX = "secret_marker_"
 
     // - iOS Simulator (debug): http://127.0.0.1:3000/api
     // - Real device: use your machine's IP (e.g., http://192.168.1.x:3000/api)
@@ -42,5 +43,30 @@ actual object Platform {
     actual fun remove(key: String) {
         NSUserDefaults.standardUserDefaults.removeObjectForKey(PREFS_PREFIX + key)
         NSUserDefaults.standardUserDefaults.synchronize()
+    }
+
+    actual fun saveSecureString(key: String, value: String) {
+        if (KeychainStorage.save(key, value)) {
+            saveString(SECRET_MARKER_PREFIX + key, "1")
+        } else {
+            removeSecureString(key)
+        }
+    }
+
+    /**
+     * El Keychain sobrevive a la desinstalación de la app; NSUserDefaults no.
+     * Sin marcador, el secreto es de una instalación anterior y se descarta.
+     */
+    actual fun loadSecureString(key: String): String? {
+        if (loadString(SECRET_MARKER_PREFIX + key) == null) {
+            KeychainStorage.remove(key)
+            return null
+        }
+        return KeychainStorage.load(key)
+    }
+
+    actual fun removeSecureString(key: String) {
+        KeychainStorage.remove(key)
+        remove(SECRET_MARKER_PREFIX + key)
     }
 }

@@ -28,4 +28,13 @@ expect object Platform {
 
     /** Remove a value from persistent storage. */
     fun remove(key: String)
+
+    /** Save a secret encrypted at rest (Android Keystore / iOS Keychain). */
+    fun saveSecureString(key: String, value: String)
+
+    /** Load a secret. Returns null if not found or if it can no longer be decrypted. */
+    fun loadSecureString(key: String): String?
+
+    /** Remove a secret. */
+    fun removeSecureString(key: String)
 }
