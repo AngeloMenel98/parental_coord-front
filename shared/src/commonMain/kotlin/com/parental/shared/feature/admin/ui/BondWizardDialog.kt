@@ -168,17 +168,6 @@ private fun WizardPrimaryAction(state: AdminUiState, viewModel: AdminViewModel) 
         }
     }
 
-    Text(
-        text = when (state.bondWizardStep) {
-            STEP_NAME -> "Paso 1 de 3. Todavía no se crea nada."
-            STEP_MEMBERS -> "Paso 2 de 3. Se necesitan exactamente dos."
-            else -> "Paso 3 de 3. Se crean el vínculo, los progenitores y los hijos."
-        },
-        modifier = Modifier.fillMaxWidth().padding(top = Spacing.xs),
-        style = MaterialTheme.typography.labelSmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-    )
 }
 
 @Composable
