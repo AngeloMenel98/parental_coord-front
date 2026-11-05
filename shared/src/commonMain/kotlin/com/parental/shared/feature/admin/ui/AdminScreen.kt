@@ -56,6 +56,11 @@ fun AdminScreen(
     val state by viewModel.uiState.collectAsState()
     val uriHandler = LocalUriHandler.current
 
+    if (state.showBondWizard) {
+        BondWizardScreen(state = state, viewModel = viewModel)
+        return
+    }
+
     if (state.showPdfPreview) {
         PdfPreviewScreen(
             state = state,
@@ -123,7 +128,6 @@ fun AdminScreen(
 
     ChildActionDialogs(state, viewModel)
     AddChildDialog(state, viewModel)
-    BondWizardDialog(state, viewModel)
     NewProgenitorDialog(state, viewModel)
 }
 

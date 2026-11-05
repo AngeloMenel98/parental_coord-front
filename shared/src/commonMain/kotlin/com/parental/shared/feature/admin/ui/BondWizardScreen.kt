@@ -3,7 +3,8 @@ package com.parental.shared.feature.admin.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -18,13 +19,17 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import com.parental.shared.core.ui.theme.Spacing
 import com.parental.shared.feature.admin.domain.model.AdminUser
 
 /**
  * F5 · wizard de creación de vínculo — implementación de `admin-forms-ui/03`.
+ *
+ * F7 · es una PANTALLA, no un `Dialog`. Un diálogo tiene su propia ventana y los insets
+ * del sistema no llegan con la misma semántica, así que un botón anclado al pie terminaba
+ * debajo de la barra de navegación. Como pantalla, el `Scaffold` mide contra la ventana
+ * real de la app: la barra superior esquiva la barra de estado y el `bottomBar` esquiva la
+ * de navegación y el teclado.
  *
  * Tres pasos en una sola pantalla: nombre y acuerdo, progenitores por búsqueda, hijos.
  * Nada se persiste hasta el paso 3, y el paso 3 exige al menos un hijo porque el producto
@@ -38,22 +43,18 @@ private const val STEP_CHILDREN = 2
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun BondWizardDialog(state: AdminUiState, viewModel: AdminViewModel) {
-    if (!state.showBondWizard) return
-
-    Dialog(
-        onDismissRequest = { viewModel.closeBondWizard() },
-        properties = DialogProperties(usePlatformDefaultWidth = false),
-    ) {
-        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
-            // F7 · `safeDrawingPadding` mantiene el contenido fuera de la barra de estado y
-            // de los botones/gesto de navegación del teléfono. Sin esto, un botón anclado
-            // al pie queda literalmente debajo del botón "atrás" del sistema.
-            Column(modifier = Modifier.fillMaxSize().safeDrawingPadding()) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.sm, vertical = Spacing.sm),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
+fun BondWizardScreen(state: AdminUiState, viewModel: AdminViewModel) {
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    Text(
+                        text = "Crear vínculo",
+                        fontFamily = FontFamily.Serif,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                },
+                navigationIcon = {
                     TextButton(
                         onClick = {
                             if (state.bondWizardStep == STEP_NAME) {
@@ -65,51 +66,41 @@ fun BondWizardDialog(state: AdminUiState, viewModel: AdminViewModel) {
                     ) {
                         Text(if (state.bondWizardStep == STEP_NAME) "Cancelar" else "Atrás")
                     }
-                    Spacer(modifier = Modifier.weight(1f))
-                    Text(
-                        text = "Crear vínculo",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontFamily = FontFamily.Serif,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                    Spacer(modifier = Modifier.weight(1f))
-                    // Espeja el ancho del botón de la izquierda para centrar el título.
-                    Spacer(modifier = Modifier.width(72.dp))
-                }
-
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-
-                Column(modifier = Modifier.padding(horizontal = Spacing.lg).padding(top = Spacing.md)) {
-                    WizardStepper(state.bondWizardStep)
-                }
-
-                // F7 · el botón vuelve a estar anclado al pie (el usuario lo quiere
-                // abajo), pero el pie suma el inset de navegación del dispositivo:
-                // queda en el borde útil de la pantalla, no debajo de los botones del
-                // teléfono. El contenido de cada paso se scrollea por su cuenta.
-                Box(modifier = Modifier.weight(1f).padding(horizontal = Spacing.lg)) {
-                    when (state.bondWizardStep) {
-                        STEP_NAME -> Column(Modifier.verticalScroll(rememberScrollState())) {
-                            WizardStepName(state, viewModel)
-                        }
-                        STEP_MEMBERS -> WizardStepMembers(state, viewModel)
-                        else -> Column(Modifier.verticalScroll(rememberScrollState())) {
-                            WizardStepChildren(state, viewModel)
-                        }
-                    }
-                }
-
+                },
+            )
+        },
+        bottomBar = {
+            // `navigationBarsPadding` + `imePadding`: el botón queda sobre la barra del
+            // teléfono y sube con el teclado cuando hay un campo enfocado.
+            Surface(color = MaterialTheme.colorScheme.surface, tonalElevation = 2.dp) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(
-                            start = Spacing.lg,
-                            end = Spacing.lg,
-                            top = Spacing.md,
-                            bottom = Spacing.md,
-                        ),
+                        .navigationBarsPadding()
+                        .imePadding()
+                        .padding(horizontal = Spacing.lg, vertical = Spacing.md),
                 ) {
                     WizardFooter(state, viewModel)
+                }
+            }
+        },
+    ) { padding ->
+        Column(modifier = Modifier.fillMaxSize().padding(padding)) {
+            Column(modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.sm)) {
+                WizardStepper(state.bondWizardStep)
+            }
+
+            Box(modifier = Modifier.weight(1f).padding(horizontal = Spacing.lg)) {
+                when (state.bondWizardStep) {
+                    STEP_NAME -> Column(Modifier.verticalScroll(rememberScrollState())) {
+                        WizardStepName(state, viewModel)
+                    }
+
+                    STEP_MEMBERS -> WizardStepMembers(state, viewModel)
+
+                    else -> Column(Modifier.verticalScroll(rememberScrollState())) {
+                        WizardStepChildren(state, viewModel)
+                    }
                 }
             }
         }
