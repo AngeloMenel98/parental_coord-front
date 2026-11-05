@@ -11,18 +11,25 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelStore
+import androidx.lifecycle.ViewModelStoreOwner
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.parental.shared.core.error.ApiResult
-import com.parental.shared.core.network.ApiClient
 import com.parental.shared.core.ui.components.BottomNavBar
 import com.parental.shared.core.ui.theme.ParentalCoordinationTheme
 import com.parental.shared.feature.activities.ui.ActividadesScreen
 import com.parental.shared.feature.activities.ui.ActividadesViewModel
-import com.parental.shared.feature.auth.data.repository.AuthRepository
+import com.parental.shared.feature.auth.data.remote.AuthApi
+import com.parental.shared.feature.auth.domain.repository.IAuthRepository
 import com.parental.shared.feature.auth.ui.LoginScreen
 import com.parental.shared.feature.auth.ui.LoginViewModel
 import com.parental.shared.feature.admin.ui.AdminScreen
@@ -30,6 +37,9 @@ import com.parental.shared.feature.admin.ui.AdminViewModel
 import com.parental.shared.feature.home.ui.HomeScreen
 import com.parental.shared.feature.home.ui.HomeViewModel
 import com.parental.shared.feature.session.data.SessionManager
+import org.koin.compose.KoinContext
+import org.koin.compose.koinInject
+import org.koin.compose.viewmodel.koinViewModel
 
 private sealed class Screen(val route: String) {
     data object Login : Screen("login")
@@ -37,28 +47,48 @@ private sealed class Screen(val route: String) {
     data object Admin : Screen("admin")
 }
 
+/**
+ * Dueño de los ViewModels de la sesión actual. Vive como ViewModel de la
+ * Activity (sobrevive a rotaciones) y se vacía en el logout para que el
+ * próximo usuario no herede VMs ni datos del anterior.
+ */
+private class SessionViewModelStoreOwner : ViewModel(), ViewModelStoreOwner {
+    override val viewModelStore = ViewModelStore()
+
+    fun reset() = viewModelStore.clear()
+
+    override fun onCleared() = viewModelStore.clear()
+}
+
 @Composable
 fun App() {
-    val authRepository = remember { AuthRepository() }
-    val sessionManager = remember { SessionManager() }
+    KoinContext {
+        // Singletons de Koin: la sesión ya viene restaurada desde el storage.
+        val sessionManager = koinInject<SessionManager>()
+        val authApi = koinInject<AuthApi>()
 
-    // Restore persisted session on startup
-    LaunchedEffect(Unit) {
-        sessionManager.restoreFromStorage()
-        // Legacy sessions (pre userId) — backfill via GET /auth/me so the
-        // activities confirm-affordance visibility rule can evaluate.
-        val token = sessionManager.token
-        if (token != null && sessionManager.userId == null) {
-            when (val me = ApiClient.authApi().me(token)) {
-                is ApiResult.Success -> sessionManager.updateUserId(me.data.id)
-                is ApiResult.Error -> Unit // degrade safely: no confirm affordance until re-login
+        LaunchedEffect(Unit) {
+            // Legacy sessions (pre userId) — backfill via GET /auth/me so the
+            // activities confirm-affordance visibility rule can evaluate.
+            if (sessionManager.token != null && sessionManager.userId == null) {
+                when (val me = authApi.me()) {
+                    is ApiResult.Success -> sessionManager.updateUserId(me.data.id)
+                    is ApiResult.Error -> Unit // degrade safely: no confirm affordance until re-login
+                }
             }
         }
-    }
 
-    // ADR-10: un único wrap del tema en commonMain — Android hoy, iOS hereda.
-    ParentalCoordinationTheme {
-        AppContent(authRepository = authRepository, sessionManager = sessionManager)
+        val sessionOwner = viewModel { SessionViewModelStoreOwner() }
+
+        // ADR-10: un único wrap del tema en commonMain — Android hoy, iOS hereda.
+        ParentalCoordinationTheme {
+            CompositionLocalProvider(LocalViewModelStoreOwner provides sessionOwner) {
+                AppContent(
+                    sessionManager = sessionManager,
+                    onSessionEnded = sessionOwner::reset,
+                )
+            }
+        }
     }
 }
 
@@ -69,14 +99,32 @@ fun App() {
  */
 @Composable
 private fun AppContent(
-    authRepository: AuthRepository,
     sessionManager: SessionManager,
+    onSessionEnded: () -> Unit,
 ) {
-    val currentScreen = if (sessionManager.loginPending) {
+    val authRepository = koinInject<IAuthRepository>()
+
+    val onLogout: () -> Unit = {
+        authRepository.logout()
+        sessionManager.clear()
+        onSessionEnded()
+    }
+
+    // Token vencido/revocado (401 en un request autenticado) → mismo camino que el logout manual.
+    LaunchedEffect(sessionManager) {
+        sessionManager.sessionExpired.collect {
+            if (sessionManager.isLoggedIn) onLogout()
+        }
+    }
+
+    // Snapshot reactivo de la sesión: cualquier cambio (login, backfill, logout) recompone.
+    val session by sessionManager.state.collectAsStateWithLifecycle()
+
+    val currentScreen = if (session.loginPending) {
         // Login in progress (bonds fetch pending) — keep on Login screen
         Screen.Login
-    } else if (sessionManager.isLoggedIn) {
-        when (sessionManager.role) {
+    } else if (session.isLoggedIn) {
+        when (session.role) {
             "admin" -> Screen.Admin
             else -> Screen.Home
         }
@@ -86,86 +134,20 @@ private fun AppContent(
 
     when (currentScreen) {
         Screen.Login -> {
-            val viewModel = remember { LoginViewModel(authRepository) }
-            DisposableEffect(Unit) {
-                onDispose { viewModel.destroy() }
-            }
-            LoginScreen(
-                viewModel = viewModel,
-                onLoginSuccess = { response ->
-                    val name = response.user.firstName ?: response.user.email
-
-                    // Mark login as pending — keeps UI on Login screen during bonds fetch
-                    sessionManager.beginLogin()
-
-                    sessionManager.setSession(
-                        token = response.access_token,
-                        userName = name,
-                        role = response.user.systemRole,
-                        userId = response.user.id,
-                    )
-
-                    // Fetch bonds and set the first one as active
-                    val bondsApi = ApiClient.bondsApi()
-                    try {
-                        val result = bondsApi.getMyBonds(response.access_token)
-                        when (result) {
-                            is ApiResult.Success -> {
-                                if (result.data.isNotEmpty()) {
-                                    val firstBond = result.data.first()
-                                    sessionManager.updateBondId(firstBond.id)
-                                } else {
-                                    // No bonds found for this user
-                                }
-                            }
-                            is ApiResult.Error -> {
-                                // Failed to fetch bonds
-                            }
-                        }
-                    } catch (e: Exception) {
-                        // Exception fetching bonds
-                    } finally {
-                        // Complete login — now safe to navigate to Home/Admin
-                        sessionManager.completeLogin()
-                    }
-                },
-            )
+            // El flujo de login vive en el VM (sobrevive a rotaciones); al
+            // completarse, el cambio de sesión recompone hacia Home/Admin.
+            LoginScreen(viewModel = koinViewModel<LoginViewModel>())
         }
 
         Screen.Admin -> {
-            val adminApi = remember { ApiClient.adminApi() }
-            val token = sessionManager.token
-            if (token == null) {
-                sessionManager.clear()
-                return
-            }
-            val viewModel = remember {
-                AdminViewModel(
-                    adminApi = adminApi,
-                    token = token,
-                )
-            }
-            DisposableEffect(Unit) {
-                onDispose { viewModel.destroy() }
-            }
             AdminScreen(
-                viewModel = viewModel,
-                onLogout = {
-                    authRepository.logout()
-                    sessionManager.clear()
-                },
+                viewModel = koinViewModel<AdminViewModel>(),
+                onLogout = onLogout,
             )
         }
 
         Screen.Home -> {
-            var bottomRoute by remember { mutableStateOf("home") }
-            val token = sessionManager.token
-            val userName = sessionManager.userName.orEmpty()
-
-            if (token == null) {
-                sessionManager.clear()
-                return
-            }
+            var bottomRoute by rememberSaveable { mutableStateOf("home") }
 
             // Gastos/Terceros son placeholders inertes: solo Inicio/Actividades navegan.
             val onNavigateBottom: (String) -> Unit = { route ->
@@ -176,50 +158,18 @@ private fun AppContent(
             }
 
             if (bottomRoute == "activities") {
-                val bondId = sessionManager.bondId
-                when {
-                    bondId == null -> SinVinculoScreen(onGoHome = { bottomRoute = "home" })
-                    else -> {
-                        // userId: login lo provee; sesiones legacy → backfill vía /auth/me.
-                        // keyed on userId para que el VM se reconstruya si el backfill llega tarde.
-                        val currentUserId = sessionManager.userId
-                        val activitiesViewModel = remember(currentUserId) {
-                            ActividadesViewModel(
-                                activitiesApi = ApiClient.activitiesApi(),
-                                categoriesApi = ApiClient.categoriesApi(),
-                                bondsApi = ApiClient.bondsApi(),
-                                token = token,
-                                bondId = bondId,
-                                currentUserId = currentUserId ?: "",
-                            )
-                        }
-                        DisposableEffect(Unit) {
-                            onDispose { activitiesViewModel.destroy() }
-                        }
-                        ActividadesScreen(
-                            viewModel = activitiesViewModel,
-                            onNavigateBottom = onNavigateBottom,
-                        )
-                    }
-                }
-            } else {
-                val homeApi = remember { ApiClient.homeApi() }
-                val viewModel = remember {
-                    HomeViewModel(
-                        homeApi = homeApi,
-                        token = token,
-                        userName = userName,
+                when (session.bondId) {
+                    null -> SinVinculoScreen(onGoHome = { bottomRoute = "home" })
+                    else -> ActividadesScreen(
+                        // Una única instancia por sesión: volver a la tab no refetchea.
+                        viewModel = koinViewModel<ActividadesViewModel>(),
+                        onNavigateBottom = onNavigateBottom,
                     )
                 }
-                DisposableEffect(Unit) {
-                    onDispose { viewModel.destroy() }
-                }
+            } else {
                 HomeScreen(
-                    viewModel = viewModel,
-                    onLogout = {
-                        authRepository.logout()
-                        sessionManager.clear()
-                    },
+                    viewModel = koinViewModel<HomeViewModel>(),
+                    onLogout = onLogout,
                     onNavigateBottom = onNavigateBottom,
                 )
             }

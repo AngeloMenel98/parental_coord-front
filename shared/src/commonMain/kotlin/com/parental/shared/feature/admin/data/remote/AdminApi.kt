@@ -1,152 +1,94 @@
 package com.parental.shared.feature.admin.data.remote
 
 import com.parental.shared.core.error.ApiResult
+import com.parental.shared.core.network.safeApiCall
 import com.parental.shared.feature.admin.domain.model.AdminBond
 import com.parental.shared.feature.admin.domain.model.AdminChild
 import com.parental.shared.feature.admin.domain.model.AdminUser
-import io.ktor.client.call.*
+import io.ktor.client.*
 import io.ktor.client.request.*
 import io.ktor.http.*
+import kotlinx.serialization.Serializable
+
+// Bodies tipados: un Map<String, Any> con valores de distinto tipo no es
+// serializable con kotlinx.serialization (createBond fallaba siempre).
+
+@Serializable
+internal data class CreateUserRequest(
+    val email: String,
+    val password: String,
+    val firstName: String,
+    val lastName: String,
+)
+
+@Serializable
+internal data class CreateBondRequest(
+    val title: String,
+    val agreementType: String,
+    val userIds: List<String>,
+)
+
+@Serializable
+internal data class AddChildRequest(
+    val firstName: String,
+    val lastName: String,
+    val dateOfBirth: String? = null,
+)
 
 class AdminApi(
-    private val client: io.ktor.client.HttpClient,
-    private val baseUrl: String,
+    private val client: HttpClient,
 ) {
     // ── Users ────────────────────────────────────────────────────────
 
-    suspend fun listUsers(token: String): ApiResult<List<AdminUser>> {
-        return try {
-            val response = client.get("$baseUrl/admin/users") {
-                header("Authorization", "Bearer $token")
-            }
-            if (response.status.isSuccess()) {
-                ApiResult.Success(response.body())
-            } else {
-                ApiResult.Error(response.status.value, response.status.description)
-            }
-        } catch (e: Exception) {
-            ApiResult.Error(0, e.message ?: "Network error")
-        }
+    suspend fun listUsers(): ApiResult<List<AdminUser>> = safeApiCall {
+        client.get("admin/users")
     }
 
     suspend fun createUser(
-        token: String,
         email: String,
         password: String,
         firstName: String,
         lastName: String,
-    ): ApiResult<AdminUser> {
-        return try {
-            val response = client.post("$baseUrl/admin/users") {
-                header("Authorization", "Bearer $token")
-                contentType(ContentType.Application.Json)
-                setBody(
-                    mapOf(
-                        "email" to email,
-                        "password" to password,
-                        "firstName" to firstName,
-                        "lastName" to lastName,
-                    )
-                )
-            }
-            if (response.status.isSuccess()) {
-                ApiResult.Success(response.body())
-            } else {
-                ApiResult.Error(response.status.value, response.status.description)
-            }
-        } catch (e: Exception) {
-            ApiResult.Error(0, e.message ?: "Network error")
+    ): ApiResult<AdminUser> = safeApiCall {
+        client.post("admin/users") {
+            contentType(ContentType.Application.Json)
+            setBody(CreateUserRequest(email, password, firstName, lastName))
         }
     }
 
     // ── Bonds ────────────────────────────────────────────────────────
 
-    suspend fun listBonds(token: String): ApiResult<List<AdminBond>> {
-        return try {
-            val response = client.get("$baseUrl/admin/bonds") {
-                header("Authorization", "Bearer $token")
-            }
-            if (response.status.isSuccess()) {
-                ApiResult.Success(response.body())
-            } else {
-                ApiResult.Error(response.status.value, response.status.description)
-            }
-        } catch (e: Exception) {
-            ApiResult.Error(0, e.message ?: "Network error")
-        }
+    suspend fun listBonds(): ApiResult<List<AdminBond>> = safeApiCall {
+        client.get("admin/bonds")
     }
 
     suspend fun createBond(
-        token: String,
         title: String,
         agreementType: String,
         userIds: List<String>,
-    ): ApiResult<AdminBond> {
-        return try {
-            val response = client.post("$baseUrl/admin/bonds") {
-                header("Authorization", "Bearer $token")
-                contentType(ContentType.Application.Json)
-                setBody(
-                    mapOf(
-                        "title" to title,
-                        "agreementType" to agreementType,
-                        "userIds" to userIds,
-                    )
-                )
-            }
-            if (response.status.isSuccess()) {
-                ApiResult.Success(response.body())
-            } else {
-                ApiResult.Error(response.status.value, response.status.description)
-            }
-        } catch (e: Exception) {
-            ApiResult.Error(0, e.message ?: "Network error")
+    ): ApiResult<AdminBond> = safeApiCall {
+        client.post("admin/bonds") {
+            contentType(ContentType.Application.Json)
+            setBody(CreateBondRequest(title, agreementType, userIds))
         }
     }
 
     // ── Children ─────────────────────────────────────────────────────
 
-    suspend fun listBondChildren(token: String, bondId: String): ApiResult<List<AdminChild>> {
-        return try {
-            val response = client.get("$baseUrl/admin/bonds/$bondId/children") {
-                header("Authorization", "Bearer $token")
-            }
-            if (response.status.isSuccess()) {
-                ApiResult.Success(response.body())
-            } else {
-                ApiResult.Error(response.status.value, response.status.description)
-            }
-        } catch (e: Exception) {
-            ApiResult.Error(0, e.message ?: "Network error")
-        }
+    suspend fun listBondChildren(bondId: String): ApiResult<List<AdminChild>> = safeApiCall {
+        client.get("admin/bonds/$bondId/children")
     }
 
     suspend fun addChildToBond(
-        token: String,
         bondId: String,
         firstName: String,
         lastName: String,
         dateOfBirth: String? = null,
-    ): ApiResult<AdminChild> {
-        return try {
-            val body = mutableMapOf<String, Any>(
-                "firstName" to firstName,
-                "lastName" to lastName,
-            )
-            if (dateOfBirth != null) body["dateOfBirth"] = dateOfBirth
-
-            val response = client.post("$baseUrl/admin/bonds/$bondId/children") {
-                header("Authorization", "Bearer $token")
-                contentType(ContentType.Application.Json)
-                setBody(body)
-            }
-            if (response.status.isSuccess()) {
-                ApiResult.Success(response.body())
-            } else {
-                ApiResult.Error(response.status.value, response.status.description)
-            }
-        } catch (e: Exception) {
-            ApiResult.Error(0, e.message ?: "Network error")
+    ): ApiResult<AdminChild> = safeApiCall {
+        client.post("admin/bonds/$bondId/children") {
+            contentType(ContentType.Application.Json)
+            // dateOfBirth null se omite del JSON (ApiJson.explicitNulls = false).
+            setBody(AddChildRequest(firstName, lastName, dateOfBirth))
         }
     }
 }

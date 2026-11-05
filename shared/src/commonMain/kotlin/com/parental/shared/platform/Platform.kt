@@ -1,17 +1,21 @@
 package com.parental.shared.platform
 
-import io.ktor.client.*
+import io.ktor.client.engine.HttpClientEngine
 
 /**
- * Platform-specific declarations for API configuration, HTTP client, and persistent storage.
+ * Platform-specific declarations for API configuration, HTTP engine, and persistent storage.
  * Each target (Android, iOS) provides its own `actual` implementation.
+ * The HttpClient itself (plugins, JSON, auth) is built once in commonMain.
  */
 expect object Platform {
-    /** Base URL for the API, configured per platform/environment. */
+    /** Base URL for the API, configured per platform/build type. */
     val baseUrl: String
 
-    /** Create a platform-appropriate HTTP client. */
-    fun createHttpClient(): HttpClient
+    /** True on debug builds: enables HTTP logging. */
+    val isDebug: Boolean
+
+    /** Create the platform-appropriate Ktor engine (OkHttp / Darwin). */
+    fun createHttpEngine(): HttpClientEngine
 
     /** Save a string value to persistent storage. */
     fun saveString(key: String, value: String)

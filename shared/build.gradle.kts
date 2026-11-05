@@ -39,12 +39,20 @@ kotlin {
                 implementation("io.ktor:ktor-client-core:2.3.12")
                 implementation("io.ktor:ktor-client-content-negotiation:2.3.12")
                 implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.12")
+                implementation("io.ktor:ktor-client-logging:2.3.12")
 
                 implementation("co.touchlab:kermit:2.0.4")
 
                 // Koin (DI)
                 implementation(platform("io.insert-koin:koin-bom:4.0.4"))
                 implementation("io.insert-koin:koin-core")
+                implementation("io.insert-koin:koin-compose")
+                implementation("io.insert-koin:koin-compose-viewmodel")
+
+                // Lifecycle ViewModel (KMP): los VMs sobreviven a recomposiciones y cambios de config
+                implementation("org.jetbrains.androidx.lifecycle:lifecycle-viewmodel-compose:2.8.4")
+                // collectAsStateWithLifecycle: deja de colectar flows con la app en background
+                implementation("org.jetbrains.androidx.lifecycle:lifecycle-runtime-compose:2.8.4")
 
                 // Compose Multiplatform
                 implementation(compose.runtime)

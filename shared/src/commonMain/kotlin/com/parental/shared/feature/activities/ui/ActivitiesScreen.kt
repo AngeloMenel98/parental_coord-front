@@ -13,6 +13,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -93,7 +94,8 @@ fun ActividadesScreen(
     viewModel: ActividadesViewModel,
     onNavigateBottom: (String) -> Unit = {},
 ) {
-    val uiState by viewModel.uiState.collectAsState()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val currentUserId by viewModel.currentUserId.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val initialToday = remember { currentDate() }
 
@@ -122,7 +124,7 @@ fun ActividadesScreen(
             onNavigateBottom = onNavigateBottom,
             onConfirm = viewModel::confirmAssignment,
             isConfirming = uiState.isConfirming,
-            currentUserId = viewModel.currentUserId,
+            currentUserId = currentUserId,
         )
     } else {
         ActividadesListScreen(
@@ -137,7 +139,7 @@ fun ActividadesScreen(
             onNavigateBottom = onNavigateBottom,
             onConfirm = viewModel::confirmAssignment,
             isConfirming = uiState.isConfirming,
-            currentUserId = viewModel.currentUserId,
+            currentUserId = currentUserId,
             timelineMode = timelineMode,
             onTimelineModeChange = { timelineMode = it },
             weekStartIso = weekStartIso,

@@ -1,17 +1,17 @@
 package com.parental.shared.feature.admin.ui
 
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import com.parental.shared.core.error.ApiResult
 import com.parental.shared.feature.admin.data.remote.AdminApi
 import com.parental.shared.feature.admin.domain.model.AdminBond
 import com.parental.shared.feature.admin.domain.model.AdminChild
 import com.parental.shared.feature.admin.domain.model.AdminUser
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 data class AdminUiState(
@@ -43,12 +43,11 @@ data class AdminUiState(
 
 class AdminViewModel(
     private val adminApi: AdminApi,
-    private val token: String,
-) {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-
+) : ViewModel() {
     private val _uiState = MutableStateFlow(AdminUiState())
     val uiState: StateFlow<AdminUiState> = _uiState.asStateFlow()
+
+    private var childrenJob: Job? = null
 
     init {
         loadData()
@@ -60,77 +59,86 @@ class AdminViewModel(
     }
 
     fun selectTab(index: Int) {
-        _uiState.value = _uiState.value.copy(selectedTab = index)
+        _uiState.update { it.copy(selectedTab = index) }
     }
 
     // ── Users ────────────────────────────────────────────────────────
 
     private fun loadUsers() {
-        scope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true)
-            when (val result = adminApi.listUsers(token)) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true) }
+            when (val result = adminApi.listUsers()) {
                 is ApiResult.Success -> {
-                    _uiState.value = _uiState.value.copy(
-                        users = result.data,
-                        isLoading = false,
-                    )
+                    _uiState.update {
+                        it.copy(
+                            users = result.data,
+                            isLoading = false,
+                        )
+                    }
                 }
                 is ApiResult.Error -> {
-                    _uiState.value = _uiState.value.copy(
-                        error = result.message,
-                        isLoading = false,
-                    )
+                    _uiState.update {
+                        it.copy(
+                            error = result.message,
+                            isLoading = false,
+                        )
+                    }
                 }
             }
         }
     }
 
     fun updateUserEmail(value: String) {
-        _uiState.value = _uiState.value.copy(newUserEmail = value)
+        _uiState.update { it.copy(newUserEmail = value) }
     }
 
     fun updateUserPassword(value: String) {
-        _uiState.value = _uiState.value.copy(newUserPassword = value)
+        _uiState.update { it.copy(newUserPassword = value) }
     }
 
     fun updateUserFirstName(value: String) {
-        _uiState.value = _uiState.value.copy(newUserFirstName = value)
+        _uiState.update { it.copy(newUserFirstName = value) }
     }
 
     fun updateUserLastName(value: String) {
-        _uiState.value = _uiState.value.copy(newUserLastName = value)
+        _uiState.update { it.copy(newUserLastName = value) }
     }
 
     fun createUser() {
         val s = _uiState.value
+        if (s.isCreatingUser) return // single-flight: un doble tap no crea el usuario dos veces
         if (s.newUserEmail.isBlank() || s.newUserPassword.isBlank() ||
             s.newUserFirstName.isBlank() || s.newUserLastName.isBlank()
         ) {
-            _uiState.value = s.copy(error = "All fields are required")
+            _uiState.update { it.copy(error = "All fields are required") }
             return
         }
 
-        scope.launch {
-            _uiState.value = _uiState.value.copy(isCreatingUser = true, error = null)
+        _uiState.update { it.copy(isCreatingUser = true, error = null) }
+        viewModelScope.launch {
             when (val result = adminApi.createUser(
-                token, s.newUserEmail, s.newUserPassword,
+                s.newUserEmail, s.newUserPassword,
                 s.newUserFirstName, s.newUserLastName,
             )) {
                 is ApiResult.Success -> {
-                    _uiState.value = _uiState.value.copy(
-                        newUserEmail = "",
-                        newUserPassword = "",
-                        newUserFirstName = "",
-                        newUserLastName = "",
-                        isCreatingUser = false,
-                    )
+                    _uiState.update {
+                        it.copy(
+                            newUserEmail = "",
+                            newUserPassword = "",
+                            newUserFirstName = "",
+                            newUserLastName = "",
+                            isCreatingUser = false,
+                        )
+                    }
                     loadUsers()
                 }
                 is ApiResult.Error -> {
-                    _uiState.value = _uiState.value.copy(
-                        error = result.message,
-                        isCreatingUser = false,
-                    )
+                    _uiState.update {
+                        it.copy(
+                            error = result.message,
+                            isCreatingUser = false,
+                        )
+                    }
                 }
             }
         }
@@ -139,61 +147,66 @@ class AdminViewModel(
     // ── Bonds ────────────────────────────────────────────────────────
 
     private fun loadBonds() {
-        scope.launch {
-            when (val result = adminApi.listBonds(token)) {
+        viewModelScope.launch {
+            when (val result = adminApi.listBonds()) {
                 is ApiResult.Success -> {
-                    _uiState.value = _uiState.value.copy(bonds = result.data)
+                    _uiState.update { it.copy(bonds = result.data) }
                 }
                 is ApiResult.Error -> {
-                    _uiState.value = _uiState.value.copy(error = result.message)
+                    _uiState.update { it.copy(error = result.message) }
                 }
             }
         }
     }
 
     fun updateBondTitle(value: String) {
-        _uiState.value = _uiState.value.copy(newBondTitle = value)
+        _uiState.update { it.copy(newBondTitle = value) }
     }
 
     fun updateBondAgreementType(value: String) {
-        _uiState.value = _uiState.value.copy(newBondAgreementType = value)
+        _uiState.update { it.copy(newBondAgreementType = value) }
     }
 
     fun updateBondUser1Id(value: String) {
-        _uiState.value = _uiState.value.copy(newBondUser1Id = value)
+        _uiState.update { it.copy(newBondUser1Id = value) }
     }
 
     fun updateBondUser2Id(value: String) {
-        _uiState.value = _uiState.value.copy(newBondUser2Id = value)
+        _uiState.update { it.copy(newBondUser2Id = value) }
     }
 
     fun createBond() {
         val s = _uiState.value
+        if (s.isCreatingBond) return
         if (s.newBondTitle.isBlank() || s.newBondUser1Id.isBlank() || s.newBondUser2Id.isBlank()) {
-            _uiState.value = s.copy(error = "Title and two user IDs are required")
+            _uiState.update { it.copy(error = "Title and two user IDs are required") }
             return
         }
 
-        scope.launch {
-            _uiState.value = _uiState.value.copy(isCreatingBond = true, error = null)
+        _uiState.update { it.copy(isCreatingBond = true, error = null) }
+        viewModelScope.launch {
             when (val result = adminApi.createBond(
-                token, s.newBondTitle, s.newBondAgreementType,
+                s.newBondTitle, s.newBondAgreementType,
                 listOf(s.newBondUser1Id, s.newBondUser2Id),
             )) {
                 is ApiResult.Success -> {
-                    _uiState.value = _uiState.value.copy(
-                        newBondTitle = "",
-                        newBondUser1Id = "",
-                        newBondUser2Id = "",
-                        isCreatingBond = false,
-                    )
+                    _uiState.update {
+                        it.copy(
+                            newBondTitle = "",
+                            newBondUser1Id = "",
+                            newBondUser2Id = "",
+                            isCreatingBond = false,
+                        )
+                    }
                     loadBonds()
                 }
                 is ApiResult.Error -> {
-                    _uiState.value = _uiState.value.copy(
-                        error = result.message,
-                        isCreatingBond = false,
-                    )
+                    _uiState.update {
+                        it.copy(
+                            error = result.message,
+                            isCreatingBond = false,
+                        )
+                    }
                 }
             }
         }
@@ -202,69 +215,72 @@ class AdminViewModel(
     // ── Children ─────────────────────────────────────────────────────
 
     fun selectBond(bondId: String) {
-        _uiState.value = _uiState.value.copy(selectedBondId = bondId)
-        scope.launch {
-            when (val result = adminApi.listBondChildren(token, bondId)) {
+        _uiState.update { it.copy(selectedBondId = bondId) }
+        // Cambiar de vínculo cancela la carga anterior: no se mezclan hijos de otro vínculo.
+        childrenJob?.cancel()
+        childrenJob = viewModelScope.launch {
+            when (val result = adminApi.listBondChildren(bondId)) {
                 is ApiResult.Success -> {
-                    _uiState.value = _uiState.value.copy(bondChildren = result.data)
+                    _uiState.update { it.copy(bondChildren = result.data) }
                 }
                 is ApiResult.Error -> {
-                    _uiState.value = _uiState.value.copy(error = result.message)
+                    _uiState.update { it.copy(error = result.message) }
                 }
             }
         }
     }
 
     fun updateChildFirstName(value: String) {
-        _uiState.value = _uiState.value.copy(newChildFirstName = value)
+        _uiState.update { it.copy(newChildFirstName = value) }
     }
 
     fun updateChildLastName(value: String) {
-        _uiState.value = _uiState.value.copy(newChildLastName = value)
+        _uiState.update { it.copy(newChildLastName = value) }
     }
 
     fun updateChildDob(value: String) {
-        _uiState.value = _uiState.value.copy(newChildDob = value)
+        _uiState.update { it.copy(newChildDob = value) }
     }
 
     fun addChild() {
         val s = _uiState.value
+        if (s.isCreatingChild) return
         val bondId = s.selectedBondId ?: return
         if (s.newChildFirstName.isBlank() || s.newChildLastName.isBlank()) {
-            _uiState.value = s.copy(error = "Child name is required")
+            _uiState.update { it.copy(error = "Child name is required") }
             return
         }
 
-        scope.launch {
-            _uiState.value = _uiState.value.copy(isCreatingChild = true, error = null)
+        _uiState.update { it.copy(isCreatingChild = true, error = null) }
+        viewModelScope.launch {
             when (val result = adminApi.addChildToBond(
-                token, bondId, s.newChildFirstName, s.newChildLastName,
+                bondId, s.newChildFirstName, s.newChildLastName,
                 s.newChildDob.ifBlank { null },
             )) {
                 is ApiResult.Success -> {
-                    _uiState.value = _uiState.value.copy(
-                        newChildFirstName = "",
-                        newChildLastName = "",
-                        newChildDob = "",
-                        isCreatingChild = false,
-                    )
+                    _uiState.update {
+                        it.copy(
+                            newChildFirstName = "",
+                            newChildLastName = "",
+                            newChildDob = "",
+                            isCreatingChild = false,
+                        )
+                    }
                     selectBond(bondId)
                 }
                 is ApiResult.Error -> {
-                    _uiState.value = _uiState.value.copy(
-                        error = result.message,
-                        isCreatingChild = false,
-                    )
+                    _uiState.update {
+                        it.copy(
+                            error = result.message,
+                            isCreatingChild = false,
+                        )
+                    }
                 }
             }
         }
     }
 
-    fun destroy() {
-        scope.cancel()
-    }
-
     fun clearError() {
-        _uiState.value = _uiState.value.copy(error = null)
+        _uiState.update { it.copy(error = null) }
     }
 }

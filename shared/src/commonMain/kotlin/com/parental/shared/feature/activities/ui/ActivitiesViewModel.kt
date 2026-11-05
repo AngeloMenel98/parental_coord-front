@@ -1,5 +1,7 @@
 package com.parental.shared.feature.activities.ui
 
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import com.parental.shared.core.error.ApiResult
 import com.parental.shared.core.network.CategoriesApi
 import com.parental.shared.core.ui.components.CategoryInfo
@@ -8,15 +10,18 @@ import com.parental.shared.feature.activities.data.remote.ActivitiesApi
 import com.parental.shared.feature.activities.domain.model.Actividad
 import com.parental.shared.feature.activities.domain.model.ActividadDetalle
 import com.parental.shared.feature.bonds.data.remote.BondsApi
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
+import com.parental.shared.feature.session.data.SessionManager
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 enum class ActivityTab(val label: String) {
@@ -46,17 +51,28 @@ class ActividadesViewModel(
     private val activitiesApi: ActivitiesApi,
     private val categoriesApi: CategoriesApi,
     private val bondsApi: BondsApi,
-    private val token: String,
-    private val bondId: String,
-    /** userId del usuario autenticado (non-null: la pantalla está gated por login). */
-    val currentUserId: String,
-) {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private val sessionManager: SessionManager,
+) : ViewModel() {
+    /** Vínculo activo (la pantalla solo se muestra con bondId != null). */
+    private val bondId: String get() = sessionManager.bondId.orEmpty()
+
+    /**
+     * userId del usuario autenticado, derivado del estado de sesión: si el
+     * backfill vía /auth/me llega tarde, la UI se actualiza sin recrear el VM.
+     */
+    val currentUserId: StateFlow<String> = sessionManager.state
+        .map { it.userId.orEmpty() }
+        .distinctUntilChanged()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, sessionManager.userId.orEmpty())
 
     private val _uiState = MutableStateFlow(ActivitiesUiState())
     val uiState: StateFlow<ActivitiesUiState> = _uiState.asStateFlow()
 
     private var lastSelectedId: String? = null
+
+    /** Requests en curso: uno nuevo cancela al anterior (sin respuestas fuera de orden). */
+    private var loadJob: Job? = null
+    private var detailJob: Job? = null
 
     init {
         loadAll()
@@ -64,13 +80,14 @@ class ActividadesViewModel(
 
     /** Carga lista + categorías + nombres de miembros en paralelo. */
     fun loadAll() {
-        scope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true, listError = null)
+        loadJob?.cancel()
+        loadJob = viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true, listError = null) }
 
             coroutineScope {
-                val listDeferred = async { activitiesApi.listActividades(token, bondId) }
+                val listDeferred = async { activitiesApi.listActividades(bondId) }
                 val categoriesDeferred = async { categoriesApi.getCategories() }
-                val bondsDeferred = async { bondsApi.getMyBonds(token) }
+                val bondsDeferred = async { bondsApi.getMyBonds() }
 
                 val listResult = listDeferred.await()
                 val categoriesResult = categoriesDeferred.await()
@@ -100,20 +117,24 @@ class ActividadesViewModel(
 
                 when (listResult) {
                     is ApiResult.Success -> {
-                        _uiState.value = _uiState.value.copy(
-                            actividades = listResult.data,
-                            isLoading = false,
-                            categories = categories,
-                            memberNames = memberNames,
-                        )
+                        _uiState.update {
+                            it.copy(
+                                actividades = listResult.data,
+                                isLoading = false,
+                                categories = categories,
+                                memberNames = memberNames,
+                            )
+                        }
                     }
                     is ApiResult.Error -> {
-                        _uiState.value = _uiState.value.copy(
-                            listError = listResult.message,
-                            isLoading = false,
-                            categories = categories,
-                            memberNames = memberNames,
-                        )
+                        _uiState.update {
+                            it.copy(
+                                listError = listResult.message,
+                                isLoading = false,
+                                categories = categories,
+                                memberNames = memberNames,
+                            )
+                        }
                     }
                 }
             }
@@ -122,7 +143,7 @@ class ActividadesViewModel(
 
     /** Filtro puramente client-side sobre la lista ya cargada (sin refetch). */
     fun selectTab(tab: ActivityTab) {
-        _uiState.value = _uiState.value.copy(selectedTab = tab)
+        _uiState.update { it.copy(selectedTab = tab) }
     }
 
     /** Reintentar desde el estado de error de la lista → esqueleto + refetch. */
@@ -132,22 +153,28 @@ class ActividadesViewModel(
 
     fun selectActividad(id: String) {
         lastSelectedId = id
-        scope.launch {
-            _uiState.value = _uiState.value.copy(isDetailLoading = true, detailError = null)
+        // Dos taps rápidos: solo el último detalle llega a la UI.
+        detailJob?.cancel()
+        detailJob = viewModelScope.launch {
+            _uiState.update { it.copy(isDetailLoading = true, detailError = null) }
 
-            when (val result = activitiesApi.getActividad(token, id)) {
+            when (val result = activitiesApi.getActividad(id)) {
                 is ApiResult.Success -> {
-                    _uiState.value = _uiState.value.copy(
-                        selectedActividad = result.data,
-                        isDetailLoading = false,
-                    )
+                    _uiState.update {
+                        it.copy(
+                            selectedActividad = result.data,
+                            isDetailLoading = false,
+                        )
+                    }
                 }
                 is ApiResult.Error -> {
                     // Falló el detalle → permanece en la lista con banner de error.
-                    _uiState.value = _uiState.value.copy(
-                        detailError = result.message,
-                        isDetailLoading = false,
-                    )
+                    _uiState.update {
+                        it.copy(
+                            detailError = result.message,
+                            isDetailLoading = false,
+                        )
+                    }
                 }
             }
         }
@@ -159,12 +186,12 @@ class ActividadesViewModel(
     }
 
     fun backToList() {
-        _uiState.value = _uiState.value.copy(selectedActividad = null, detailError = null)
+        _uiState.update { it.copy(selectedActividad = null, detailError = null) }
     }
 
     /** Dispara el snackbar para un acción inerte (placeholders). */
     fun onInertAction(message: String) {
-        _uiState.value = _uiState.value.copy(snackbarMessage = message)
+        _uiState.update { it.copy(snackbarMessage = message) }
     }
 
     /**
@@ -175,32 +202,35 @@ class ActividadesViewModel(
      */
     fun confirmAssignment(activityId: String) {
         if (_uiState.value.isConfirming) return
-        scope.launch {
-            _uiState.value = _uiState.value.copy(isConfirming = true)
-            when (val result = activitiesApi.confirmAssignment(token, activityId)) {
+        // Se marca antes de lanzar: el flag queda puesto aunque el launch no corra inmediato.
+        _uiState.update { it.copy(isConfirming = true) }
+        viewModelScope.launch {
+            when (val result = activitiesApi.confirmAssignment(activityId)) {
                 is ApiResult.Success -> {
                     val r = result.data
-                    _uiState.value = _uiState.value.copy(
-                        isConfirming = false,
-                        actividades = _uiState.value.actividades.map {
-                            if (it.id == activityId) {
-                                it.copy(
+                    _uiState.update { state ->
+                        state.copy(
+                            isConfirming = false,
+                            actividades = state.actividades.map {
+                                if (it.id == activityId) {
+                                    it.copy(
+                                        assignedConfirmed = r.assignedConfirmed,
+                                        confirmedAt = r.confirmedAt,
+                                    )
+                                } else {
+                                    it
+                                }
+                            },
+                            selectedActividad = state.selectedActividad
+                                ?.takeIf { it.id == activityId }
+                                ?.copy(
                                     assignedConfirmed = r.assignedConfirmed,
                                     confirmedAt = r.confirmedAt,
                                 )
-                            } else {
-                                it
-                            }
-                        },
-                        selectedActividad = _uiState.value.selectedActividad
-                            ?.takeIf { it.id == activityId }
-                            ?.copy(
-                                assignedConfirmed = r.assignedConfirmed,
-                                confirmedAt = r.confirmedAt,
-                            )
-                            ?: _uiState.value.selectedActividad,
-                        snackbarMessage = "Asignación confirmada",
-                    )
+                                ?: state.selectedActividad,
+                            snackbarMessage = "Asignación confirmada",
+                        )
+                    }
                 }
                 is ApiResult.Error -> {
                     val text = if (result.code == 403) {
@@ -208,20 +238,18 @@ class ActividadesViewModel(
                     } else {
                         result.message
                     }
-                    _uiState.value = _uiState.value.copy(
-                        isConfirming = false,
-                        snackbarMessage = text,
-                    )
+                    _uiState.update {
+                        it.copy(
+                            isConfirming = false,
+                            snackbarMessage = text,
+                        )
+                    }
                 }
             }
         }
     }
 
     fun consumeSnackbar() {
-        _uiState.value = _uiState.value.copy(snackbarMessage = null)
-    }
-
-    fun destroy() {
-        scope.cancel()
+        _uiState.update { it.copy(snackbarMessage = null) }
     }
 }

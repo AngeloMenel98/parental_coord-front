@@ -2,12 +2,8 @@ package com.parental.shared.platform
 
 import android.content.Context
 import android.content.SharedPreferences
-import io.ktor.client.*
-import io.ktor.client.engine.okhttp.*
-import io.ktor.client.plugins.contentnegotiation.*
-import io.ktor.client.plugins.HttpTimeout
-import io.ktor.serialization.kotlinx.json.*
-import kotlinx.serialization.json.Json
+import io.ktor.client.engine.HttpClientEngine
+import io.ktor.client.engine.okhttp.OkHttp
 
 /**
  * Android actual implementation using SharedPreferences for persistent storage
@@ -16,32 +12,27 @@ import kotlinx.serialization.json.Json
 actual object Platform {
     private const val PREFS_NAME = "parental_coordination_prefs"
 
-    // Base URL for Android: emulator uses 10.0.2.2, real device should use production URL
-    actual val baseUrl: String = "http://10.0.2.2:3000/api"
-
     private var prefs: SharedPreferences? = null
+    private var configuredBaseUrl: String? = null
+    private var debug: Boolean = false
+
+    /** Base URL inyectada desde BuildConfig del módulo app (varía por build type). */
+    actual val baseUrl: String
+        get() = checkNotNull(configuredBaseUrl) { "Platform.init() must be called before using the API" }
+
+    actual val isDebug: Boolean get() = debug
 
     /**
-     * Initialize with Android Context. Must be called before any storage operations.
+     * Initialize with Android Context and build config. Must be called before
+     * any storage or network operation (ParentalApplication.onCreate).
      */
-    fun init(context: Context) {
+    fun init(context: Context, baseUrl: String, isDebug: Boolean) {
         prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        configuredBaseUrl = baseUrl
+        debug = isDebug
     }
 
-    actual fun createHttpClient(): HttpClient = HttpClient(OkHttp) {
-        install(ContentNegotiation) {
-            json(Json {
-                ignoreUnknownKeys = true
-                isLenient = false
-                encodeDefaults = true
-            })
-        }
-        install(HttpTimeout) {
-            requestTimeoutMillis = 20_000
-            connectTimeoutMillis = 10_000
-            socketTimeoutMillis = 20_000
-        }
-    }
+    actual fun createHttpEngine(): HttpClientEngine = OkHttp.create()
 
     actual fun saveString(key: String, value: String) {
         prefs?.edit()?.putString(key, value)?.apply()

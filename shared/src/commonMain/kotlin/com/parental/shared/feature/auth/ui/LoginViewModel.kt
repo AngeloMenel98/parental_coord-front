@@ -1,14 +1,16 @@
 package com.parental.shared.feature.auth.ui
 
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.parental.shared.core.error.ApiResult
 import com.parental.shared.feature.auth.domain.model.AuthResponse
 import com.parental.shared.feature.auth.domain.repository.IAuthRepository
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
+import com.parental.shared.feature.bonds.data.remote.BondsApi
+import com.parental.shared.feature.session.data.SessionManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 data class LoginUiState(
@@ -18,51 +20,72 @@ data class LoginUiState(
     val error: String? = null,
 )
 
+/**
+ * Orquesta el login completo (credenciales → sesión → vínculo activo) dentro de
+ * [viewModelScope]: una rotación o cambio de tema a mitad del flujo no lo
+ * cancela, porque el VM sobrevive a la recreación de la Activity. La
+ * navegación no se dispara desde acá: App reacciona al cambio de sesión.
+ */
 class LoginViewModel(
     private val authRepository: IAuthRepository,
-) {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-
+    private val sessionManager: SessionManager,
+    private val bondsApi: BondsApi,
+) : ViewModel() {
     private val _uiState = MutableStateFlow(LoginUiState())
     val uiState: StateFlow<LoginUiState> = _uiState.asStateFlow()
 
-    private val _loginSuccess = MutableStateFlow<AuthResponse?>(null)
-    val loginSuccess: StateFlow<AuthResponse?> = _loginSuccess.asStateFlow()
-
     fun onEmailChange(email: String) {
-        _uiState.value = _uiState.value.copy(email = email, error = null)
+        _uiState.update { it.copy(email = email, error = null) }
     }
 
     fun onPasswordChange(password: String) {
-        _uiState.value = _uiState.value.copy(password = password, error = null)
+        _uiState.update { it.copy(password = password, error = null) }
     }
 
     fun login() {
         val state = _uiState.value
         if (state.email.isBlank() || state.password.isBlank()) {
-            _uiState.value = state.copy(error = "Email and password are required")
+            _uiState.update { it.copy(error = "Email and password are required") }
             return
         }
+        // Single-flight: ignora un segundo tap/IME Done mientras el login está en vuelo.
+        if (state.isLoading) return
 
-        scope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true, error = null)
-
+        _uiState.update { it.copy(isLoading = true, error = null) }
+        viewModelScope.launch {
             authRepository.login(state.email, state.password)
-                .onSuccess { response ->
-                    _loginSuccess.value = response
-                    _uiState.value = _uiState.value.copy(isLoading = false)
-                }
+                .onSuccess { response -> startSession(response) }
                 .onFailure { e ->
-                    _uiState.value = _uiState.value.copy(
-                        isLoading = false,
-                        error = e.message ?: "Login failed",
-                    )
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            error = e.message ?: "Login failed",
+                        )
+                    }
                 }
         }
     }
 
-    fun destroy() {
-        scope.cancel()
-    }
+    private suspend fun startSession(response: AuthResponse) {
+        // Mark login as pending — keeps UI on Login screen during bonds fetch
+        sessionManager.beginLogin()
+        try {
+            sessionManager.setSession(
+                token = response.access_token,
+                userName = response.user.firstName ?: response.user.email,
+                role = response.user.systemRole,
+                userId = response.user.id,
+            )
 
+            // Fetch bonds and set the first one as active (el token ya está en sesión)
+            when (val result = bondsApi.getMyBonds()) {
+                is ApiResult.Success -> result.data.firstOrNull()?.let { sessionManager.updateBondId(it.id) }
+                is ApiResult.Error -> Unit // sin vínculo: Actividades muestra "Sin vínculo activo"
+            }
+        } finally {
+            // Complete login — now safe to navigate to Home/Admin. También si se cancela.
+            sessionManager.completeLogin()
+            _uiState.update { it.copy(isLoading = false, password = "") }
+        }
+    }
 }

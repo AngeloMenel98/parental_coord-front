@@ -26,8 +26,23 @@ android {
         versionName = "1.0.0"
     }
 
+    buildTypes {
+        debug {
+            // Emulador Android → backend local de la máquina host.
+            buildConfigField("String", "API_BASE_URL", "\"http://10.0.2.2:3000/api\"")
+        }
+        release {
+            // Definir en ~/.gradle/gradle.properties o con -PAPI_BASE_URL_RELEASE=https://...
+            val releaseUrl = (project.findProperty("API_BASE_URL_RELEASE") as String?)
+                ?: "https://api.parental-coord.example/api" // TODO: URL real de producción
+            require(releaseUrl.startsWith("https://")) { "API_BASE_URL_RELEASE must use HTTPS" }
+            buildConfigField("String", "API_BASE_URL", "\"$releaseUrl\"")
+        }
+    }
+
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     compileOptions {

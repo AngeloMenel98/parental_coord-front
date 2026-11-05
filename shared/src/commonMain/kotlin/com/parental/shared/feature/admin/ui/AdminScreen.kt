@@ -9,6 +9,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -27,7 +28,7 @@ fun AdminScreen(
     viewModel: AdminViewModel,
     onLogout: () -> Unit,
 ) {
-    val state by viewModel.uiState.collectAsState()
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
 
     Scaffold(
         topBar = {
@@ -337,7 +338,7 @@ private fun BondsTab(state: AdminUiState, viewModel: AdminViewModel) {
 
         // Bonds list
         items(state.bonds) { bond ->
-            BondCard(bond, viewModel)
+            BondCard(bond, isSelected = state.selectedBondId == bond.id, viewModel = viewModel)
         }
 
         // Children section for selected bond
@@ -386,8 +387,7 @@ private fun BondsTab(state: AdminUiState, viewModel: AdminViewModel) {
 }
 
 @Composable
-private fun BondCard(bond: AdminBond, viewModel: AdminViewModel) {
-    val isSelected = viewModel.uiState.collectAsState().value.selectedBondId == bond.id
+private fun BondCard(bond: AdminBond, isSelected: Boolean, viewModel: AdminViewModel) {
     // Tokens Ok/Ko modo-aware (design §9): ACTIVE → Ok.dot, INACTIVE → Ko.dot.
     // El overlay alpha 0.1f se conserva.
     val darkTheme = isSystemInDarkTheme()
