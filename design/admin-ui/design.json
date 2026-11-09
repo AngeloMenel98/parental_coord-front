@@ -1,0 +1,28 @@
+{
+  "title": "Admin — nuevas vistas del panel",
+  "brief": "Tres direcciones para el panel del rol admin de la app de coordinación parental (Kotlin Multiplatform, Android primero): hoy sólo puede crear usuarios, vínculos e hijos en tres formularios apilados. Cada dirección muestra las tres vistas que el admin necesita en un teléfono —el panorama o lista, la gestión de un vínculo con sus hijos, y el reporte del vínculo con su PDF— y difiere en estructura, no en color: qué es la unidad de trabajo y qué se ve primero.",
+  "feature": "odd/tasks/admin-reports-ui.md",
+  "artboards": [
+    {
+      "file": "01-consola-de-vinculos.html",
+      "title": "Consola de vínculos",
+      "tradeoff": "El vínculo es la unidad: búsqueda por nombre, tarjetas con salud (cumplimiento, % pagado, hijos) y el detalle con miembros, hijos editables, tendencia de cumplimiento y distribución de actividades; el reporte muestra los gastos en porcentajes por estado y la cuarta vista es la página del PDF. Máximo foco en el trabajo real del admin y cero ceremonia de dashboard; a cambio no hay lectura agregada del sistema, así que '¿cómo está todo?' exige recorrer la lista.",
+      "width": 1680,
+      "height": 900
+    },
+    {
+      "file": "02-radar-del-sistema.html",
+      "title": "Radar del sistema",
+      "tradeoff": "Responde primero 'cómo está todo': hero con anillo de vínculos activos, cuatro métricas con delta contra el mes anterior y un bloque 'Requiere atención' que ordena por problema. La lista de vínculos pasa a tabla densa con tendencia y el reporte suma barras por categoría. Se detecta un vínculo enfermo sin abrirlo; a cambio es más denso, muestra números antes que personas y obliga a un toque extra para gestionar.",
+      "width": 1266,
+      "height": 900
+    },
+    {
+      "file": "03-expediente-del-vinculo.html",
+      "title": "Expediente del vínculo",
+      "tradeoff": "El reporte ES la pantalla: tipografía serif de documento, cifras monoespaciadas, secciones separadas por hairlines y el período como control principal — el admin como auditor. La gestión (hijos, miembros, estado) vive en una hoja que sube desde abajo y no compite con la lectura. El reporte se lee como un papel y el PDF es el destino natural; a cambio hay mucho scroll y gestionar siempre cuesta un toque más.",
+      "width": 1266,
+      "height": 900
+    }
+  ]
+}

@@ -1,0 +1,60 @@
+{
+  "version": 1,
+  "comments": [
+    {
+      "id": "nb4d8pww",
+      "file": "03-ficha-acordeon.html",
+      "selector": "body > div > main > div:nth-of-type(2) > details:nth-of-type(1) > div > dl > div:nth-of-type(6) > dt",
+      "excerpt": "Para",
+      "comment": "En vez de Para, que tenga el nombre del Hijo/s a los que esta referido",
+      "createdAt": "2026-11-09T16:29:45.142Z",
+      "status": "resolved",
+      "sentAt": "2026-11-09T16:29:45.158Z",
+      "resolvedAt": "2026-11-09T16:30:07.939Z"
+    },
+    {
+      "id": "wudjpmnz",
+      "file": "02-siguiente-paso.html",
+      "selector": "body > div > main > div",
+      "excerpt": "En progreso Salud Turno odontológico de Sofi Ya confirmaste la asignación. Cuando vuelvas del turno, finalizá la actividad y adjuntá la evidencia. Evidencia hasta el vie 13 mar, 23:59 — queda 1 día Finalizar Reasignar",
+      "comment": "Todo boton tiene que aparecer aca. Me podes hacer un cuarto diseno con mas graficos? Me gusta el historial",
+      "createdAt": "2026-11-09T16:31:11.597Z",
+      "status": "resolved",
+      "sentAt": "2026-11-09T16:31:11.609Z",
+      "resolvedAt": "2026-11-09T16:32:26.241Z"
+    },
+    {
+      "id": "5m6x2qju",
+      "file": "04-bitacora-visual.html",
+      "selector": "body > div > footer",
+      "excerpt": "Finalizar Cambiar evidencia Reasignar Cargar comprobante No asistir",
+      "comment": "Me referia a los botones de cambio de estado, por ejemplo: Asignar, Asistir/No asistir, Finalizar.. etc",
+      "createdAt": "2026-11-09T16:37:54.160Z",
+      "status": "resolved",
+      "sentAt": "2026-11-09T16:40:36.522Z",
+      "resolvedAt": "2026-11-09T16:41:35.192Z"
+    },
+    {
+      "id": "cc9zgba1",
+      "file": "04-bitacora-visual.html",
+      "selector": "body > div > main > section:nth-of-type(1)",
+      "excerpt": "Estado 4 de 5 Creada Asignada Confirmada En progreso Finalizada Falta el turno y la evidencia. Se cierra el vie 13 mar. 57% Queda 1 día 8 h para cargar la evidencia del turno Cierra el vie 13 mar, 23:59",
+      "comment": "Me gusta lo de Estado, pero el quedan x hs para tal, no me convence, cambialo por otra cosa",
+      "createdAt": "2026-11-09T16:39:40.091Z",
+      "status": "resolved",
+      "sentAt": "2026-11-09T16:40:36.522Z",
+      "resolvedAt": "2026-11-09T16:41:35.192Z"
+    },
+    {
+      "id": "puxnig8q",
+      "file": "04-bitacora-visual.html",
+      "selector": "body > div > main > section:nth-of-type(2)",
+      "excerpt": "Bitácora 4 eventos 2 3 4 5 6 7 8 9 10 11 mar 2 hoy, mié 11 lun 2 mar Actividad creada Carolina Pérez · 09:14 · obligación Asignada a Martín Aguirre Carolina Pérez · 09:14 Martín confirmó la asignación 11:02 · queda en sus manos hoy, mié 11 mar Recordatorio de evidencia Hoy · el turno es mañana a las",
+      "comment": "Bien la bitacora pero me gustaria que tenga mas info directa de a q hijo se le asigno, la descripcion, etc.",
+      "createdAt": "2026-11-09T16:40:34.657Z",
+      "status": "resolved",
+      "sentAt": "2026-11-09T16:40:36.522Z",
+      "resolvedAt": "2026-11-09T16:41:35.192Z"
+    }
+  ]
+}

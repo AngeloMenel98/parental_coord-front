@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "chosen": "03-un-solo-panel.html",
+  "handoffs": {
+    "03-un-solo-panel.html": {
+      "status": "implemented",
+      "queued": false,
+      "sentAt": "2026-11-05T13:05:31.116Z",
+      "startedAt": "2026-11-05T13:05:55.040Z",
+      "implementedAt": "2026-11-05T13:13:57.802Z",
+      "feature": "odd/tasks/admin-reports-ui.md",
+      "note": "Implemented: 3-step wizard (nombre → progenitores → hijos), member search by name/email with removable chips and \"Ya está\" for picked users, create-account-in-place when nobody matches, children required (min 1) and sent in the same request. Backend now writes bond + members + children in one transaction (S15). Installed on the connected device; no loopback preview URL because the app is a physical Android build, not a web app."
+    }
+  }
+}

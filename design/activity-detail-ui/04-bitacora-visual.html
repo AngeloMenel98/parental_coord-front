@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Actividad — Bitácora visual</title>
+<style>
+  :root{
+    --primary:#00696D; --on-primary:#FFFFFF;
+    --primary-container:#9CF1F6; --on-primary-container:#002022;
+    --secondary:#4A6365; --secondary-container:#CCE8EA;
+    --error:#BA1A1A; --error-container:#FFDAD6;
+    --surface:#FAFDFC; --on-surface:#191C1D;
+    --surface-variant:#DAE4E5; --on-surface-variant:#3F4849;
+    --outline:#6F797A; --outline-variant:#BEC8C9;
+    --st-progress:#E65100; --st-done:#43A047;
+    --cat-salud:#D81B60; --cat-salud-c:#FCE4EC; --cat-salud-t:#AD1457;
+    --r-xs:4px; --r-sm:8px; --r-md:12px; --r-lg:16px; --r-xl:24px;
+    --serif:ui-serif, Georgia, "Times New Roman", serif;
+    --sans:system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --mono:ui-monospace, "Roboto Mono", Menlo, monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;background:var(--surface);color:var(--on-surface);font-family:var(--sans);font-size:14px;line-height:20px;-webkit-font-smoothing:antialiased}
+  .phone{display:flex;flex-direction:column;height:100%}
+  :focus-visible{outline:2px solid var(--primary);outline-offset:2px;border-radius:var(--r-xs)}
+
+  .appbar{display:flex;align-items:center;gap:4px;padding:6px 8px;border-bottom:1px solid var(--outline-variant);position:sticky;top:0;background:var(--surface);z-index:3}
+  .icon-btn{width:48px;height:48px;display:grid;place-items:center;border:0;background:none;border-radius:var(--r-xl);color:var(--on-surface-variant);cursor:pointer;transition:background 150ms}
+  .icon-btn:hover{background:var(--surface-variant)}
+  .appbar h1{font-size:16px;line-height:24px;font-weight:600;margin:0;flex:1}
+
+  main{flex:1;overflow-y:auto;padding:16px 16px 24px;max-width:640px;width:100%;margin:0 auto}
+
+  .chips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+  .chip{display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border-radius:var(--r-md);font-size:11px;line-height:16px;font-weight:500;letter-spacing:.3px}
+  .chip .dot{width:8px;height:8px;border-radius:50%;flex:none}
+  .chip-cat{background:var(--cat-salud-c);color:var(--cat-salud-t)}
+  .chip-cat .dot{background:var(--cat-salud)}
+  .chip-state{background:var(--surface-variant);color:var(--on-surface)}
+  .chip-state .dot{background:var(--st-progress)}
+  .hero h2{font-family:var(--serif);font-size:24px;line-height:32px;font-weight:400;margin:0 0 6px;letter-spacing:-.2px}
+  .hero .when{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;color:var(--on-surface-variant);font-size:14px;line-height:20px;margin:0}
+  .time{font-family:var(--mono);font-size:12px;letter-spacing:.5px;font-weight:500;color:var(--on-surface);text-transform:uppercase}
+
+  .card{border:1px solid var(--outline-variant);border-radius:var(--r-lg);background:var(--surface);padding:16px;margin-top:12px}
+  .card h3{margin:0;font-size:11px;line-height:16px;font-weight:500;letter-spacing:.6px;font-variant-caps:all-small-caps;color:var(--on-surface-variant)}
+  .card-head{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:16px}
+  .card-head .count{font-family:var(--mono);font-size:12px;letter-spacing:.5px;color:var(--on-surface)}
+
+  /* 1. Stage rail */
+  .steps{position:relative;display:grid;grid-template-columns:repeat(5,1fr);list-style:none;margin:0;padding:0;gap:0}
+  .steps::before,.steps::after{content:"";position:absolute;top:11px;height:2px;border-radius:2px}
+  .steps::before{left:10%;right:10%;background:var(--outline-variant)}
+  .steps::after{left:10%;width:37.5%;background:var(--primary)}
+  .steps li{position:relative;display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center}
+  .steps .disc{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;z-index:1;background:var(--surface);border:2px solid var(--outline-variant)}
+  .steps li.done .disc{background:var(--primary);border-color:var(--primary);color:var(--on-primary)}
+  .steps li.now .disc{border-color:var(--st-progress);background:var(--surface)}
+  .steps li.now .disc i{width:8px;height:8px;border-radius:50%;background:var(--st-progress);display:block}
+  .steps .lbl{font-size:10px;line-height:12px;letter-spacing:.2px;color:var(--on-surface-variant)}
+  .steps li.now .lbl,.steps li.done .lbl{color:var(--on-surface);font-weight:600}
+  .stage-note{margin:12px 0 0;font-size:12px;line-height:16px;color:var(--on-surface-variant)}
+
+  /* 2. What is still missing (replaces the countdown) */
+  .todo{margin-top:16px;padding-top:16px;border-top:1px solid var(--outline-variant)}
+  .todo-head{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:8px}
+  .sub{margin:0;font-size:11px;line-height:16px;font-weight:500;letter-spacing:.6px;font-variant-caps:all-small-caps;color:var(--on-surface-variant)}
+  .meter{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin-bottom:12px}
+  .meter span{display:block;height:6px;border-radius:3px;background:var(--surface-variant)}
+  .meter span.done{background:var(--primary)}
+  .checks{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
+  .checks li{display:flex;align-items:flex-start;gap:10px}
+  .checks .mark{width:14px;height:14px;margin-top:3px;border-radius:50%;border:2px solid var(--outline);flex:none}
+  .checks .mark.done{background:var(--primary);border-color:var(--primary)}
+  .checks b{display:block;font-size:14px;line-height:20px;font-weight:500}
+  .checks small{display:block;font-size:12px;line-height:16px;color:var(--on-surface-variant)}
+
+  /* 3. Activity strip */
+  .strip{display:grid;grid-template-columns:repeat(10,1fr);gap:2px;align-items:end;padding-bottom:4px;border-bottom:1px solid var(--outline-variant)}
+  .strip .col{display:flex;flex-direction:column;align-items:center;gap:4px}
+  .strip .dots{display:flex;flex-direction:column-reverse;gap:2px;height:26px;justify-content:flex-start}
+  .strip .dots i{width:8px;height:6px;border-radius:2px;background:var(--primary);display:block}
+  .strip .d{font-family:var(--mono);font-size:10px;letter-spacing:.2px;color:var(--on-surface-variant)}
+  .strip .col.today .d{color:var(--on-surface);font-weight:600}
+  .strip .col.today .dots i{background:var(--st-progress)}
+  .strip-legend{display:flex;justify-content:space-between;margin-top:6px;font-size:11px;line-height:16px;color:var(--on-surface-variant)}
+
+  /* 4. Bitácora timeline with icons */
+  .log{list-style:none;margin:16px 0 0;padding:0}
+  .log .day{font-size:11px;line-height:16px;font-weight:500;letter-spacing:.6px;font-variant-caps:all-small-caps;color:var(--on-surface-variant);padding:0 0 8px 44px;position:relative}
+  .log .event{position:relative;display:flex;gap:12px;padding-bottom:16px}
+  .log .event:last-child{padding-bottom:0}
+  .log .event::before{content:"";position:absolute;left:13px;top:28px;bottom:0;width:1px;background:var(--outline)}
+  .log .event:last-child::before{display:none}
+  .log .icon{width:28px;height:28px;border-radius:50%;flex:none;display:grid;place-items:center;background:var(--secondary-container);color:#051F21;z-index:1}
+  .log .icon.done{background:var(--primary);color:var(--on-primary)}
+  .log .body{min-width:0;flex:1}
+  .log .what{margin:0;font-size:14px;line-height:20px;font-weight:500}
+  .log .meta{margin:0;font-size:12px;line-height:16px;color:var(--on-surface-variant)}
+  .log .excerpt{margin:8px 0 0;padding:8px 12px;border-left:2px solid var(--outline-variant);font-size:13px;line-height:18px;color:var(--on-surface-variant)}
+  .log .tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+  .log .mini{display:inline-flex;align-items:center;gap:6px;padding:2px 8px;border-radius:var(--r-sm);background:var(--surface-variant);font-size:11px;line-height:16px;font-weight:500;color:var(--on-surface)}
+  .log .mini .dot{width:6px;height:6px;border-radius:50%;flex:none}
+  .log .who{display:inline-flex;align-items:center;gap:4px}
+
+  /* 5. Evidence */
+  .file{display:flex;align-items:center;gap:12px}
+  .thumb{width:44px;height:52px;flex:none;border:1px solid var(--outline-variant);border-radius:var(--r-xs);background:var(--surface)}
+  .file .name{font-size:14px;line-height:20px;font-weight:500}
+  .file .m{margin:0;font-size:12px;line-height:16px;color:var(--on-surface-variant)}
+  .note{margin:12px 0 0;font-size:12px;line-height:16px;color:var(--on-surface-variant)}
+  .card > .btn{margin-top:12px}
+
+  /* 6. State-change actions only, always visible */
+  .actions{padding:12px 16px calc(12px + env(safe-area-inset-bottom));border-top:1px solid var(--outline-variant);background:var(--surface)}
+  .state-note{display:flex;align-items:center;gap:6px;margin:0 0 8px;font-size:12px;line-height:16px;color:var(--on-surface-variant)}
+  .state-note .ok{width:8px;height:8px;border-radius:50%;background:var(--st-done);flex:none}
+  .actions .row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .actions .row + .row{margin-top:8px}
+  .actions .row.single{grid-template-columns:1fr}
+  .primary{min-height:48px;border:0;border-radius:var(--r-xl);background:var(--primary);color:var(--on-primary);font-family:inherit;font-size:14px;font-weight:500;cursor:pointer;transition:background 150ms}
+  .primary:hover{background:var(--primary);filter:brightness(.92)}
+  .btn{min-height:44px;padding:0 12px;border-radius:var(--r-xl);border:1px solid var(--outline);background:transparent;color:var(--primary);font-family:inherit;font-size:13px;font-weight:500;cursor:pointer;transition:background 150ms}
+  .btn:hover{background:var(--surface-variant)}
+  .btn.danger{color:var(--error);border-color:transparent}
+  .btn.danger:hover{background:var(--error-container)}
+  @media (prefers-reduced-motion: reduce){*{transition:none !important}}
+</style>
+</head>
+<body>
+<div class="phone">
+  <header class="appbar">
+    <button class="icon-btn" aria-label="Volver">
+      <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+    </button>
+    <h1>Actividad</h1>
+    <button class="icon-btn" aria-label="Más información">
+      <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><circle cx="12" cy="8" r="1" fill="currentColor" stroke="none"/></svg>
+    </button>
+  </header>
+
+  <main>
+    <div class="hero">
+      <div class="chips">
+        <span class="chip chip-state"><span class="dot"></span>En progreso</span>
+        <span class="chip chip-cat"><span class="dot"></span>Salud</span>
+      </div>
+      <h2>Turno odontológico de Sofi</h2>
+      <p class="when"><span class="time">jue 12 mar · 15:30</span> · Sofía Aguirre</p>
+    </div>
+
+    <!-- 1 + 2: stage rail and what is still missing -->
+    <section class="card" aria-labelledby="c-estado">
+      <div class="card-head"><h3 id="c-estado">Estado</h3><span class="count">4 de 5</span></div>
+      <ol class="steps">
+        <li class="done"><span class="disc"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span><span class="lbl">Creada</span></li>
+        <li class="done"><span class="disc"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span><span class="lbl">Asignada</span></li>
+        <li class="done"><span class="disc"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span><span class="lbl">Confirmada</span></li>
+        <li class="now"><span class="disc"><i aria-hidden="true"></i></span><span class="lbl">En progreso</span></li>
+        <li><span class="disc"></span><span class="lbl">Finalizada</span></li>
+      </ol>
+      <p class="stage-note">Falta el turno y la evidencia. Se cierra el vie 13 mar.</p>
+
+      <div class="todo">
+        <div class="todo-head"><h3 class="sub">Qué falta</h3><span class="count">0 de 3</span></div>
+        <div class="meter" role="img" aria-label="Ninguno de los tres pasos se completó todavía">
+          <span></span><span></span><span></span>
+        </div>
+        <ul class="checks">
+          <li><span class="mark" aria-hidden="true"></span>
+            <span><b>Turno</b><small>jue 12 mar, 15:30 · Sofía Aguirre · consultorio 3B</small></span></li>
+          <li><span class="mark" aria-hidden="true"></span>
+            <span><b>Evidencia</b><small>sin cargar · límite vie 13 mar, 23:59</small></span></li>
+          <li><span class="mark" aria-hidden="true"></span>
+            <span><b>Verificación</b><small>la hace Carolina cuando vea la evidencia</small></span></li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- 3 + 4: activity density strip and the bitácora -->
+    <section class="card" aria-labelledby="c-log">
+      <div class="card-head"><h3 id="c-log">Bitácora</h3><span class="count">4 eventos</span></div>
+
+      <div class="strip" role="img" aria-label="Eventos por día del 2 al 11 de marzo: tres el día 2, uno hoy día 11">
+        <div class="col"><span class="dots"><i></i><i></i><i></i></span><span class="d">2</span></div>
+        <div class="col"><span class="dots"></span><span class="d">3</span></div>
+        <div class="col"><span class="dots"></span><span class="d">4</span></div>
+        <div class="col"><span class="dots"></span><span class="d">5</span></div>
+        <div class="col"><span class="dots"></span><span class="d">6</span></div>
+        <div class="col"><span class="dots"></span><span class="d">7</span></div>
+        <div class="col"><span class="dots"></span><span class="d">8</span></div>
+        <div class="col"><span class="dots"></span><span class="d">9</span></div>
+        <div class="col"><span class="dots"></span><span class="d">10</span></div>
+        <div class="col today"><span class="dots"><i></i></span><span class="d">11</span></div>
+      </div>
+      <div class="strip-legend"><span>mar 2</span><span>hoy, mié 11</span></div>
+
+      <ol class="log">
+        <li class="day">lun 2 mar</li>
+        <li class="event">
+          <span class="icon done" aria-hidden="true">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+          </span>
+          <div class="body">
+            <p class="what">Actividad creada para Sofía Aguirre</p>
+            <p class="meta">Carolina Pérez · 09:14 · obligación</p>
+            <p class="excerpt">Control semestral con la odontopediatra. Llevar la orden de la obra social y el cepillo nuevo. Consultorio 3B, tercer piso.</p>
+            <div class="tags">
+              <span class="mini"><span class="dot" style="background:var(--cat-salud)"></span>Salud</span>
+              <span class="mini">Prioridad alta</span>
+              <span class="mini">Límite vie 13 mar</span>
+            </div>
+          </div>
+        </li>
+        <li class="event">
+          <span class="icon" aria-hidden="true">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.9"/></svg>
+          </span>
+          <div class="body">
+            <p class="what">Asignada a Martín Aguirre</p>
+            <p class="meta">Carolina Pérez · 09:14 · para Sofía Aguirre</p>
+          </div>
+        </li>
+        <li class="event">
+          <span class="icon done" aria-hidden="true">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+          </span>
+          <div class="body">
+            <p class="what">Martín confirmó la asignación</p>
+            <p class="meta">11:02 · se hace cargo del turno de Sofía</p>
+          </div>
+        </li>
+        <li class="day">hoy, mié 11 mar</li>
+        <li class="event">
+          <span class="icon" aria-hidden="true">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+          </span>
+          <div class="body">
+            <p class="what">Recordatorio de evidencia</p>
+            <p class="meta">Hoy · el turno de Sofía es mañana a las 15:30</p>
+          </div>
+        </li>
+      </ol>
+    </section>
+
+    <!-- 5: evidence -->
+    <section class="card" aria-labelledby="c-doc">
+      <div class="card-head"><h3 id="c-doc">Comprobantes</h3><span class="count">1</span></div>
+      <div class="file">
+        <svg class="thumb" viewBox="0 0 44 52" role="img" aria-label="Vista previa del archivo orden-obra-social.pdf">
+          <rect x="9" y="8" width="26" height="36" rx="2" fill="none" stroke="#6F797A" stroke-width="1.5"/>
+          <path d="M15 16h14M15 21h14M15 26h9" stroke="#BEC8C9" stroke-width="1.5" stroke-linecap="round"/>
+          <rect x="15" y="32" width="8" height="6" rx="1" fill="#CCE8EA"/>
+        </svg>
+        <div>
+          <div class="name">orden-obra-social.pdf</div>
+          <p class="m">2 páginas · 480 KB · Carolina Pérez · 2 mar</p>
+        </div>
+      </div>
+      <p class="note">Falta la evidencia del turno.</p>
+      <button class="btn">Cargar comprobante</button>
+    </section>
+  </main>
+
+  <footer class="actions" aria-label="Cambiar estado de la actividad">
+    <p class="state-note"><span class="ok" aria-hidden="true"></span>Asignación confirmada · Martín Aguirre, lun 2 mar 11:02</p>
+    <div class="row single"><button class="primary">Finalizar</button></div>
+    <div class="row">
+      <button class="btn">Reasignar</button>
+      <button class="btn danger">No asistir</button>
+    </div>
+  </footer>
+</div>
+</body>
+</html>

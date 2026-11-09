@@ -193,6 +193,28 @@ object ProgressStroke {
 object DetailGeometry {
     /** Diámetro del spinner de confirmación. `R2-T2-2` — permanente. */
     val progressSize: Dp = 18.dp
+
+    // ── `activity-detail-bitacora` (T2) — agregados ADITIVOS, no reescrituras. ──
+    // Riel de etapas, medidor de pasos y discos de la bitácora son dimensiones con nombre;
+    // ninguna es de la escala de [Spacing] y ninguna debe "corregirse" a 4/6/8/12/16/24.
+
+    /** ⌀ del disco de una etapa del riel. */
+    val stageDisc: Dp = 24.dp
+
+    /** ⌀ del punto interior de la etapa ACTUAL (anillo). */
+    val stageDot: Dp = 10.dp
+
+    /** ⌀ del marcador del checklist de "Qué falta". */
+    val checkMark: Dp = 14.dp
+
+    /** Alto de la barra de un paso en el medidor. */
+    val meterHeight: Dp = 6.dp
+
+    /** ⌀ del disco de un evento de la bitácora. */
+    val logDisc: Dp = 28.dp
+
+    /** Lado del icono dentro de un disco (riel y bitácora). */
+    val iconSize: Dp = 14.dp
 }
 
 /**

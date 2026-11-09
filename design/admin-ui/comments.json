@@ -1,0 +1,49 @@
+{
+  "version": 1,
+  "comments": [
+    {
+      "id": "3vstomy0",
+      "file": "01-consola-de-vinculos.html",
+      "selector": "body > div > section:nth-of-type(1) > main",
+      "excerpt": "24 USUARIOS 12 VÍNCULOS 11 ACTIVOS Paz–Gómez ACUERDO FORMAL Al día Mario Paz Lucía Gómez 2 Hijos 74% Cumplido 62% Pagado Ruiz–Sosa ACUERDO INFORMAL Con atrasos Caro Ruiz Iván Sosa 1 Hijos 48% Cumplido 39% Pagado Ferreyra–Duarte ACUERDO FORMAL Sin reporte Ana Ferreyra Julián Duarte 3 Hijos — Cumplido",
+      "comment": "Se tiene que poder realizar una busqueda por nombre del vinculo",
+      "createdAt": "2026-11-05T11:15:51.612Z",
+      "status": "resolved",
+      "sentAt": "2026-11-05T11:23:20.813Z",
+      "resolvedAt": "2026-11-05T11:24:12.712Z"
+    },
+    {
+      "id": "lv2mvp5i",
+      "file": "01-consola-de-vinculos.html",
+      "selector": "body > div > section:nth-of-type(2) > main > div:nth-of-type(3)",
+      "excerpt": "ÚLTIMOS MOVIMIENTOS Control pediátrico Salud · Cumplida · hace 2 días Cumplida Cuota de natación Recreación · Vencida · hace 5 días Vencida",
+      "comment": "En vez de ultimos movimientos, que sea algo como Tendencia o algun grafico relacionado",
+      "createdAt": "2026-11-05T11:20:43.523Z",
+      "status": "resolved",
+      "sentAt": "2026-11-05T11:23:20.813Z",
+      "resolvedAt": "2026-11-05T11:24:12.712Z"
+    },
+    {
+      "id": "5o3ep3sb",
+      "file": "01-consola-de-vinculos.html",
+      "selector": "body > div > section:nth-of-type(3) > main > div:nth-of-type(3)",
+      "excerpt": "Gastos Total $ 248.500,00 Pagado por monto 62,00% Pagado por cantidad 58,33% Pendiente $ 94.430,00",
+      "comment": "Por ahi tener una idea de gastos en porcentajes y no numeros, Por cantidad pagada, rechazada.",
+      "createdAt": "2026-11-05T11:22:11.859Z",
+      "status": "resolved",
+      "sentAt": "2026-11-05T11:23:20.813Z",
+      "resolvedAt": "2026-11-05T11:24:12.712Z"
+    },
+    {
+      "id": "ct6ozj11",
+      "file": "01-consola-de-vinculos.html",
+      "selector": "body > div > section:nth-of-type(3) > main",
+      "excerpt": "Desde 01/06/2026 Hasta 30/06/2026 Actividades Total 42 Cumplidas 31 Vencidas 3 Cumplimiento 73,81% Gastos Total $ 248.500,00 Pagado por monto 62,00% Pagado por cantidad 58,33% Pendiente $ 94.430,00 Progenitores Mario · 22/42 52,38% Lucía · 9/20 45,00% Generar PDF del reporte El PDF se arma en el ser",
+      "comment": "Me podrias hacer una visualizacion de como queda el PDF?",
+      "createdAt": "2026-11-05T11:22:59.532Z",
+      "status": "resolved",
+      "sentAt": "2026-11-05T11:23:20.813Z",
+      "resolvedAt": "2026-11-05T11:24:12.712Z"
+    }
+  ]
+}

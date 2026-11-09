@@ -1,11 +1,16 @@
 package com.parental.shared.feature.activities.ui.detail
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.PersonOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -346,6 +351,13 @@ private fun DetailContent(
                 CategoryBadge(categoryId = a.categoryId, resolve = resolve)
             }
         }
+        // `activity-detail-bitacora` T2 · Estado: el riel de 5 etapas y el bloque "Qué falta".
+        // Van arriba, pegados a la cabecera (código/título/chips): la pregunta que trae a
+        // alguien al detalle es "¿en qué quedó esto?".
+        item { DetailStatusCard(actividad = a, attachmentCount = attachments.size) }
+        // La bitácora sólo habla de hitos con marca; los adjuntos no participan en ella.
+        val bitacora = bitacoraEvents(a, memberNames, children)
+        if (bitacora.isNotEmpty()) item { DetailBitacoraCard(bitacora) }
         // S3/T18 · LA VENTANA DE VERIFICACIÓN. Es la MISMA fuente que la tarjeta —`deadline`,
         // que el servidor reancla a `now + 36 h` al entrar en `verify` (R14)—, no un segundo
         // reloj: el cliente no calcula cuándo vence, sólo lee cuándo vence. Si el backend no
@@ -652,6 +664,203 @@ internal fun DetailCard(title: String? = null, body: String? = null, content: @C
             }
             if (body != null) Text(body, style = MaterialTheme.typography.bodyMedium)
             content()
+        }
+    }
+}
+
+/**
+ * `activity-detail-bitacora` T2 · Tarjeta "Estado": riel de etapas + bloque "Qué falta".
+ *
+ * Las dos piezas se calculan con las funciones puras de `BitacoraDerivation.kt`; acá sólo se
+ * pinta. Que la regla viva afuera es lo que permite testearla sin infraestructura de UI.
+ */
+@Composable
+private fun DetailStatusCard(actividad: ActividadDetalle, attachmentCount: Int) {
+    val stages = activityStages(actividad)
+    val steps = detailChecklist(actividad, attachmentCount)
+    DetailCard(title = "Estado") {
+        StageRail(stages)
+        Spacer(Modifier.height(Spacing.md))
+        CheckMeter(steps)
+        Spacer(Modifier.height(Spacing.md))
+        steps.forEachIndexed { index, step ->
+            CheckRow(step)
+            if (index != steps.lastIndex) Spacer(Modifier.height(Spacing.md))
+        }
+    }
+}
+
+/** Riel de 5 etapas. UN nodo de semántica: los rótulos se anuncian como una frase, no cinco. */
+@Composable
+private fun StageRail(stages: List<StageNode>) {
+    val current = stages.first { it.current }
+    val scheme = MaterialTheme.colorScheme
+    Row(
+        modifier = Modifier.fillMaxWidth().clearAndSetSemantics {
+            contentDescription = "Etapa ${current.stage.ordinal + 1} de ${stages.size}: ${current.stage.label}"
+        },
+    ) {
+        stages.forEachIndexed { index, node ->
+            val next = stages.getOrNull(index + 1)
+            val previous = stages.getOrNull(index - 1)
+            Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                Box(Modifier.fillMaxWidth().height(DetailGeometry.stageDisc), contentAlignment = Alignment.Center) {
+                    // La línea vive DENTRO de la celda y va del borde al centro: las celdas
+                    // contiguas la empalman sin medir nada a mano. Un tramo sólo se pinta si
+                    // AMBOS extremos se alcanzaron: una actividad cerrada sin confirmar deja
+                    // el hueco visible en vez de rellenarlo por los dos lados.
+                    if (previous != null && previous.reached && node.reached) {
+                        Box(
+                            Modifier.align(Alignment.CenterStart).fillMaxWidth(0.5f)
+                                .height(Spacing.hairline)
+                                .background(scheme.primary),
+                        )
+                    }
+                    if (next != null && node.reached && next.reached) {
+                        Box(
+                            Modifier.align(Alignment.CenterEnd).fillMaxWidth(0.5f)
+                                .height(Spacing.hairline)
+                                .background(scheme.primary),
+                        )
+                    }
+                    StageDisc(node)
+                }
+                Spacer(Modifier.height(Spacing.xs))
+                Text(
+                    text = node.stage.label,
+                    style = MaterialTheme.typography.labelSmall,
+                    textAlign = TextAlign.Center,
+                    color = if (node.reached) scheme.onSurface else scheme.onSurfaceVariant,
+                    fontWeight = if (node.current) FontWeight.SemiBold else FontWeight.Normal,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun StageDisc(node: StageNode) {
+    val scheme = MaterialTheme.colorScheme
+    val base = Modifier.size(DetailGeometry.stageDisc)
+    when {
+        // Actual: anillo + punto, NO un check — "alcanzada" y "ocurriendo" no son lo mismo.
+        node.current -> Box(base.border(ProgressStroke.thin, scheme.primary, CircleShape), Alignment.Center) {
+            Box(Modifier.size(DetailGeometry.stageDot).background(scheme.primary, CircleShape))
+        }
+        node.reached -> Box(base.background(scheme.primary, CircleShape), Alignment.Center) {
+            Icon(
+                imageVector = Icons.Filled.Check,
+                contentDescription = null,
+                tint = scheme.onPrimary,
+                modifier = Modifier.size(DetailGeometry.iconSize),
+            )
+        }
+        else -> Box(base.border(ProgressStroke.thin, scheme.outlineVariant, CircleShape))
+    }
+}
+
+/** Medidor de pasos: una barra por paso visible. "0 de 2" es información, no decoración. */
+@Composable
+private fun CheckMeter(steps: List<CheckStep>) {
+    val done = steps.count { it.done }
+    val scheme = MaterialTheme.colorScheme
+    Row(
+        modifier = Modifier.fillMaxWidth().semantics {
+            contentDescription = "$done de ${steps.size} pasos completos"
+        },
+        horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+    ) {
+        steps.forEach { step ->
+            Box(
+                Modifier.weight(1f).height(DetailGeometry.meterHeight)
+                    .background(if (step.done) scheme.primary else scheme.surfaceVariant, ParentalShapes.small),
+            )
+        }
+    }
+}
+
+@Composable
+private fun CheckRow(step: CheckStep) {
+    val scheme = MaterialTheme.colorScheme
+    Row(
+        verticalAlignment = Alignment.Top,
+        // El medidor anuncia el conteo; esta fila tiene que decir CUÁL paso está hecho, o el
+        // estado del paso sólo existe para quien ve el color del marcador.
+        modifier = Modifier.fillMaxWidth().semantics(mergeDescendants = true) {
+            contentDescription = "${if (step.done) "Hecho" else "Pendiente"}: ${step.label}, ${step.detail}"
+        },
+    ) {
+        val mark = Modifier.padding(top = Spacing.xs).size(DetailGeometry.checkMark)
+        Box(
+            if (step.done) mark.background(scheme.primary, CircleShape)
+            else mark.border(ProgressStroke.thin, scheme.outline, CircleShape),
+        )
+        Spacer(Modifier.width(Spacing.md))
+        Column {
+            Text(step.label, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Medium)
+            Text(step.detail, style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
+        }
+    }
+}
+
+/** `activity-detail-bitacora` T2 · Bitácora de eventos, agrupada por día. */
+@Composable
+private fun DetailBitacoraCard(events: List<BitacoraEvent>) {
+    DetailCard(title = "Bitácora") {
+        events.forEachIndexed { index, event ->
+            val date = event.date
+            // Encabezado de día sólo cuando cambia: la bitácora no repite la fecha en cada fila.
+            if (date != null && date != events.getOrNull(index - 1)?.date) {
+                Text(
+                    text = formatLongDate(date),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Spacer(Modifier.height(Spacing.sm))
+            }
+            BitacoraRow(event)
+            if (index != events.lastIndex) Spacer(Modifier.height(Spacing.md))
+        }
+    }
+}
+
+@Composable
+private fun BitacoraRow(event: BitacoraEvent) {
+    val scheme = MaterialTheme.colorScheme
+    val icon = when (event.kind) {
+        BitacoraKind.Created -> Icons.Filled.Add
+        BitacoraKind.Confirmed -> Icons.Filled.Check
+        BitacoraKind.Completed -> Icons.Filled.Check
+        BitacoraKind.Declined -> Icons.Filled.PersonOff
+    }
+    val declined = event.kind == BitacoraKind.Declined
+    val byline = listOfNotNull(event.author, event.time).joinToString(" · ")
+    Row(verticalAlignment = Alignment.Top) {
+        Box(
+            Modifier.size(DetailGeometry.logDisc).background(
+                if (declined) scheme.errorContainer else scheme.secondaryContainer,
+                CircleShape,
+            ),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = if (declined) scheme.onErrorContainer else scheme.onSecondaryContainer,
+                modifier = Modifier.size(DetailGeometry.iconSize),
+            )
+        }
+        Spacer(Modifier.width(Spacing.md))
+        Column {
+            Text(event.title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+            if (byline.isNotBlank()) {
+                Text(byline, style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
+            }
+            // `context` = el hijo al que refiere el evento (S5), o el motivo de la no asistencia.
+            event.context?.let {
+                Text(it, style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
+            }
         }
     }
 }
