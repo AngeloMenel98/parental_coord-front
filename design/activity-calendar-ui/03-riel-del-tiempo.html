@@ -39,15 +39,16 @@
 
   /* ---- month density map ---- */
   .density{flex:none;padding:0 12px 6px;border-bottom:1px solid var(--outline-variant)}
-  .dhead{display:flex;align-items:center;gap:1px;height:34px}
+  .dhead{display:flex;align-items:center;gap:1px;height:44px}
   .dhead h2{margin:0;font-family:var(--serif);font-size:16px;font-weight:600;padding:0 2px;white-space:nowrap}
   .dhead .sub{font-size:9px;font-weight:800;letter-spacing:.1em;color:var(--on-surface-variant);margin-left:5px;text-transform:uppercase;white-space:nowrap}
   .arrow{width:32px;height:32px;display:grid;place-items:center;border:0;border-radius:50%;background:transparent;color:var(--on-surface-variant);cursor:pointer;flex:none}
   .arrow:hover{background:rgba(25,28,29,.06)}
   .arrow svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-  .toggle{margin-left:auto;height:28px;padding:0 10px 0 11px;border-radius:999px;border:1px solid var(--outline-variant);background:transparent;color:var(--primary);font-size:11.5px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:5px;flex:none;white-space:nowrap}
+  /* show/hide the density map: chevron only, 44dp target, name lives in aria-label */
+  .toggle{margin-left:auto;width:44px;height:44px;border-radius:999px;border:1px solid var(--outline-variant);background:transparent;color:var(--primary);cursor:pointer;display:grid;place-items:center;flex:none}
   .toggle:hover{background:rgba(0,105,109,.06)}
-  .toggle svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;transition:transform 150ms ease}
+  .toggle svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;transition:transform 150ms ease}
   .toggle[aria-expanded="false"] svg{transform:rotate(180deg)}
 
   .ws{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-top:1px}
@@ -65,6 +66,18 @@
   .legend{display:flex;align-items:center;gap:4px;margin:6px 2px 0;font-size:10px;color:var(--on-surface-variant);white-space:nowrap}
   .legend i{width:11px;height:11px;border-radius:3px;display:block}
   .legend .lg-alert{width:5px;height:5px;border-radius:50%;background:var(--error);margin-left:8px}
+
+  /* filters live inside the density panel, under the grid and above the legend */
+  .dfilters{display:grid;gap:6px;margin:8px 2px 0}
+  .drow{display:flex;align-items:center;gap:6px;overflow-x:auto;scrollbar-width:none;padding:1px 0}
+  .drow::-webkit-scrollbar{display:none}
+  .fchip{flex:none;height:34px;padding:0 12px;border-radius:999px;border:1px solid var(--outline-variant);background:transparent;color:var(--on-surface-variant);font-size:12px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+  .fchip:hover{border-color:var(--outline)}
+  .fchip[aria-pressed="true"]{background:var(--secondary-container);border-color:transparent;color:var(--on-secondary-container)}
+  .fchip.av{padding-left:6px}
+  .cavatar{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-size:10.5px;font-weight:800;flex:none}
+  .cavatar.sofia{background:#FCE4EC;color:#AD1457}
+  .cavatar.tomas{background:#E0F2F1;color:#00695C}
 
   /* ---- continuous rail ---- */
   .timeline{flex:1;min-height:0;overflow-y:auto;position:relative;padding-bottom:86px;scrollbar-width:none;-webkit-mask-image:linear-gradient(to bottom,#000 calc(100% - 18px),transparent);mask-image:linear-gradient(to bottom,#000 calc(100% - 18px),transparent)}
@@ -107,6 +120,9 @@
   .pill.short.narrow .stat{font-size:8.5px;line-height:10px;padding:0 3px 0 2px;gap:3px}
   .pill .cnt{font-size:9.5px;font-weight:800;color:var(--on-surface-variant);margin-left:auto;white-space:nowrap;font-variant-numeric:tabular-nums}
   .pill.short .pfoot{display:none}
+  .pill.narrow .stat{font-size:9px;padding:1px 5px 1px 4px}
+  .pill.narrow .pfoot{gap:4px}
+  .pill.narrow .cnt{font-size:8.5px}
   .pill.tall .ptitle{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
   .pill.narrow .ico{display:none}
   .pill.narrow .ptitle{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;font-size:11.5px;line-height:13px}
@@ -125,6 +141,15 @@
   .emptyday svg{width:22px;height:22px;fill:none;stroke:var(--outline);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
   .emptyday p{margin:0;font-size:12px;color:var(--on-surface-variant)}
   .emptyday button{height:32px;padding:0 14px;border-radius:999px;border:0;background:var(--primary-container);color:var(--on-primary-container);font-size:12px;font-weight:700;cursor:pointer}
+
+  /* "Hoy" landed on a day with nothing on it: a small status surface inside the rail */
+  .hoynotice{margin:0 16px 8px;padding:10px 12px;border-radius:12px;background:var(--secondary-container);color:var(--on-secondary-container);display:flex;align-items:center;gap:10px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+  .hoynotice .hnico{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;background:rgba(0,105,109,.12);color:var(--primary);flex:none}
+  .hoynotice .hnico svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+  .hoynotice p{margin:0;flex:1;min-width:0;font-size:12px;line-height:16px}
+  .hoynotice p b{font-weight:800}
+  .hoynotice .hsub{display:block;margin-top:1px;font-size:9.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;opacity:.72}
+  .hoynotice .hact{flex:none;height:38px;padding:0 14px;border-radius:999px;border:0;background:var(--primary);color:var(--on-primary);font-size:12px;font-weight:700;cursor:pointer}
 
   /* ---- day list panel ---- */
   .daylist{margin:6px 16px 10px;border:1px solid var(--outline-variant);border-radius:12px;background:var(--surface);overflow:hidden}
@@ -150,12 +175,18 @@
   .urow .who{font-size:10px;font-weight:700;color:var(--on-surface-variant);white-space:nowrap;flex:none}
 
   .fabgap{flex:none;height:78px} /* keeps the floating create button clear of every pill */
-  .fab{position:absolute;right:16px;bottom:74px;width:56px;height:56px;border-radius:50%;border:0;background:var(--primary);color:#fff;display:grid;place-items:center;box-shadow:0 4px 14px rgba(0,0,0,.26);cursor:pointer;z-index:6}
+  .fab{position:absolute;right:16px;bottom:98px;width:56px;height:56px;border-radius:50%;border:0;background:var(--primary);color:#fff;display:grid;place-items:center;box-shadow:0 4px 14px rgba(0,0,0,.26);cursor:pointer;z-index:6}
   .fab:hover{background:#00575A}
-  .hoybtn{position:absolute;left:16px;bottom:83px;height:38px;padding:0 14px 0 11px;border-radius:999px;border:1px solid var(--outline-variant);background:var(--surface);color:var(--primary);font-size:12.5px;font-weight:700;display:inline-flex;align-items:center;gap:6px;box-shadow:0 2px 8px rgba(0,0,0,.14);cursor:pointer;z-index:6}
+  .hoybtn{position:absolute;left:16px;bottom:107px;height:38px;padding:0 14px 0 11px;border-radius:999px;border:1px solid var(--outline-variant);background:var(--surface);color:var(--primary);font-size:12.5px;font-weight:700;display:inline-flex;align-items:center;gap:6px;box-shadow:0 2px 8px rgba(0,0,0,.14);cursor:pointer;z-index:6}
   .hoybtn:hover{background:rgba(0,105,109,.06)}
   .hoybtn svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
   .fab svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:2.3;stroke-linecap:round}
+
+  /* mock chrome, not product: simulates an empty today so the "Hoy" notice is reachable */
+  .simstrip{flex:none;height:24px;display:flex;align-items:center;justify-content:center;border-top:1px dashed var(--outline-variant);background:var(--surface)}
+  .simtoggle{border:0;background:transparent;color:var(--on-surface-variant);opacity:.6;font-family:var(--mono);font-size:9.5px;font-weight:600;letter-spacing:.04em;height:20px;padding:0 8px;display:inline-flex;align-items:center;gap:5px;cursor:pointer;white-space:nowrap}
+  .simtoggle:hover{opacity:1}
+  .simtoggle[aria-pressed="true"]{color:var(--primary);opacity:1}
 
   .bottomnav{flex:none;display:flex;align-items:stretch;height:58px;border-top:1px solid var(--outline-variant);background:var(--surface);padding-bottom:1px}
   .navitem{flex:1;display:grid;place-items:center;gap:1px;border:0;background:transparent;color:var(--on-surface-variant);cursor:pointer;padding:0}
@@ -193,13 +224,24 @@
       <h2>Mayo 2026</h2>
       <button class="arrow" type="button" aria-label="Mes siguiente"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9.5 6l6 6-6 6"/></svg></button>
       <span class="sub">Densidad</span>
-      <button class="toggle" type="button" id="densityToggle" aria-expanded="true" aria-controls="dowRow heatGrid legend">
-        <span id="toggleLabel">Ocultar</span>
+      <button class="toggle" type="button" id="densityToggle" aria-expanded="true" aria-controls="dowRow heatGrid densityFilters legend" aria-label="Ocultar el mapa de densidad">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg>
       </button>
     </div>
     <div class="ws" id="dowRow" aria-hidden="true"><span>LU</span><span>MA</span><span>MI</span><span>JU</span><span>VI</span><span>SA</span><span>DO</span></div>
     <div class="heat" id="heatGrid"></div>
+    <div class="dfilters" id="densityFilters">
+      <div class="drow" role="group" aria-label="Filtrar por hijo">
+        <button class="fchip" type="button" aria-pressed="true">Todos</button>
+        <button class="fchip av" type="button" aria-pressed="false"><span class="cavatar sofia" aria-hidden="true">S</span>Sofía</button>
+        <button class="fchip av" type="button" aria-pressed="false"><span class="cavatar tomas" aria-hidden="true">T</span>Tomás</button>
+      </div>
+      <div class="drow" role="group" aria-label="Filtrar por tipo">
+        <button class="fchip" type="button" aria-pressed="true">Todas</button>
+        <button class="fchip" type="button" aria-pressed="false">Eventos</button>
+        <button class="fchip" type="button" aria-pressed="false">Obligaciones</button>
+      </div>
+    </div>
     <div class="legend" id="legend" role="group" aria-label="Escala de densidad">
       <span id="legendLabel">Menos</span>
       <i style="background:rgba(25,28,29,.04);box-shadow:inset 0 0 0 1px var(--outline-variant)"></i>
@@ -243,6 +285,10 @@
       <span class="label">Terceros</span>
     </button>
   </nav>
+
+  <div class="simstrip">
+    <button class="simtoggle" type="button" id="simEmpty" aria-pressed="false" aria-label="Simulación: simular hoy sin actividades">mock · simular hoy sin actividades</button>
+  </div>
 </div>
 
 <script>
@@ -261,6 +307,7 @@
   var OVER={13:1};
   var LEAD=4, LAST=31, TODAY=13;
   var NOW=10*60+41;
+  var SIM_TODAY_EMPTY=false;
   var PXH=76, DSTART=7*60, DEND=21*60;
   var CANVAS_H=(DEND-DSTART)/60*PXH;
 
@@ -335,14 +382,17 @@
       grid.appendChild(s);
     }
     for(var d=1; d<=LAST; d++){
-      var n=HEAT[d]||0;
+      /* the mock day-empty simulation also empties today in the density map */
+      var simEmpty=SIM_TODAY_EMPTY && d===TODAY;
+      var n=simEmpty ? 0 : (HEAT[d]||0);
+      var od=simEmpty ? 0 : (OVER[d]||0);
       var b=document.createElement("button");
       b.type="button";
       b.className="hcell"+(lvl(n)>0?" lvl"+lvl(n):"")+(d===TODAY?" today":"")+(d===TODAY?" sel":"");
       b.textContent=String(d);
       b.setAttribute("aria-pressed", d===TODAY ? "true" : "false");
-      b.setAttribute("aria-label", d+" de mayo, "+countLabel(n)+(OVER[d]?", "+OVER[d]+" vencida":""));
-      if(OVER[d]){
+      b.setAttribute("aria-label", d+" de mayo, "+countLabel(n)+(od?", "+od+" vencida":""));
+      if(od){
         var dot=document.createElement("span");
         dot.className="alert";
         dot.setAttribute("aria-hidden","true");
@@ -524,35 +574,102 @@
     });
     host.appendChild(und);
 
-    var target=document.getElementById("day-"+TODAY);
-    host.scrollTop=target ? target.offsetTop : 0;
+    landOnNow();
   }
 
-  /* Month density map: compact show/hide pill at the top right of the density header. */
-  function setDensity(open){
-    document.getElementById("dowRow").hidden=!open;
-    document.getElementById("heatGrid").hidden=!open;
-    document.getElementById("legend").hidden=!open;
-    document.getElementById("densityToggle").setAttribute("aria-expanded", open ? "true" : "false");
-    document.getElementById("toggleLabel").textContent = open ? "Ocultar" : "Ver el mes";
-    var target=document.getElementById("day-"+TODAY);
-    var host=document.getElementById("timeline");
+  /* Month density map: one chevron-only control shows/hides grid, filters and legend together. */
+  var DENSITY_PARTS=["dowRow","heatGrid","densityFilters","legend"];
+  function scrollToToday(){
+    var target=document.getElementById("day-"+TODAY), host=document.getElementById("timeline");
     if(target) host.scrollTop=target.offsetTop;
+  }
+  function setDensity(open){
+    DENSITY_PARTS.forEach(function(id){ document.getElementById(id).hidden=!open; });
+    var btn=document.getElementById("densityToggle");
+    btn.setAttribute("aria-expanded", open ? "true" : "false");
+    btn.setAttribute("aria-label", open ? "Ocultar el mapa de densidad" : "Mostrar el mapa de densidad");
+    scrollToToday();
   }
 
   document.getElementById("densityToggle").addEventListener("click",function(){
     setDensity(this.getAttribute("aria-expanded")!=="true");
   });
 
-  /* "Hoy": bring the rail back to MIÉ 13 MAY (instant when reduced motion is requested). */
+  function todayDay(){
+    for(var i=0;i<DAYS.length;i++) if(DAYS[i].d===TODAY) return DAYS[i];
+    return null;
+  }
+  function saveTodayItems(day){
+    var saved=null;
+    if(day.items.length){ saved=day.items; }
+    day.items=[];
+    return saved;
+  }
+
+  /* "Hoy" with nothing on today: land on the day and say so, inline, instead of jumping silently. */
+  function showHoyNotice(){
+    var group=document.getElementById("day-"+TODAY);
+    if(!group || group.querySelector(".hoynotice")) return;
+    var el=document.createElement("div");
+    el.className="hoynotice";
+    el.setAttribute("role","status");
+    el.innerHTML='<span class="hnico" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M8 3v4M16 3v4M3 10.5h18"/><path d="M12 14v3"/><path d="M12 18.4v.01"/></svg></span>'+
+      '<p><b>Hoy no tiene actividades</b><span class="hsub">Miércoles 13 de mayo</span></p>'+
+      '<button class="hact" type="button">Agregar</button>';
+    var head=group.querySelector(".dayheader");
+    if(head) head.insertAdjacentElement("afterend", el); else group.insertBefore(el, group.firstElementChild);
+    var empty=group.querySelector(".emptyday");
+    if(empty) empty.hidden=true; /* the notice already carries the message and its action */
+  }
+
   document.getElementById("hoyBtn").addEventListener("click",function(){
     var host=document.getElementById("timeline");
     var target=document.getElementById("day-"+TODAY);
     if(!target) return;
+    var day=todayDay();
+    if(day && day.items.length===0) showHoyNotice();
     var reduce=window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     if(host.scrollTo) host.scrollTo({top:target.offsetTop, behavior: reduce ? "auto" : "smooth"});
     else host.scrollTop=target.offsetTop;
   });
+
+  /* Filters: two chip rows inside the panel, one selected chip per row (visual state only). */
+  Array.prototype.forEach.call(document.querySelectorAll(".dfilters .drow"),function(row){
+    var chips=row.querySelectorAll(".fchip");
+    Array.prototype.forEach.call(chips,function(chip){
+      chip.addEventListener("click",function(){
+        Array.prototype.forEach.call(chips,function(o){ o.setAttribute("aria-pressed","false"); });
+        chip.setAttribute("aria-pressed","true");
+      });
+    });
+  });
+
+  /* Mock-only control at the very bottom: empties today so the notice can be reviewed. */
+  var savedTodayItems=null;
+  document.getElementById("simEmpty").addEventListener("click",function(){
+    var day=todayDay();
+    if(!day) return;
+    var simulated=this.getAttribute("aria-pressed")==="true";
+    if(!simulated){ savedTodayItems=saveTodayItems(day); SIM_TODAY_EMPTY=true; }
+    else if(savedTodayItems){ day.items=savedTodayItems; savedTodayItems=null; SIM_TODAY_EMPTY=false; }
+    this.setAttribute("aria-pressed", simulated ? "false" : "true");
+    this.textContent=simulated ? "mock · simular hoy sin actividades" : "mock · hoy sin actividades (restaurar)";
+    renderHeat();
+    renderTimeline();
+  });
+
+  /* The rail is only ~3.4 h tall once the panel carries its filters: open on the now line
+     so proportional pills and the overlap stay readable; "Hoy" still jumps to the day start. */
+  function landOnNow(){
+    var host=document.getElementById("timeline");
+    var target=document.getElementById("day-"+TODAY);
+    if(!target) return;
+    var day=todayDay();
+    host.scrollTop=target.offsetTop;
+    if(!day || day.items.length===0) return;
+    var nowOffset=(NOW-DSTART)/60*PXH;
+    host.scrollTop=Math.max(0, target.offsetTop + nowOffset - Math.round(host.clientHeight*0.45));
+  }
 
   renderHeat();
   renderTimeline();
