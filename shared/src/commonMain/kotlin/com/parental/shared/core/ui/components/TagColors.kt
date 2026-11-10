@@ -83,3 +83,14 @@ fun statusTagTriple(status: String): TagTriple? {
  */
 fun isDoneStatus(status: String): Boolean =
     StatusTokens.aliasMap[status.uppercase()] == StatusTokens.Status.Done
+
+/**
+ * `true` cuando el estado resuelve a `Overdue` por el mapa canónico de alias.
+ *
+ * Existía duplicado como comparación de cadena en `RailCanvas.kt` y en `MonthDensity.kt`.
+ * Comparar el alias resuelto da lo mismo para lo que manda el servidor hoy y sigue siendo
+ * correcto si mañana aparece otro alias de `Overdue`, que es justo lo que `R3-T3-3` pide
+ * evitar replicando. Queda una copia en `ActivityCard.kt`; desaparece con esa tarjeta en T8.
+ */
+fun isOverdueStatus(status: String): Boolean =
+    StatusTokens.aliasMap[status.uppercase()] == StatusTokens.Status.Overdue

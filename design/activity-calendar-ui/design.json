@@ -1,0 +1,27 @@
+{
+  "title": "Actividades — calendario y timeline proporcional",
+  "brief": "Rediseño de la pantalla Actividades de una app de coordinación parental (Kotlin Multiplatform, Android primero) con foco en el calendario y en una línea de tiempo visual. Aplica la mecánica del PRD v0.2 de la Vista de Actividades — altura de bloque proporcional a la duración, eje de horas, marcador de hora actual, chips de todo el día, rango horario con duración, contador de subtareas, minutos restantes del bloque en curso, solapamientos lado a lado, FAB de alta y estado vacío — sobre el dominio real (Sofía, Tomás, categorías del servidor) y los tokens de design/system.md. Deliberadamente NO aplica: acento coral, nav Inbox·Timeline·AI·Settings ni el checkbox que saltea la verificación: el flujo sigue siendo Confirmar → Por verificar → Cumplida.",
+  "artboards": [
+    {
+      "file": "01-mes-que-respira.html",
+      "title": "Mes que respira",
+      "tradeoff": "Un solo calendario persistente: el mes completo con un punto por categoría y el volumen de los días cargados, que se pliega a la franja de la semana en cuanto elegís un día (y se vuelve a abrir con 'Ver el mes'). Debajo, el día se lee como píldoras con altura proporcional a la duración, eje horario, marcador de la hora actual y chips de todo el día. A cambio, por debajo de 30 minutos la altura mínima de toque rompe la proporción (07:30–07:45 ocupa lo mismo que 10:00–10:30), y el mes abierto deja apenas tres horas de timeline a la vista.",
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "02-semana-en-carriles.html",
+      "title": "Semana en carriles",
+      "tradeoff": "La semana se vuelve forma: siete columnas en miniatura con barras proporcionales, hairlines de hora y solapamientos lado a lado, que dejan ver de un vistazo qué día está cargado y cuál vacío; debajo, el día elegido partido en carriles por hijo (Sofía / Tomás / Sin asignar) con conmutador 'Por hora'. Responde la pregunta real de la coordinación compartida y hace visible el filtro por hijo sin gastar una fila de chips. A cambio, las miniaturas no admiten títulos (solo color y posición), la escala se comprime a ~21 px por hora para que la semana entera entre en el alto, y arriba del FAB solo entra el primer carril: Tomás queda a un scroll de distancia.",
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "03-riel-del-tiempo.html",
+      "title": "Riel del tiempo",
+      "tradeoff": "Un único riel cronológico con encabezados de día pegajosos y plegables, eje horario por día, píldoras proporcionales y solapamientos lado a lado, más un mapa de densidad mensual que codifica cantidad con opacidad y número —y que se muestra u oculta desde el pill del encabezado del calendario— y un panel 'Lista del día' colapsable para leer el día en formato compacto. El alta queda en un único FAB circular y el regreso a hoy en un pill flotante. Máxima lectura de qué viene y cuánto pesa cada día; el vencimiento aparece en el mapa, en el encabezado del día y en el bloque. A cambio, se pierde la comparación visual entre semanas y los huecos sin actividad se vuelven franjas largas y vacías en el riel.",
+      "width": 390,
+      "height": 844
+    }
+  ]
+}
