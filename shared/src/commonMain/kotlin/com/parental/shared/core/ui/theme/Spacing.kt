@@ -288,6 +288,76 @@ object RailGeometry {
     val ChipRowMinHeight: Dp = 76.dp
 }
 
+/**
+ * Geometría del MAPA DE DENSIDAD mensual — T5 de `odd/tasks/activity-rail.md` (S4, S11).
+ *
+ * Es aditivo puro: ningún token existente cambia de nombre ni de valor. Los cuatro alphas son
+ * el único sitio donde vive la escala de opacidad, así que la celda, la leyenda y cualquier
+ * futura miniatura no pueden pintar peldaños distintos.
+ *
+ * 🔴 AQUÍ NO HAY COLORES. Los alphas se aplican SIEMPRE sobre `MaterialTheme.colorScheme.primary`
+ * (un único color para los cinco peldaños); `Color.kt` sigue siendo el único dueño de los hex.
+ */
+object MonthMapGeometry {
+    /**
+     * Alto de una celda de día — 44dp.
+     *
+     * El arteboard mide 34px y S11 pide objetivos ≥ 44dp: la celda entera es un botón, así que
+     * se queda en el mínimo táctil de S11 y no en la medida del dibujo. El ANCHO lo pone la
+     * grilla (7 columnas a peso igual); no se fija aquí, porque en un móvil de 320dp una celda
+     * de 44dp de ancho no cabría con el espaciado de S2.
+     */
+    val CellHeight: Dp = 44.dp
+
+    /**
+     * Alpha del peldaño [DensityLevel.LOW] — 0.12f sobre `surface` (el `lvl1` del arteboard).
+     *
+     * CONTRASTE VERIFICADO en el par más oscuro (`FULL`, 0.44f): `onSurface` sobre el tinte
+     * compuesto da **8.20:1** en claro (#191C1D sobre #8CBCBD) y **4.76:1** en oscuro (#E0E3E3
+     * sobre #41686B) — AA en ambos modos, y por eso los cuatro peldaños pueden llegar a 0.44
+     * sin que el número del día pierda legibilidad. En los peldaños bajos el contraste sólo
+     * sube (13.98:1 y 11.53:1 a 0.24f). Bajar el número a 14sp también ayudaría, pero el token
+     * de tipo no es de esta tarea.
+     */
+    val LevelLowAlpha: Float = 0.12f
+
+    /** Alpha del peldaño [DensityLevel.MEDIUM] — 0.24f sobre `surface` (el `lvl2`). */
+    val LevelMediumAlpha: Float = 0.24f
+
+    /** Alpha del peldaño [DensityLevel.HIGH] — 0.34f sobre `surface` (el `lvl3`). */
+    val LevelHighAlpha: Float = 0.34f
+
+    /** Alpha del peldaño [DensityLevel.FULL] — 0.44f sobre `surface` (el `lvl4`). */
+    val LevelFullAlpha: Float = 0.44f
+
+    /**
+     * Punto de "hoy" — 5dp, el `.hcell.today::after` del arteboard.
+     *
+     * Lleva anillo de [MarkerRingSize] en `surface` porque `primary` sobre el tinte `FULL` de
+     * `primary` da 3.10:1 (claro) / 3.61:1 (oscuro): supera el 3:1 de WCAG 1.4.11 para
+     * indicadores no textuales, pero el halo es lo que lo hace visible sobre CUALQUIER peldaño.
+     */
+    val MarkerSize: Dp = 5.dp
+
+    /**
+     * Punto de día vencido — mismo tamaño que el de hoy, en `error`.
+     *
+     * El `error` sobre el tinte `FULL` da 3.09:1 (claro #BA1A1A sobre #8CBCBD) y 3.62:1
+     * (oscuro #FFB4AB sobre #41686B): el anillo de `surface` no es decoración, es lo que lo
+     * separa del tinte en el peldaño más oscuro. En los demás peldaños el contraste sube.
+     */
+    val OverdueMarkerSize: Dp = 5.dp
+
+    /** Diámetro del anillo `surface` de un marcador — 8dp (punto de 5 + 1,5 de anillo por lado). */
+    val MarkerRingSize: Dp = 8.dp
+
+    /** Borde del día SELECCIONADO — 2dp `primary` por dentro, como el `.hcell.sel`. */
+    val SelectedBorderWidth: Dp = 2.dp
+
+    /** Lado de una muestra de la leyenda — 12dp (el `11px` del arteboard redondeado a la escala). */
+    val SwatchSize: Dp = 12.dp
+}
+
 /** Grosor de trazo de un indicador circular. Un trazo no es un espaciado. */
 object ProgressStroke {
     val thin: Dp = 2.dp
