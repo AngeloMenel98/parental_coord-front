@@ -79,11 +79,11 @@ fun ActividadesScreen(
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val initialToday = remember { currentDate() }
-    // R4-T1-2 · id → `FocusRequester` de la fila que la pintó; T2-2 lo lee al cerrar.
-    // T6 · El riel todavía NO registra sus filas (`RailTimeline` no recibe este mapa), así que
-    // hoy el retorno de foco cae siempre en el contenedor de la lista. El mecanismo se conserva
-    // entero —`retainAll` por conjunto de datos y las dos caídas de `returnFocus`— para que
-    // T7/T8 lo restablezcan sin volver a escribir la aritmética.
+    // R4-T1-2 · id → `FocusRequester` del bloque del riel que lo pintó; T7 lo lee al cerrar la
+    // hoja. El mapa lo crea ESTA pantalla y lo llena cada bloque de `RailDayCanvas` / la fila sin
+    // fecha de `RailTimeline` con el MISMO patrón que `ActivityCard` (`remember` + `SideEffect`),
+    // así que escribir no recompone a nadie. La poda vive en `ActividadesListScreen`, donde se
+    // conocen las secciones: es el conjunto de datos que de verdad se renderiza.
     val focusRequesters = remember { mutableStateMapOf<String, FocusRequester>() }
 
     // T6 (L6) · Estado local de presentación. El riel es la ÚNICA vista, así que ya no hay un
@@ -120,9 +120,12 @@ fun ActividadesScreen(
     // recomponer el ítem—, así que el retorno caería al contenedor por un motivo inventado. Una
     // recarga, en cambio, cambia los datos: todo ítem superviviente recompone y se reinscribe por
     // su `SideEffect`, y un id que ya no existe no puede volver a pedir foco. Queda acotado.
-    LaunchedEffect(uiState.actividades) {
-        focusRequesters.keys.retainAll(uiState.actividades.map { it.id }.toSet())
-    }
+    //
+    // T7 · La poda se mudó a `ActividadesListScreen`, donde viven las SECCIONES: antes el mapa se
+    // podaba contra `uiState.actividades` (el conjunto sin filtrar), así que un id que el filtro
+    // de pestaña o de hijo acababa de esconder conservaba un requester de un nodo que ya no está.
+    // La regla es la misma; cambia el conjunto de datos contra el que se mide, y ahora es el que
+    // el riel dibuja.
 
     // El pedido es SIEMPRE posterior al clear y va guardado: pedido antes, `closeDetail` podría
     // haber borrado ya la fila y la petición caería al contenedor, o fallaría sin red de seguridad.
@@ -184,6 +187,13 @@ fun ActividadesScreen(
             onOpenCreate = viewModel::openCreate,
             selectedDateIso = selectedDateIso,
             onSelectedDateChange = { selectedDateIso = it },
+            // R2-T2-7 · ÚNICO punto por el que el riel dispara una acción de swipe. Callback, no
+            // singleton: el bloque sigue siendo función pura de sus datos (T7).
+            onSwipeAction = viewModel::startSwipeAction,
+            // T7 (R4) · El mapa de foco de la pantalla, para que cada bloque del riel pueda
+            // registrar su `FocusRequester`: es lo que hace que el retorno desde la hoja de
+            // detalle vuelva al bloque que la abrió en vez de caer en el contenedor.
+            focusRequesters = focusRequesters,
             // Hogar de foco: SIN nodo anunciable nuevo, sólo un destino al que caer si la fila
             // que abrió la hoja ya no existe.
             listFocusRequester = listFallback,
@@ -287,6 +297,18 @@ private fun ActividadesListScreen(
     onOpenCreate: () -> Unit,
     selectedDateIso: String,
     onSelectedDateChange: (String) -> Unit,
+    /**
+     * R2-T2-7 · Callback del gesto del riel (T7). Se pasa como callback y no se lee de un
+     * singleton: el bloque sigue siendo función pura de sus datos y este archivo no sabe qué
+     * acciones existen, sólo las reenvía. El tipo es [SwipeAction], así que añadir una acción
+     * obliga a tocar aquí a propósito y no por olvido.
+     */
+    onSwipeAction: (String, SwipeAction) -> Unit,
+    /**
+     * R4 · Destino de foco por actividad, llenado por los bloques del riel. El mapa lo posee la
+     * pantalla exterior (es quien lo lee al cerrar la hoja) y aquí sólo se pasa y se poda.
+     */
+    focusRequesters: MutableMap<String, FocusRequester>,
     listFocusRequester: FocusRequester,
 ) {
     val zone = remember { TimeZone.currentSystemDefault() }
@@ -353,6 +375,24 @@ private fun ActividadesListScreen(
             }
         }
     }
+    // T7 (R4) · Poda del mapa de foco por CONJUNTO DE DATOS, y ahora por el conjunto que el riel
+    // RENDERIZA. Podar al cerrar borraría la entrada de un bloque que sigue compuesto y que no
+    // volvería a registrarse —`SideEffect` sólo corre al recomponer—, así que el retorno caería al
+    // contenedor por un motivo inventado. Con las secciones como medida, un id que sale del riel
+    // (recarga, filtro de pestaña o de hijo) pierde su requester y no puede volver a pedir foco;
+    // lo que queda vivo se reinscribe solo. Un día PLEGADO conserva las suyas: su `railDay` sigue
+    // en la sección, y si el bloque no está compuesto el segundo respaldo de `returnFocus`
+    // (`onFailure`) cubre el nodo desprendido. Queda acotado.
+    val railVisibleIds = remember(sections) {
+        sections.flatMap { section ->
+            section.railDay?.blocks?.map { block -> block.row.actividad.id }
+                ?: section.undatedRows.map { row -> row.actividad.id }
+        }.toSet()
+    }
+    LaunchedEffect(railVisibleIds) {
+        focusRequesters.keys.retainAll(railVisibleIds)
+    }
+
     val visibleMonth = parseIsoDate(visibleMonthIso) ?: today
     // La densidad sale de las filas FILTRADAS: si el usuario está en "Eventos", el mapa
     // cuenta eventos. Un mapa sobre `uiState.actividades` ignoraría la pestaña y el hijo.
@@ -524,8 +564,14 @@ private fun ActividadesListScreen(
             // tapan el final del riel. La `Column` no scrollea —lo que scrollea es el riel—, así
             // que el pill queda siempre alcanzable sin taparlo todo.
             Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
+                // T7 (S11) · LOS TRES ESTADOS SE EXCLUYEN. Una sola `when` con cuatro ramas
+                // —carga, error, vacío, contenido— y ningún estado montado como HERMANO del
+                // riel: si el esqueleto o el vacío se compusieran junto al riel, el usuario
+                // vería la lista debajo de (o encima de) un cartel que dice que todavía no hay
+                // lista. El orden de precedencia es el de siempre y el `guard` de la rama 1
+                // (`isLoading && isEmpty`) impide que una recarga con datos tape lo que ya se ve.
                 when {
-                    uiState.isLoading && uiState.actividades.isEmpty() -> ListSkeleton()
+                    uiState.isLoading && uiState.actividades.isEmpty() -> RailSkeleton()
                     uiState.listError != null -> EmptyState(
                         title = "No pudimos cargar",
                         message = uiState.listError!!,
@@ -545,6 +591,10 @@ private fun ActividadesListScreen(
                     // la única línea de predicado que T5-4 mueve y no se puede
                     // tener ambas cosas — ver el informe de apply. Sin cambio de
                     // comportamiento.
+                    //
+                    // T7 · El vacío deja de ser un cartel muerto: ofrece el alta con el
+                    // MISMO callback que el FAB (S7: un solo camino de alta, y este es su
+                    // atajo cuando el FAB está lejos del pulgar).
                     else -> Crossfade(
                         targetState = uiState.actividades.isEmpty(),
                         animationSpec = tween(MotionTokens.durationStandard),
@@ -554,6 +604,8 @@ private fun ActividadesListScreen(
                             EmptyState(
                                 title = "No hay actividades",
                                 message = "",
+                                actionLabel = "Crear actividad",
+                                onAction = onOpenCreate,
                             )
                         } else RailTimeline(
                             // T6 (S3) · El riel es la ÚNICA vista de Actividades (L6). Las
@@ -571,6 +623,14 @@ private fun ActividadesListScreen(
                             listState = listState,
                             onOpen = { row -> onSelectActividad(row.actividad.id) },
                             onToggleDay = toggleDay,
+                            // T7 (R2-T2-7, L11) · El gesto vuelve a tener superficie: la
+                            // agenda lo llevaba en sus filas y el riel lo monta en sus bloques,
+                            // con el motivo obligatorio y la oferta de deshacer que la pantalla
+                            // ya tenía cableadas.
+                            onSwipeAction = onSwipeAction,
+                            // T7 (R4) · El mapa de foco, para que el retorno desde la hoja
+                            // vuelva al bloque que la abrió.
+                            focusRequesters = focusRequesters,
                         )
                     }
                 }

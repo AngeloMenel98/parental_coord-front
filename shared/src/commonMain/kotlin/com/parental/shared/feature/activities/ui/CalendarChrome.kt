@@ -16,6 +16,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.parental.shared.core.ui.theme.AgendaGeometry
 import com.parental.shared.core.ui.theme.ParentalShapes
+import com.parental.shared.core.ui.theme.RailGeometry
 import com.parental.shared.core.ui.theme.Spacing
 
 /*
@@ -166,3 +167,94 @@ internal fun ListSkeleton() {
         }
     }
 }
+
+/**
+ * Duración, en horas, de cada bloque del esqueleto del riel — 1 h, 1 h 30, 30 min, 45 min.
+ *
+ * El esqueleto NO inventa alturas: las deriva de [RailGeometry.DpPerHour] con el piso de toque
+ * [RailGeometry.MinBlockHeight], que es la MISMA escala que usa el riel real (`railHeightDp`).
+ * Una altura a ojo prometería bloques de un tamaño que la pantalla cargada no pinta.
+ */
+private val RAIL_SKELETON_BLOCK_HOURS = listOf(1f, 1.5f, 0.5f, 0.75f)
+
+/**
+ * Ancho de cada bloque del esqueleto, como fracción del carril.
+ *
+ * No todos son completos: el riel dibuja solapamientos lado a lado (S3), y dos bloques
+ * estrechos en el esqueleto anuncian esa forma en vez de prometer una lista de filas.
+ */
+private val RAIL_SKELETON_BLOCK_WIDTHS = listOf(1f, 0.62f, 1f, 0.48f)
+
+/** Cuántas marcas de hora lleva la canaleta del esqueleto. */
+private const val RAIL_SKELETON_GUTTER_TICKS = 4
+
+/**
+ * Esqueleto del RIEL — T7 (`S11`), hermano de [ListSkeleton] y NO su sustituto genérico.
+ *
+ * 🔴 LA FORMA ES EL CONTRATO. El esqueleto de filas (`ListSkeleton`) dibuja una tarjeta con
+ * columna de fecha + dos líneas de texto: es la forma de la agenda, que ya no se monta. Al
+ * cargar, esa forma prometía una lista que la pantalla no pinta y el contenido aterrizaba con
+ * un salto de estructura. Aquí la forma es la del riel: una canaleta de horas a la izquierda y
+ * bloques apilados de alto PROPORCIONAL a su duración, algunos más estrechos para insinuar los
+ * solapamientos en carriles.
+ *
+ * **UN nodo de semántica**, igual que [ListSkeleton]: el rótulo vive en el contenedor y
+ * `clearAndSetSemantics` limpia los hijos, que son decoración. Sin shimmer: no hay animación
+ * que anunciar y un barrido con `rememberInfiniteTransition` no aporta información — el rótulo
+ * ya dice "Cargando actividades".
+ *
+ * Sin `fillMaxHeight()`: el esqueleto mide lo que miden sus bloques y se queda arriba, como el
+ * primer día del riel, en vez de estirarse por el viewport que todavía está vacío.
+ */
+@Composable
+internal fun RailSkeleton() {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = Spacing.lg, vertical = Spacing.sm)
+            .clearAndSetSemantics { contentDescription = RAIL_SKELETON_LABEL },
+    ) {
+        // Canaleta: cuatro marcas cortas en el ancho de la columna de horas del riel, así el
+        // eje cae en la misma x que el de la pantalla cargada.
+        Column(
+            modifier = Modifier
+                .width(AgendaGeometry.timeColumn)
+                .padding(end = Spacing.sm),
+            verticalArrangement = Arrangement.spacedBy(Spacing.xl),
+        ) {
+            repeat(RAIL_SKELETON_GUTTER_TICKS) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(0.6f)
+                        .height(Spacing.md)
+                        .clip(ParentalShapes.extraSmall)
+                        .background(MaterialTheme.colorScheme.surfaceVariant),
+                )
+            }
+        }
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+        ) {
+            RAIL_SKELETON_BLOCK_HOURS.forEachIndexed { index, hours ->
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(RAIL_SKELETON_BLOCK_WIDTHS[index])
+                        // La altura del riel es `duración × DpPerHour`, con el objetivo táctil
+                        // como piso (S11): el mismo par que `railHeightDp`.
+                        .height(
+                            maxOf(
+                                RailGeometry.MinBlockHeight,
+                                (hours * RailGeometry.DpPerHour).dp,
+                            ),
+                        )
+                        .clip(ParentalShapes.medium)
+                        .background(MaterialTheme.colorScheme.surfaceVariant),
+                )
+            }
+        }
+    }
+}
+
+/** Rótulo del esqueleto: la MISMA frase que ya usaba [ListSkeleton], sin copy nuevo. */
+private const val RAIL_SKELETON_LABEL = "Cargando actividades"

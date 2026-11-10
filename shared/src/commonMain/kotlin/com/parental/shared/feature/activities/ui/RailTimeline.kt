@@ -27,10 +27,14 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -53,6 +57,8 @@ import com.parental.shared.core.ui.theme.ParentalShapes
 import com.parental.shared.core.ui.theme.RailGeometry
 import com.parental.shared.core.ui.theme.Spacing
 import com.parental.shared.feature.bonds.domain.model.VinculoChild
+import com.parental.shared.feature.activities.ui.swipe.ActivitySwipeBox
+import com.parental.shared.feature.activities.ui.swipe.SwipeAction
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 
@@ -103,6 +109,13 @@ private const val RAIL_UNDATED_KEY = "sin-fecha"
  *   (T6) mueve con el índice de `railItemIndexOf`.
  * @param onToggleDay pliega o despliega el día tocado. Sólo el chevron lo dispara (S5): el
  *   encabezado NO es un botón, así que el chevron nunca queda anidado en otro `clickable`.
+ * @param onSwipeAction T7 (L11) · ÚNICO punto por el que el riel dispara una acción de swipe. Se
+ *   pasa como callback y no se lee de un singleton: la superficie sigue siendo función pura de
+ *   sus datos. **Sin valor por defecto**: una llamante nueva que lo omita no compila, que es lo
+ *   que impide repetir el agujero de `c817fd0` (riel sin capa de gesto y todo en verde).
+ * @param focusRequesters T7 (R4) · id → `FocusRequester` que registra cada bloque y cada fila sin
+ *   fecha. Es el MISMO mapa que lee la pantalla al cerrar la hoja de detalle: sin este cable el
+ *   retorno de foco cae siempre en el contenedor de la lista.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -117,6 +130,8 @@ internal fun RailTimeline(
     listState: LazyListState,
     onOpen: (TimelineRow) -> Unit,
     onToggleDay: (LocalDate) -> Unit,
+    onSwipeAction: (String, SwipeAction) -> Unit,
+    focusRequesters: MutableMap<String, FocusRequester>,
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(
@@ -145,7 +160,21 @@ internal fun RailTimeline(
                             zone = zone,
                             memberNames = memberNames,
                             children = children,
+                            focusRequesters = focusRequesters,
                             onClick = { onOpen(undatedRow) },
+                            // T7 (R2-T2-7) · El gesto se monta en el PUNTO DE RENDER, igual
+                            // que en la agenda: la fila declara el hueco y aquí se crea la capa.
+                            // El `actividad` ES esta fila, así que la política de acciones
+                            // (`can_*`) no puede aplicarse a otra.
+                            swipe = { content ->
+                                ActivitySwipeBox(
+                                    actividad = undatedRow.actividad,
+                                    onSwipe = { action ->
+                                        onSwipeAction(undatedRow.actividad.id, action)
+                                    },
+                                    content = content,
+                                )
+                            },
                         )
                     }
                 }
@@ -160,6 +189,8 @@ internal fun RailTimeline(
                         today = today,
                         nowMinute = nowMinute,
                         onOpen = onOpen,
+                        onSwipeAction = onSwipeAction,
+                        focusRequesters = focusRequesters,
                     )
                 }
             }
@@ -335,6 +366,8 @@ private fun RailDayBody(
     today: LocalDate,
     nowMinute: Int?,
     onOpen: (TimelineRow) -> Unit,
+    onSwipeAction: (String, SwipeAction) -> Unit,
+    focusRequesters: MutableMap<String, FocusRequester>,
 ) {
     val railDay = section.railDay ?: return
     if (railDay.blocks.isEmpty()) {
@@ -361,6 +394,8 @@ private fun RailDayBody(
             // La línea de "ahora" sólo tiene sentido en el día de hoy: en cualquier otro
             // día diría una hora que no es la de ese eje.
             nowMinute = nowMinute.takeIf { section.date == today },
+            onSwipeAction = onSwipeAction,
+            focusRequesters = focusRequesters,
             modifier = Modifier.weight(1f),
         )
     }
@@ -414,14 +449,56 @@ private fun RailFreeDay() {
  * Una fila de la sección "Sin fecha de inicio" — el `.urow` del artboard (`:146`).
  *
  * ⚠ FILA PROPIA Y NO `AgendaTimelineRow`: esa firma pide `resolve`, `onSelectActividad`,
- * `onConfirm`, `isConfirming`, `focusRequesters` y el hueco `swipe`, y `RailTimeline` sólo
- * recibe `onOpen`. "Sin fecha" TAMPOCO tiene un `date` que pasarle, y cambiar su firma para
- * acomodar este caso tocaría las dos superficies que todavía la montan (`AgendaList` y
- * `WeekAgenda`), que se retiran en T8. Es la fila mínima del arteboard: riel de categoría,
- * título y estado en palabras.
+ * `onConfirm` e `isConfirming` —que el riel no tiene— y "Sin fecha" TAMPOCO tiene un `date` que
+ * pasarle; cambiar su firma para acomodar este caso tocaría las dos superficies que todavía la
+ * montan (`AgendaList` y `WeekAgenda`), que se retiran en T8. Es la fila mínima del arteboard:
+ * riel de categoría, título y estado en palabras.
+ *
+ * T7 · Lo que la fila SÍ gana es lo que le tocaba por derecho propio: su hueco `swipe` y su
+ * registro de foco, con la MISMA forma que `ActivityCard` (`remember` + `SideEffect` + hueco sin
+ * default), no una paralela. Lo demás sigue igual.
+ * @param swipe T7 · Hueco de gesto (R2-T2-7), con el tipo EXACTO de ranura que declaran
+ *   `ActivityCard` y `AgendaTimelineRow` y **sin valor por defecto**: la omisión tiene que ser un
+ *   error de compilación, no una superficie sin gesto que compila. El envoltorio
+ *   (`ActivitySwipeBox`) lo monta `RailTimeline`, en el punto de render.
+ * @param focusRequesters T7 · destino de foco por id; lo registra el `SideEffect`, igual que la
+ *   fila de la agenda y como la tarjeta, para que el retorno de foco desde la hoja encuentre esta
+ *   fila y no el contenedor de la lista.
  */
 @Composable
 private fun RailUndatedRow(
+    row: TimelineRow,
+    info: CategoryInfo?,
+    zone: TimeZone,
+    memberNames: Map<String, String>,
+    children: List<VinculoChild>,
+    focusRequesters: MutableMap<String, FocusRequester>,
+    onClick: () -> Unit,
+    swipe: @Composable (content: @Composable () -> Unit) -> Unit,
+) {
+    val focusRequester = remember { FocusRequester() }
+    // R4 · `SideEffect` + no-leer-en-composición ⇒ escribir el mapa no recompone a nadie.
+    SideEffect { focusRequesters[row.actividad.id] = focusRequester }
+
+    // El `focusRequester` vive FUERA del hueco de gesto: el hueco desplaza el contenido y los
+    // `ParentDataModifier` no lo atraviesan (R2-T2-7). Mismo reparto que `ActivityCard`.
+    Box(modifier = Modifier.fillMaxWidth().focusRequester(focusRequester)) {
+        swipe {
+            RailUndatedRowBody(
+                row = row,
+                info = info,
+                zone = zone,
+                memberNames = memberNames,
+                children = children,
+                onClick = onClick,
+            )
+        }
+    }
+}
+
+/** Cuerpo de la fila sin fecha — lo que el huésped dibuja dentro del hueco de gesto. */
+@Composable
+private fun RailUndatedRowBody(
     row: TimelineRow,
     info: CategoryInfo?,
     zone: TimeZone,

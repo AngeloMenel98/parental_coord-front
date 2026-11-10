@@ -7,9 +7,13 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
@@ -31,6 +35,8 @@ import com.parental.shared.core.ui.theme.RailGeometry
 import com.parental.shared.core.ui.theme.Spacing
 import com.parental.shared.core.ui.theme.TypeTokens
 import com.parental.shared.feature.bonds.domain.model.VinculoChild
+import com.parental.shared.feature.activities.ui.swipe.ActivitySwipeBox
+import com.parental.shared.feature.activities.ui.swipe.SwipeAction
 import kotlinx.datetime.TimeZone
 
 /*
@@ -101,6 +107,10 @@ internal fun RailHourGutter(axis: RailAxis, dpPerHour: Float, modifier: Modifier
  * @param nowMinute minuto de día de la línea de "ahora", o `null` si el día no es hoy: lo
  *   calcula la pantalla. Fuera del eje no se dibuja.
  * @param minBlockHeight piso de toque; T7 lo necesita para el estado de carga.
+ * @param onSwipeAction T7 (L11) · ÚNICO punto por el que un bloque dispara una acción de swipe.
+ *   **Sin valor por defecto**: el día entero se quedaría sin gesto en silencio si lo tuviera.
+ * @param focusRequesters T7 (R4) · id → `FocusRequester` que registra cada bloque: es el mapa que
+ *   la pantalla lee para devolver el foco al bloque que abrió la hoja de detalle.
  */
 @Composable
 internal fun RailDayCanvas(
@@ -110,6 +120,8 @@ internal fun RailDayCanvas(
     children: List<VinculoChild>,
     zone: TimeZone,
     onOpen: (TimelineRow) -> Unit,
+    onSwipeAction: (String, SwipeAction) -> Unit,
+    focusRequesters: MutableMap<String, FocusRequester>,
     nowMinute: Int? = null,
     modifier: Modifier = Modifier,
     dpPerHour: Float = RailGeometry.DpPerHour,
@@ -146,7 +158,25 @@ internal fun RailDayCanvas(
                 y = railOffsetDp(block.startMinute, axis, dpPerHour).dp,
                 width = laneWidth,
                 height = railHeightDp(block, dpPerHour, minBlockHeight.value).dp,
+                focusRequesters = focusRequesters,
                 onClick = { onOpen(block.row) },
+                // T7 (R2-T2-7, L11) · El gesto se monta AQUÍ, en el punto de render; el bloque
+                // sólo declara el hueco. `ActivitySwipeBox` se reutiliza TAL CUAL —sin un
+                // parámetro nuevo ni un cambio de su contrato de ranura— porque el alto de
+                // entrada está ACOTADO: la caja de foco mide `.height(height)`, así que su
+                // `fillCrossAxis` por defecto encuentra un máximo y no colapsa a 0 (la trampa
+                // documentada del envoltorio). El alto MEDIDO del bloque no cambia: el envoltorio
+                // mide exactamente el `height` del eje.
+                swipe = { content ->
+                    ActivitySwipeBox(
+                        actividad = block.row.actividad,
+                        modifier = Modifier.fillMaxSize(),
+                        onSwipe = { action ->
+                            onSwipeAction(block.row.actividad.id, action)
+                        },
+                        content = content,
+                    )
+                },
             )
         }
     }
@@ -209,6 +239,13 @@ private fun RailNowLine(y: Dp, modifier: Modifier) {
  *
  * Un bloque `Done` baja a [RailGeometry.DoneAlpha], tacha el título Y conserva el estado en
  * palabras: la opacidad nunca es la única señal.
+ *
+ * T7 · DOS CAJAS, y el reparto importa. La EXTERNA es geometría (posición, tamaño, foco) y la
+ * INTERNA es la píldora. El hueco `swipe` se monta entre las dos para que:
+ *  · el `FocusRequester` quede FUERA del envoltorio de gesto (un `ParentDataModifier` no lo
+ *    atraviesa — R2-T2-7), igual que en `ActivityCard`; y
+ *  · el desplazamiento del gesto mueva el bloque DENTRO de su propio rectángulo, sin tocar la
+ *    x/y del eje ni el alto que reserva el día.
  */
 @Composable
 private fun RailBlockPill(
@@ -218,6 +255,41 @@ private fun RailBlockPill(
     x: Dp,
     y: Dp,
     width: Dp,
+    height: Dp,
+    focusRequesters: MutableMap<String, FocusRequester>,
+    onClick: () -> Unit,
+    swipe: @Composable (content: @Composable () -> Unit) -> Unit,
+) {
+    val focusRequester = remember { FocusRequester() }
+    // R4-T1-2 (mismo patrón que la tarjeta y la fila): `SideEffect` + no-leer-en-composición ⇒
+    // escribir el mapa no recompone a nadie.
+    SideEffect { focusRequesters[block.row.actividad.id] = focusRequester }
+
+    Box(
+        modifier = Modifier
+            .offset(x = x, y = y)
+            .width(width)
+            .height(height)
+            .focusRequester(focusRequester),
+    ) {
+        swipe {
+            RailBlockBody(
+                block = block,
+                info = info,
+                semanticLabel = semanticLabel,
+                height = height,
+                onClick = onClick,
+            )
+        }
+    }
+}
+
+/** Píldora del bloque: fondo, riel de categoría, texto y estado. Ocupa su caja entera. */
+@Composable
+private fun RailBlockBody(
+    block: RailBlock,
+    info: CategoryInfo?,
+    semanticLabel: String,
     height: Dp,
     onClick: () -> Unit,
 ) {
@@ -240,9 +312,7 @@ private fun RailBlockPill(
     }
     Box(
         modifier = Modifier
-            .offset(x = x, y = y)
-            .width(width)
-            .height(height)
+            .fillMaxSize()
             .alpha(if (isDone) RailGeometry.DoneAlpha else 1f)
             .clip(ParentalShapes.medium)
             .background((triple?.dot ?: MaterialTheme.colorScheme.outline).copy(alpha = RailGeometry.BlockTintAlpha))

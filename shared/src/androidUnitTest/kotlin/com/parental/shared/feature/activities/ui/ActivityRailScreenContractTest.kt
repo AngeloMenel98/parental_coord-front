@@ -34,6 +34,11 @@ import kotlin.test.fail
  *  7. **El flujo de completado no cambia** (S8): sigue siendo `Confirmar` → *Por verificar* →
  *     `Cumplida` desde la hoja de detalle, sin checkbox que saltee la verificación del otro
  *     progenitor.
+ *  8. **T7 (S11) · Los tres estados del riel se excluyen entre sí** y el de carga tiene forma de
+ *     riel (canaleta + bloques proporcionales), no la de fila: un esqueleto de filas promete
+ *     una lista que la pantalla ya no es. Y **cada bloque registra su `FocusRequester`**, que la
+ *     pantalla poda por conjunto de datos: sin registro, el retorno de foco desde la hoja cae
+ *     siempre en el contenedor.
  */
 class ActivityRailScreenContractTest {
 
@@ -239,7 +244,122 @@ class ActivityRailScreenContractTest {
         )
     }
 
-    // ── 7 · PRESERVE · lo que T6 NO toca ───────────────────────────────────────────────
+    // ── 7 · T7 (S11) · Los estados del riel y la retención de foco ─────────────────────
+
+    @Test
+    fun `el esqueleto del riel tiene forma de riel y no la de una fila`() {
+        assertTrue(
+            "RailSkeleton(" in screen,
+            "🔴 El estado de carga no monta un esqueleto del riel.",
+        )
+        assertFalse(
+            "ListSkeleton(" in screen,
+            "🔴 El estado de carga volvió a montar `ListSkeleton`: su forma es la de una fila de " +
+                "agenda (bloque de fecha + dos líneas) y promete una lista que la pantalla ya no es.",
+        )
+        val chrome = stripComments(source("CalendarChrome.kt"))
+        assertTrue(
+            "internal fun RailSkeleton(" in chrome,
+            "🔴 El esqueleto del riel no existe en `CalendarChrome.kt`, junto al de filas.",
+        )
+        val skeleton = chrome.substringAfter("internal fun RailSkeleton(")
+        assertTrue(
+            "timeColumn" in skeleton,
+            "🔴 El esqueleto no tiene canaleta: el riel sin gutter no es el riel.",
+        )
+        assertTrue(
+            "RailGeometry.DpPerHour" in skeleton && "RailGeometry.MinBlockHeight" in skeleton,
+            "🔴 Los bloques del esqueleto no son proporcionales: la altura sale de la escala del " +
+                "riel (`DpPerHour`) con el piso de toque (`MinBlockHeight`), no de un dp inventado.",
+        )
+        assertEquals(
+            1,
+            Regex("clearAndSetSemantics").findAll(skeleton).count(),
+            "🔴 El esqueleto habla más de una vez (o ninguna): es UN nodo semántico con su rótulo.",
+        )
+    }
+
+    @Test
+    fun `carga, error y vacio se excluyen entre si`() {
+        // Una `when` con cuatro ramas: cargando, error, vacío y contenido. Si dos de las tres
+        // primeras se pintan como hermanas, el riel aparece debajo con el estado de encima (o al
+        // revés) y el usuario ve una lista que todavía no existe.
+        val inicio = screen.indexOf("Box(modifier = Modifier.fillMaxWidth().weight(1f))")
+        assertTrue(
+            inicio >= 0,
+            "🔴 El contenido de la pantalla ya no vive en el `Box` con `weight(1f)`: la región de los " +
+                "estados no se puede acotar.",
+        )
+        val region = screen.substring(inicio)
+        val carga = region.indexOf("uiState.isLoading && uiState.actividades.isEmpty() -> RailSkeleton()")
+        val error = region.indexOf("uiState.listError != null -> EmptyState(")
+        val vacio = region.indexOf("\"No hay actividades\"")
+        val riel = region.indexOf("RailTimeline(")
+        assertTrue(carga >= 0, "🔴 La rama de carga no es `isLoading && actividades.isEmpty()` → `RailSkeleton()`.")
+        assertTrue(error > carga, "🔴 El error no es la rama siguiente a la carga.")
+        assertTrue(vacio > error, "🔴 El vacío no es la rama siguiente al error.")
+        assertTrue(riel > vacio, "🔴 El riel no es la última rama: se pintaría debajo de los estados.")
+        assertEquals(1, Regex("RailSkeleton\\(").findAll(screen).count(), "🔴 El esqueleto se monta más de una vez.")
+        assertEquals(1, Regex("RailTimeline\\(").findAll(screen).count(), "🔴 El riel se monta más de una vez.")
+
+        // El error conserva su acción y el vacío usa el MISMO alta que el FAB (S7: un solo camino).
+        assertTrue(
+            "actionLabel = \"Reintentar\"" in region && "onAction = onRetryList" in region,
+            "🔴 El estado de error perdió su reintento.",
+        )
+        assertTrue(
+            "actionLabel = \"Crear actividad\"" in region && "onAction = onOpenCreate" in region,
+            "🔴 El vacío no ofrece el alta: la única entrada quedaría en el FAB, fuera de la vista.",
+        )
+        assertEquals(
+            1,
+            Regex("onClick = onOpenCreate").findAll(screen).count(),
+            "🔴 El alta del vacío y el FAB no comparten callback: dos caminos de alta distintos.",
+        )
+    }
+
+    @Test
+    fun `cada bloque del riel registra su requester y la pantalla lo poda`() {
+        assertTrue(
+            "focusRequesters = focusRequesters" in screen,
+            "🔴 La pantalla no entrega el mapa de foco al riel: el retorno desde la hoja cae siempre " +
+                "en el contenedor (el agujero que dejó `c817fd0`).",
+        )
+        assertTrue(
+            "retainAll(" in screen,
+            "🔴 La pantalla dejó de podar el mapa de foco: un id que ya no existe se quedaría con un " +
+                "requester de un nodo muerto.",
+        )
+        val canvas = stripComments(source("RailCanvas.kt"))
+        assertTrue(
+            "SideEffect { focusRequesters[" in canvas,
+            "🔴 El bloque del riel no registra su `FocusRequester` con el `SideEffect` de " +
+                "`ActivityCard`: es el MISMO mecanismo, no uno paralelo.",
+        )
+        assertTrue(
+            "focusRequester(focusRequester)" in canvas,
+            "🔴 El bloque registra el requester pero no lo monta: el nodo no existe.",
+        )
+        val timeline = stripComments(source("RailTimeline.kt"))
+        assertTrue(
+            "focusRequesters: MutableMap<String, FocusRequester>" in timeline,
+            "🔴 `RailTimeline` no recibe el mapa: el riel no puede registrar sus filas.",
+        )
+        assertEquals(
+            3,
+            Regex("focusRequesters = focusRequesters").findAll(timeline).count(),
+            "🔴 El riel no reenvía el mapa por sus tres escalones (fila sin fecha, cuerpo del día " +
+                "y lienzo del día): alguna superficie se queda sin registrar y su retorno de foco " +
+                "cae al contenedor.",
+        )
+        assertTrue(
+            "focusRequesters = focusRequesters" in canvas,
+            "🔴 El lienzo no entrega el mapa al bloque: el registro del `SideEffect` no llega nunca " +
+                "a la pantalla.",
+        )
+    }
+
+    // ── 8 · PRESERVE · lo que T6/T7 NO tocan ──────────────────────────────────────────
 
     @Test
     fun `los filtros, la barra y el snackbar siguen montados como antes`() {
