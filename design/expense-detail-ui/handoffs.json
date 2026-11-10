@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "chosen": "01-expediente.html",
+  "handoffs": {
+    "01-expediente.html": {
+      "status": "implemented",
+      "queued": true,
+      "sentAt": "2026-11-04T12:24:19.092Z",
+      "startedAt": null,
+      "implementedAt": "2026-11-04T12:35:57.680Z",
+      "note": "Expediente implemented in Compose: hero with status/category chips (category without icon), serif amount, viewer share and split bar; facts grid with Hijos -> em dash; description; document block with clip Attach wired to presign/upload/confirm; single collapsible timeline that only adds occurred steps; pinned actions bar driven by server flags. Suite 55/507 green and :androidApp:assembleDebug green; APK installed. Device screenshot blocked: the phone entered Dozing and MIUI rejects adb input injection."
+    }
+  }
+}

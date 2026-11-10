@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -20,6 +21,7 @@ import com.parental.shared.core.error.ApiResult
 import com.parental.shared.core.network.ApiClient
 import com.parental.shared.core.ui.components.BottomNavBar
 import com.parental.shared.core.ui.theme.ParentalCoordinationTheme
+import com.parental.shared.core.ui.theme.ThemeController
 import com.parental.shared.feature.activities.ui.ActividadesScreen
 import com.parental.shared.feature.activities.ui.ActividadesViewModel
 import com.parental.shared.feature.expenses.ui.ExpensesScreen
@@ -63,9 +65,21 @@ fun App() {
         }
     }
 
+    // El interruptor sol/luna del Inicio elige el tema; sin decisión explícita manda el
+    // sistema. El controlador guarda la DECISIÓN y se resuelve en cada composición, así
+    // que un cambio de tema del sistema se refleja sin recrear nada.
+    val themeController = remember { ThemeController() }
+    val systemDark = isSystemInDarkTheme()
+    val darkTheme = themeController.resolve(systemDark)
+
     // ADR-10: un único wrap del tema en commonMain — Android hoy, iOS hereda.
-    ParentalCoordinationTheme {
-        AppContent(authRepository = authRepository, sessionManager = sessionManager)
+    ParentalCoordinationTheme(darkTheme = darkTheme) {
+        AppContent(
+            authRepository = authRepository,
+            sessionManager = sessionManager,
+            isDarkTheme = darkTheme,
+            onToggleTheme = { themeController.toggle(systemDark) },
+        )
     }
 }
 
@@ -78,6 +92,8 @@ fun App() {
 private fun AppContent(
     authRepository: AuthRepository,
     sessionManager: SessionManager,
+    isDarkTheme: Boolean = false,
+    onToggleTheme: (() -> Unit)? = null,
 ) {
     // S12 · G-3 — la salida vive en la barra global de todas las vistas, así que el
     // efecto es UNO solo: no hay dos lambdas que puedan divergir.
@@ -324,6 +340,7 @@ private fun AppContent(
                         }
                         ExpensesScreen(
                             viewModel = expensesViewModel,
+                            currentUserId = currentUserId,
                             onLogout = logout,
                             onNavigateBottom = onNavigateBottom,
                             unreadCount = unreadCount,
@@ -353,6 +370,8 @@ private fun AppContent(
                     onNavigateBottom = onNavigateBottom,
                     unreadCount = unreadCount,
                     onOpenNotifications = { showNotifications = true },
+                    isDarkTheme = isDarkTheme,
+                    onToggleTheme = onToggleTheme,
                 )
             }
         }

@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "chosen": "01-consola-de-vinculos.html",
+  "handoffs": {
+    "01-consola-de-vinculos.html": {
+      "status": "implemented",
+      "queued": false,
+      "sentAt": "2026-11-05T11:36:34.392Z",
+      "startedAt": "2026-11-05T11:37:01.272Z",
+      "implementedAt": "2026-11-05T11:43:23.077Z",
+      "feature": "odd/tasks/admin-reports-ui.md",
+      "note": "Implemented in Compose: bond console with search + health cards, detail with children/members/report + 6-month trend, report with expense percentages, and the PDF page preview. Backend gained /admin/bonds/health and /admin/bonds/:id/trend (S13-S14) since the artboard's numbers did not exist in the API. 512 shared tests green."
+    }
+  }
+}

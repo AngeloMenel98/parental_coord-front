@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Admin — Consola de vínculos</title>
+<style>
+  :root{
+    --primary:#00696D;--on-primary:#FFFFFF;--primary-container:#9CF1F6;--on-primary-container:#002022;
+    --secondary:#4A6365;--secondary-container:#CCE8EA;--on-secondary-container:#051F21;
+    --surface:#FAFDFC;--on-surface:#191C1D;--surface-variant:#DAE4E5;--on-surface-variant:#3F4849;
+    --outline:#6F797A;--outline-variant:#BEC8C9;--error:#BA1A1A;--error-container:#FFDAD6;
+    --done:#43A047;--overdue:#E53935;--assigned:#1E88E5;--verify:#B26A00;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    --serif:Georgia,"Times New Roman",Times,serif;
+    --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+    --r4:4px;--r8:8px;--r12:12px;--r16:16px;--r24:24px;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--surface-variant);font-family:var(--sans);color:var(--on-surface);-webkit-font-smoothing:antialiased}
+  .board{display:flex;gap:24px;padding:28px 24px;align-items:flex-start}
+  .caption{position:absolute;left:24px;top:6px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--on-surface-variant)}
+  .phone{width:390px;height:844px;background:var(--surface);border-radius:var(--r24);overflow:hidden;
+    box-shadow:0 1px 2px rgba(0,0,0,.08),0 12px 32px rgba(0,0,0,.10);display:flex;flex-direction:column;position:relative}
+  /* top bar */
+  .topbar{display:flex;align-items:center;justify-content:space-between;padding:14px 16px 12px;background:var(--surface);
+    border-bottom:1px solid var(--outline-variant)}
+  .topbar h1{margin:0;font-family:var(--serif);font-size:24px;line-height:32px;font-weight:600}
+  .topbar .who{display:flex;align-items:center;gap:8px}
+  .avatar{width:32px;height:32px;border-radius:var(--r24);background:var(--primary-container);color:var(--on-primary-container);
+    display:grid;place-items:center;font-size:11px;font-weight:600;letter-spacing:.04em}
+  .seg{display:flex;gap:4px;padding:8px 16px;background:var(--surface);border-bottom:1px solid var(--outline-variant)}
+  .seg button{flex:1;font:inherit;font-size:14px;line-height:20px;font-weight:500;padding:8px 0;border:0;border-radius:var(--r24);
+    background:transparent;color:var(--on-surface-variant);cursor:pointer}
+  .seg button[aria-selected="true"]{background:var(--secondary-container);color:var(--on-secondary-container)}
+  .content{flex:1;overflow:hidden;padding:16px;display:flex;flex-direction:column;gap:12px}
+  /* summary strip */
+  .strip{display:grid;grid-template-columns:1fr 1fr 1fr;background:var(--surface);border:1px solid var(--outline-variant);border-radius:var(--r12)}
+  .strip div{padding:10px 8px;text-align:center;border-right:1px solid var(--outline-variant)}
+  .strip div:last-child{border-right:0}
+  .strip b{display:block;font-family:var(--serif);font-size:24px;line-height:32px}
+  .strip span{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--on-surface-variant)}
+  /* bond card */
+  .bond{border:1px solid var(--outline-variant);border-radius:var(--r12);background:var(--surface);padding:12px;display:grid;gap:8px}
+  .bond-head{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+  .bond-head h2{margin:0;font-size:16px;line-height:24px;font-weight:500}
+  .agr{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--on-surface-variant)}
+  .chip{display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border-radius:var(--r12);
+    font-size:11px;line-height:16px;font-weight:500;letter-spacing:.04em}
+  .chip .dot{width:8px;height:8px;border-radius:50%}
+  .chip.ok{background:rgba(67,160,71,.15);color:var(--done)}
+  .chip.ko{background:rgba(229,57,53,.15);color:var(--overdue)}
+  .chip.pend{background:rgba(178,106,0,.15);color:var(--verify)}
+  .people{display:flex;flex-wrap:wrap;gap:6px;font-size:12px;line-height:16px;color:var(--on-surface-variant)}
+  .people span{background:var(--surface-variant);padding:2px 8px;border-radius:var(--r8)}
+  .metrics{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;border-top:1px solid var(--outline-variant);padding-top:8px}
+  .metrics div{display:grid;gap:2px}
+  .metrics b{font-family:var(--mono);font-size:12px;font-weight:500;letter-spacing:.5px}
+  .metrics span{font-size:11px;color:var(--on-surface-variant);letter-spacing:.03em}
+  .bar{height:6px;border-radius:var(--r4);background:var(--surface-variant);overflow:hidden}
+  .bar i{display:block;height:100%;background:var(--done)}
+  .bar.warn i{background:var(--verify)}
+  /* detail */
+  .back{display:inline-flex;align-items:center;gap:6px;font-size:14px;color:var(--primary);text-decoration:none;font-weight:500}
+  .section{display:grid;gap:8px}
+  .section h3{margin:0;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--on-surface-variant)}
+  .row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 12px;border:1px solid var(--outline-variant);
+    border-radius:var(--r12);background:var(--surface)}
+  .row .main{display:grid;gap:2px}
+  .row .main b{font-size:14px;line-height:20px;font-weight:500}
+  .row .main span{font-size:12px;line-height:16px;color:var(--on-surface-variant)}
+  .row .acts{display:flex;gap:4px}
+  .iconbtn{width:36px;height:36px;border-radius:50%;border:1px solid var(--outline-variant);background:transparent;display:grid;
+    place-items:center;cursor:pointer;color:var(--on-surface-variant)}
+  .iconbtn.danger{color:var(--error);border-color:rgba(186,26,26,.35)}
+  .addbtn{font:inherit;font-size:14px;font-weight:500;padding:10px 12px;border-radius:var(--r12);border:1px dashed var(--outline);
+    background:transparent;color:var(--primary);cursor:pointer}
+  .fab{position:absolute;right:16px;bottom:16px;width:56px;height:56px;border-radius:var(--r16);border:0;background:var(--primary);
+    color:var(--on-primary);font-size:28px;line-height:1;display:grid;place-items:center;cursor:pointer;
+    box-shadow:0 4px 12px rgba(0,32,34,.28)}
+  /* report */
+  .range{display:flex;gap:8px}
+  .range button{flex:1;font:inherit;font-size:13px;padding:10px;border-radius:var(--r12);border:1px solid var(--outline);
+    background:transparent;color:var(--on-surface);cursor:pointer}
+  .card{border:1px solid var(--outline-variant);border-radius:var(--r12);padding:12px;display:grid;gap:8px;background:var(--surface)}
+  .card h3{margin:0;font-size:14px;line-height:20px;font-weight:500}
+  .kv{display:flex;justify-content:space-between;font-size:12px;line-height:16px;color:var(--on-surface-variant)}
+  .kv b{font-family:var(--mono);color:var(--on-surface);font-weight:500;letter-spacing:.3px}
+  .primary-cta{font:inherit;font-size:14px;font-weight:500;padding:14px;border:0;border-radius:var(--r12);background:var(--primary);
+    color:var(--on-primary);cursor:pointer}
+  .hint{font-size:11px;color:var(--on-surface-variant);letter-spacing:.02em}
+  .search{font:inherit;font-size:13px;padding:10px 12px;border-radius:var(--r12);border:1px solid var(--outline);
+    background:var(--surface);color:var(--on-surface);width:100%}
+  .card h3 small{font-size:11px;font-weight:400;color:var(--on-surface-variant)}
+  .chart{display:flex;align-items:flex-end;gap:8px;height:108px;padding-top:4px}
+  .chart .col{flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:6px;height:100%}
+  .chart .col i{display:block;width:100%;border-radius:var(--r4) var(--r4) 0 0;background:var(--surface-variant)}
+  .chart .col.current i{background:var(--primary)}
+  .chart .col span{font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--on-surface-variant)}
+  .chart .col.current span{color:var(--on-surface);font-weight:500}
+  .stack{display:flex;height:14px;border-radius:var(--r4);overflow:hidden;background:var(--surface-variant)}
+  .stack i{display:block;height:100%}
+  .legend{display:grid;gap:4px;margin-top:2px}
+  .legend span{display:flex;align-items:center;gap:6px;font-size:11px;line-height:16px;color:var(--on-surface-variant)}
+  .legend .dot{width:8px;height:8px;border-radius:50%;flex:none}
+  .legendline{display:flex;align-items:center;justify-content:space-between;gap:8px}
+  .pdfwrap{flex:1;display:grid;place-items:center;min-height:0}
+  .pdfpage{width:100%;max-width:326px;background:#FFFFFF;border:1px solid var(--outline-variant);border-radius:var(--r4);
+    padding:18px 18px 14px;display:flex;flex-direction:column;gap:5px;box-shadow:0 2px 10px rgba(25,28,29,.12);
+    font-family:var(--serif)}
+  .pdfkicker{margin:0;font-family:var(--sans);font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--on-surface-variant)}
+  .pdftitle{margin:0;font-size:20px;line-height:26px;font-weight:600;letter-spacing:-.01em}
+  .pdfmeta{margin:0 0 4px;font-family:var(--sans);font-size:10px;line-height:15px;color:var(--on-surface-variant)}
+  .pdfh{margin:6px 0 2px;font-size:10px;letter-spacing:.14em;text-transform:uppercase;font-family:var(--sans);
+    font-weight:500;color:var(--primary);border-bottom:1px solid var(--outline-variant);padding-bottom:2px}
+  .pdfrow{display:flex;justify-content:space-between;gap:8px;font-family:var(--sans);font-size:10px;line-height:16px;
+    color:var(--on-surface-variant)}
+  .pdfrow b{font-family:var(--mono);font-size:10px;color:var(--on-surface);font-weight:500}
+  .pdffoot{margin-top:auto;font-family:var(--sans);font-size:8px;letter-spacing:.06em;color:var(--on-surface-variant);
+    border-top:1px solid var(--outline-variant);padding-top:6px}
+  :focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+  @media (prefers-reduced-motion:no-preference){.bar i{transition:width 150ms ease}}
+</style>
+</head>
+<body>
+<p class="caption">01 · Consola de vínculos — el vínculo como unidad de trabajo</p>
+<div class="board">
+
+  <!-- Frame 1: bonds list -->
+  <section class="phone" aria-label="Pantalla 1: lista de vínculos">
+    <header class="topbar">
+      <h1>Vínculos</h1>
+      <div class="who"><span class="avatar">AM</span></div>
+    </header>
+    <nav class="seg" aria-label="Secciones del panel">
+      <button aria-selected="false">Usuarios</button>
+      <button aria-selected="true">Vínculos</button>
+      <button aria-selected="false">Reportes</button>
+    </nav>
+    <main class="content">
+      <div class="strip">
+        <div><b>24</b><span>Usuarios</span></div>
+        <div><b>12</b><span>Vínculos</span></div>
+        <div><b>11</b><span>Activos</span></div>
+      </div>
+
+      <input class="search" type="search" placeholder="Buscar vínculo por nombre" aria-label="Buscar vínculo por nombre">
+
+      <article class="bond">
+        <div class="bond-head">
+          <div>
+            <h2>Paz–Gómez</h2>
+            <span class="agr">Acuerdo formal</span>
+          </div>
+          <span class="chip ok"><i class="dot" style="background:var(--done)"></i>Al día</span>
+        </div>
+        <p class="people"><span>Mario Paz</span><span>Lucía Gómez</span></p>
+        <div class="metrics">
+          <div><b>2</b><span>Hijos</span></div>
+          <div><b>74%</b><span>Cumplido</span></div>
+          <div><b>62%</b><span>Pagado</span></div>
+        </div>
+        <div class="bar" role="img" aria-label="Cumplimiento 74 por ciento"><i style="width:74%"></i></div>
+      </article>
+
+      <article class="bond">
+        <div class="bond-head">
+          <div>
+            <h2>Ruiz–Sosa</h2>
+            <span class="agr">Acuerdo informal</span>
+          </div>
+          <span class="chip ko"><i class="dot" style="background:var(--overdue)"></i>Con atrasos</span>
+        </div>
+        <p class="people"><span>Caro Ruiz</span><span>Iván Sosa</span></p>
+        <div class="metrics">
+          <div><b>1</b><span>Hijos</span></div>
+          <div><b>48%</b><span>Cumplido</span></div>
+          <div><b>39%</b><span>Pagado</span></div>
+        </div>
+        <div class="bar warn" role="img" aria-label="Cumplimiento 48 por ciento"><i style="width:48%"></i></div>
+      </article>
+
+      <article class="bond">
+        <div class="bond-head">
+          <div>
+            <h2>Ferreyra–Duarte</h2>
+            <span class="agr">Acuerdo formal</span>
+          </div>
+          <span class="chip pend"><i class="dot" style="background:var(--verify)"></i>Sin reporte</span>
+        </div>
+        <p class="people"><span>Ana Ferreyra</span><span>Julián Duarte</span></p>
+        <div class="metrics">
+          <div><b>3</b><span>Hijos</span></div>
+          <div><b>—</b><span>Cumplido</span></div>
+          <div><b>—</b><span>Pagado</span></div>
+        </div>
+        <div class="bar" role="img" aria-label="Sin datos de cumplimiento"><i style="width:0"></i></div>
+      </article>
+    </main>
+    <button class="fab" aria-label="Crear vínculo">+</button>
+  </section>
+
+  <!-- Frame 2: bond detail -->
+  <section class="phone" aria-label="Pantalla 2: detalle del vínculo">
+    <header class="topbar">
+      <h1 style="font-size:20px">Paz–Gómez</h1>
+      <div class="who"><span class="chip ok"><i class="dot" style="background:var(--done)"></i>Activo</span></div>
+    </header>
+    <nav class="seg" aria-label="Vistas del vínculo">
+      <button aria-selected="true">Hijos</button>
+      <button aria-selected="false">Miembros</button>
+      <button aria-selected="false">Reporte</button>
+    </nav>
+    <main class="content">
+      <a class="back" href="#">‹ Todos los vínculos</a>
+
+      <div class="section">
+        <h3>Miembros</h3>
+        <div class="row">
+          <div class="main"><b>Mario Paz</b><span>mario.paz@mail.com · Progenitor</span></div>
+        </div>
+        <div class="row">
+          <div class="main"><b>Lucía Gómez</b><span>lucia.gomez@mail.com · Progenitora</span></div>
+        </div>
+      </div>
+
+      <div class="section">
+        <h3>Hijos · 2</h3>
+        <div class="row">
+          <div class="main"><b>Mateo Paz</b><span>15/05/2020 · 6 años · 18 actividades</span></div>
+          <div class="acts">
+            <button class="iconbtn" aria-label="Editar Mateo Paz">✎</button>
+            <button class="iconbtn danger" aria-label="Borrar Mateo Paz">🗑</button>
+          </div>
+        </div>
+        <div class="row">
+          <div class="main"><b>Lucía Paz</b><span>02/09/2022 · 4 años · 11 actividades</span></div>
+          <div class="acts">
+            <button class="iconbtn" aria-label="Editar Lucía Paz">✎</button>
+            <button class="iconbtn danger" aria-label="Borrar Lucía Paz">🗑</button>
+          </div>
+        </div>
+        <button class="addbtn">+ Agregar hijo</button>
+      </div>
+
+      <div class="section">
+        <h3>Tendencia · cumplimiento por mes</h3>
+        <div class="chart" role="img" aria-label="Cumplimiento mensual: enero 52, febrero 58, marzo 63, abril 59, mayo 68, junio 74 por ciento">
+          <div class="col"><i style="height:52%"></i><span>Ene</span></div>
+          <div class="col"><i style="height:58%"></i><span>Feb</span></div>
+          <div class="col"><i style="height:63%"></i><span>Mar</span></div>
+          <div class="col"><i style="height:59%"></i><span>Abr</span></div>
+          <div class="col"><i style="height:68%"></i><span>May</span></div>
+          <div class="col current"><i style="height:74%"></i><span>Jun</span></div>
+        </div>
+        <div class="legendline">
+          <span class="chip ok"><i class="dot" style="background:var(--done)"></i>Junio 73,81%</span>
+          <span class="hint">▲ 6 pts vs mayo</span>
+        </div>
+      </div>
+
+      <div class="section">
+        <h3>Estado de las 42 actividades</h3>
+        <div class="stack" role="img" aria-label="31 cumplidas, 8 en curso, 3 vencidas">
+          <i style="width:74%;background:var(--done)"></i>
+          <i style="width:19%;background:var(--assigned)"></i>
+          <i style="width:7%;background:var(--overdue)"></i>
+        </div>
+        <div class="legend">
+          <span><i class="dot" style="background:var(--done)"></i>Cumplidas 31 · 73,81%</span>
+          <span><i class="dot" style="background:var(--assigned)"></i>En curso 8 · 19,05%</span>
+          <span><i class="dot" style="background:var(--overdue)"></i>Vencidas 3 · 7,14%</span>
+        </div>
+      </div>
+    </main>
+  </section>
+
+  <!-- Frame 3: report -->
+  <section class="phone" aria-label="Pantalla 3: reporte del vínculo">
+    <header class="topbar">
+      <h1 style="font-size:20px">Reporte</h1>
+      <div class="who"><span class="agr">Junio 2026</span></div>
+    </header>
+    <nav class="seg" aria-label="Secciones del panel">
+      <button aria-selected="false">Usuarios</button>
+      <button aria-selected="false">Vínculos</button>
+      <button aria-selected="true">Reportes</button>
+    </nav>
+    <main class="content">
+      <div class="range">
+        <button>Desde 01/06/2026</button>
+        <button>Hasta 30/06/2026</button>
+      </div>
+
+      <div class="card">
+        <h3>Actividades</h3>
+        <div class="kv"><span>Total</span><b>42</b></div>
+        <div class="kv"><span>Cumplidas</span><b>31</b></div>
+        <div class="kv"><span>Vencidas</span><b>3</b></div>
+        <div class="kv"><span>Cumplimiento</span><b>73,81%</b></div>
+      </div>
+
+      <div class="card">
+        <h3>Gastos <small>12 gastos</small></h3>
+        <p class="hint" style="margin:0">Por cantidad de gastos</p>
+        <div class="stack" role="img" aria-label="7 pagados 58,33 por ciento, 2 aprobados 16,67 por ciento, 2 pendientes 16,67 por ciento, 1 rechazado 8,33 por ciento">
+          <i style="width:58.33%;background:var(--done)"></i>
+          <i style="width:16.67%;background:var(--primary)"></i>
+          <i style="width:16.67%;background:var(--verify)"></i>
+          <i style="width:8.33%;background:var(--error)"></i>
+        </div>
+        <div class="legend">
+          <span><i class="dot" style="background:var(--done)"></i>Pagados 7 · 58,33%</span>
+          <span><i class="dot" style="background:var(--primary)"></i>Aprobados 2 · 16,67%</span>
+          <span><i class="dot" style="background:var(--verify)"></i>Pendientes 2 · 16,67%</span>
+          <span><i class="dot" style="background:var(--error)"></i>Rechazados 1 · 8,33%</span>
+        </div>
+        <div class="kv" style="border-top:1px solid var(--outline-variant);padding-top:8px">
+          <span>Por monto</span><b>62,00% / 38,00%</b>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Progenitores</h3>
+        <div class="kv"><span>Mario · 22/42</span><b>52,38%</b></div>
+        <div class="kv"><span>Lucía · 9/20</span><b>45,00%</b></div>
+      </div>
+
+      <button class="primary-cta">Generar PDF del reporte</button>
+      <p class="hint">El PDF se arma en el servidor y se abre desde acá cuando está listo.</p>
+    </main>
+  </section>
+
+
+  <!-- Frame 4: PDF preview -->
+  <section class="phone" aria-label="Pantalla 4: vista previa del PDF generado">
+    <header class="topbar">
+      <h1 style="font-size:20px">Reporte · PDF</h1>
+      <div class="who"><span class="chip ok"><i class="dot" style="background:var(--done)"></i>Listo · 2 págs.</span></div>
+    </header>
+    <main class="content">
+      <div class="pdfwrap">
+        <article class="pdfpage" aria-label="Vista previa de la página 1 del PDF">
+          <p class="pdfkicker">Coordinación parental</p>
+          <h2 class="pdftitle">Reporte de vínculo</h2>
+          <p class="pdfmeta">Paz–Gómez · acuerdo formal<br>Período 01/06/2026 → 30/06/2026</p>
+
+          <h3 class="pdfh">Actividades</h3>
+          <div class="pdfrow"><span>Total</span><b>42</b></div>
+          <div class="pdfrow"><span>Cumplidas</span><b>31</b></div>
+          <div class="pdfrow"><span>Vencidas</span><b>3</b></div>
+          <div class="pdfrow"><span>Cumplimiento</span><b>73,81%</b></div>
+
+          <h3 class="pdfh">Gastos</h3>
+          <div class="pdfrow"><span>Pagado por monto</span><b>62,00%</b></div>
+          <div class="pdfrow"><span>Pagado por cantidad</span><b>58,33%</b></div>
+          <div class="pdfrow"><span>Rechazados</span><b>8,33%</b></div>
+
+          <h3 class="pdfh">Hijos</h3>
+          <div class="pdfrow"><span>Mateo Paz · 6 años</span><b>18 act.</b></div>
+          <div class="pdfrow"><span>Lucía Paz · 4 años</span><b>11 act.</b></div>
+
+          <p class="pdffoot">Generado 30/06/2026 12:00 · pág. 1 / 2</p>
+        </article>
+      </div>
+      <button class="primary-cta">Abrir PDF</button>
+    </main>
+  </section>
+
+</div>
+</body>
+</html>

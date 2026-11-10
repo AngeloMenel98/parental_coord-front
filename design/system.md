@@ -2,8 +2,9 @@
 
 Synced from the Kotlin Multiplatform `shared` module. Sources are Compose theme
 files and the core component library; every value below was found in source, and
-each entry names its source path. Dark-scheme values exist in source but the
-artboards in this folder render the light scheme (the app's default).
+each entry names its source path. The dark scheme follows the **Material Baseline** palette (below); the artboards in this
+folder render the light scheme by default, and `home-ui/01` and `home-ui/04` carry a
+light/dark switch for review.
 
 ## Colors
 
@@ -30,6 +31,32 @@ Source: `shared/src/commonMain/kotlin/com/parental/shared/core/ui/theme/Color.kt
 | `outline` | `#6F797A` | Timeline line (4.37:1), fallback tag color |
 | `outlineVariant` | `#BEC8C9` | Row separators (deliberately low contrast) |
 | `inversePrimary` | `#80D4D9` | Dark-scheme primary |
+
+### Brand scheme (dark, Material Baseline)
+
+Source: `Color.kt` → `DarkColorScheme`
+
+| Token | Value | Usage |
+| --- | --- | --- |
+| `primary` | `#BB86FC` | Botones, íconos activos |
+| `onPrimary` | `#000000` | Texto sobre `primary` |
+| `primaryContainer` | `#3700B3` | Píldora del nav, selección, avatares |
+| `onPrimaryContainer` | `#FFFFFF` | Texto sobre `primaryContainer` |
+| `secondary` | `#03DAC6` | Barras de progreso y acentos |
+| `onSecondary` | `#000000` | Texto sobre `secondary` |
+| `secondaryContainer` | `#018786` | Superficie tonal |
+| `background` / `surface` | `#121212` | Fondo de pantalla |
+| `surfaceVariant` | `#1E1E1E` | **Superficie de tarjeta**: `#121212` + overlay blanco 8% |
+| `onSurface` / `onBackground` | `#FFFFFF` | Texto primario |
+| `onSurfaceVariant` | `#B3B3B3` | Texto secundario (≈70% de blanco) |
+| `outline` | `#8A8A8A` | Bordes (≈54% de blanco) |
+| `outlineVariant` | `12% de blanco` | Hairlines y tracks del anillo |
+| `error` | `#CF6679` | Errores |
+| `onError` | `#000000` | Texto sobre `error` |
+| `errorContainer` / `onErrorContainer` | `#93000A` / `#FFDAD6` | Superficie de error |
+
+⚠ El ítem seleccionado del nav no usa `primary`: `#BB86FC` sobre `#3700B3` da 4.39:1 y no
+alcanza AA para 12sp. Usa `onPrimaryContainer` (8.6:1); en claro usa `primary` (8.2:1).
 
 ### Category tags (6, light dots)
 
@@ -108,4 +135,14 @@ Sources: `shared/src/commonMain/kotlin/com/parental/shared/core/ui/components/`
   icon. Content capped at 640dp, horizontal padding 16.
 - **EmptyState** (`CalendarChrome.kt`): `EventBusy` icon (decorative) + `titleMedium` title + optional body + optional button; one semantics node, action outside.
 - **ListSkeleton** (`CalendarChrome.kt`): 4 static cards, `surfaceVariant` blocks, reuses the real timeline line.
+- **Home** (`feature/home/ui/HomeScreen.kt`, design `home-ui/04-hoy-con-anillo.html`): saludo
+  centrado (fecha `labelMedium` en small caps, `Hola, {nombre}` en `headlineSmall` serif) y chip
+  de vínculo centrado debajo con la tríada `Ok`/`Ko`; tarjeta **Hoy** con `Card(onClick)`, o sea
+  UN objetivo táctil sin chevron, filas hora mono (`TypeTokens.time`) + título + punto de
+  categoría + `StatusTag`; **franja de métricas** en una sola `Surface` con hairlines, tres celdas
+  pulsables centradas (1f / 1f / 1.4f, alto mínimo 70dp) que navegan a Actividades y Gastos;
+  **anillo de cumplimiento** de 12 arcos en `Canvas` (124dp, trazo 11dp, gap 3°) cuyo color sale
+  de `complianceBand` (rojo <25%, naranja <50%, ámbar <75%, verde ≥75%) usando el par
+  dot/content de `StatusTokens`; sección **Hijos** con chips de 48dp (avatar 40dp, nombre y
+  `N vencidas` / `Al día`).
 - Accessibility contract: merged row semantics, decorative icons cleared, color never the only signal (weight + label carry status), touch targets ≥ 44dp (48 in new work), WCAG AA pairs verified in source comments.

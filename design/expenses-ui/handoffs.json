@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "chosen": "04-saldo-vivo-libro-swipe.html",
+  "handoffs": {
+    "04-saldo-vivo-libro-swipe.html": {
+      "status": "implemented",
+      "queued": false,
+      "sentAt": "2026-11-04T09:19:26.142Z",
+      "startedAt": "2026-11-04T09:37:39.038Z",
+      "implementedAt": "2026-11-04T09:54:53.338Z",
+      "note": "The selected Expenses artboard and its Compose implementation now match the recorded feedback. The balance card, flat ledger separators, full-height rectangular swipe actions, and viewer-specific “Tu parte” were corrected; focused/full tests and the Android debug build pass. On-device visual verification was unavailable because no device was attached."
+    }
+  }
+}

@@ -61,11 +61,17 @@ saldo NO se recalcula. Los estados loading / error / sin vínculo siguen existie
 
 | ID | Spec | Ruta | Estado |
 | --- | --- | --- | --- |
-| T1 | S6 | inline | paleta dark + rol del nav |
-| T2 | S2,S5 | worker | agenda de hoy y estado por hijo (dominio + API) |
-| T3 | S1,S3,S4,S5 | worker | reescritura de `HomeScreen` |
-| T4 | S2,S4,S5,S7 | worker | tests de dominio y contrato de fuente |
-| T5 | S6 | inline | `design/system.md` sincronizado |
+| T1 | S6 | inline | hecho · `eb84c1d` |
+| T2 | S2,S5 | inline | hecho · `63f917e` |
+| T3 | S1,S3,S4,S5 | inline | hecho · `feat(home): redesign Inicio` |
+| T4 | S2,S4,S5,S7 | inline | hecho · en los dos commits anteriores |
+| T5 | S6 | inline | hecho · `eb84c1d` (system.md) |
+| T6 | S1,S4 | inline | hecho · `fix(home)` |
+| T7 | S8 | inline | hecho · `fix(home)` |
+
+Los writers delegados no arrancaron: la sesión padre está en `/home/angelo`, que no es un
+repo git, y el bootstrap del writer exige un project root seguro. El trabajo se hizo
+inline.
 
 ## Log
 
@@ -101,3 +107,47 @@ L14 (decisión): el artboard quedó `design/home-ui/04-hoy-con-anillo.html`; los
 01–03 se conservan como alternativas.
 
 L15 (decisión): S3 navega a la pestaña, sin filtro preseleccionado (ver Non-goals).
+
+L16 (ejecución): `develop` no es la rama por defecto del remoto, así que el trabajo va en
+`feat/home-hoy-con-anillo`. **Frontera de slice**: el conteo del gate mide la rama entera
+contra `origin/main` (99 commits heredados de `develop`, ~34k líneas); los commits de esta
+feature son las unidades de revisión reales:
+`eb84c1d` tema (~200), `63f917e` dominio+API+tests (656), `feat(home): redesign Inicio`
+(pantalla + contrato), `docs(design)` (documento + artboards).
+
+L17 (desvío de S4/S5): el artboard pide un botón `Detalle` en la card de cumplimiento y
+chips de hijo pulsables. No hay destino para ninguno de los dos (no existe pantalla de
+detalle de cumplimiento ni de hijo), así que se omitieron en vez de dejar botones que no
+hacen nada. Cuando exista el destino, se agrega el `onClick`.
+
+L18 (desvío de polaridad): las tarjetas del Home usan `surfaceVariant` como contenedor,
+igual que el resto de la app, en vez de la polaridad invertida del artboard (pantalla
+`surfaceVariant`, tarjeta `surface`). El track del anillo pasa a `outlineVariant` porque
+`surfaceVariant` sobre una tarjeta `surfaceVariant` es invisible.
+
+L19 (verificación en dispositivo): instalado y capturado en un dispositivo real, en claro y en
+oscuro (`cmd uimode night yes`). Dos correcciones salieron de ahí, no del test:
+ · la barra superior del Inicio seguía el `primary` histórico (teal) en vez de la superficie
+   del artboard; ahora usa los mismos colores que la barra de Actividades;
+ · `formatPercentage` imprimía `50.0%` (toString de Double) y el período se mostraba como
+   `2026-11`; ahora es `50%` / `66,7%` y `Noviembre`.
+
+L20 (verbatim): "vi unos problemas, el toggle switch no se encuentra en ningun lado,  veo en la
+seccion de cumpliemnto que aparece 2 veces 0 de O tareas, deja solo el que esta dentro del
+circulo. Pone a la derecha la fecha y el Hola, Maria  mientras que a la derecha el Vinculo
+Activo. Luego pasemos a hace un design de Gastos view."
+
+S8 (nueva, de L20): el interruptor sol/luna es parte de la APP, no del andamiaje. Vive en la
+barra del Inicio; muestra el tema actual (sol = claro, luna = oscuro), anuncia la acción
+("Activar tema oscuro"/"Activar tema claro") y persiste la elección en `Platform` con la clave
+`ui.theme`. Sin elección explícita manda el sistema.
+
+S1 (reescrita por L20): fecha y `Hola, {nombre}` a la IZQUIERDA; el chip de vínculo a la DERECHA,
+en la misma fila.
+
+S4 (reescrita por L20): el `X de Y` aparece UNA sola vez, dentro del anillo; el encabezado dice
+sólo el período.
+
+L21 (decisión): el título de la barra del Inicio pasa a `Inicio`. Con el interruptor la barra
+lleva tres acciones y "Coordinación Parental" se truncaba a "Coordinación Pare…"; las otras
+pestañas ya usan el nombre de la sección.
