@@ -12,8 +12,8 @@ import kotlin.test.fail
  *
  * El cambio llegó a `sdd-verify` con 46 pruebas de swipe en verde y el gesto montado en la
  * fila equivocada: `ActivitySwipeBox` era el parámetro `swipe` de `DayAgendaRow`, así que
- * sólo las filas CON hora de un único día se deslizaban. La lista (`TimelineMode.AGENDA`) y
- * las filas SIN fecha de inicio no lo montaban, y nadie se enteró porque:
+ * sólo las filas CON hora de un único día se deslizaban. La lista y las filas SIN fecha de
+ * inicio no lo montaban, y nadie se enteró porque:
  *
  *  1. Las pruebas de `ActivitySwipeBox` la ejercitaban en AISLAMIENTO — nunca preguntaban
  *     quién la monta, que es la única pregunta que tenía respuesta incorrecta.
@@ -30,9 +30,18 @@ import kotlin.test.fail
  * Mismo criterio que los guards de Batch E, que también se comprueban por estructura.
  *
  * Si algún día hay infraestructura de Compose UI, esta prueba debe SUPERSEDERSE por una que
- * componga `TimelineMode.AGENDA` y `TimelineMode.SEMANA` y cuente los nodos con
- * `customActions`. No coexistir: dos fuentes de verdad sobre el mismo guard es como vuelve
- * a romperse.
+ * componga el riel del tiempo y cuente los nodos con `customActions`. No coexistir: dos fuentes
+ * de verdad sobre el mismo guard es como vuelve a romperse.
+ *
+ * T6 · La pantalla cambió de forma (L6: el riel reemplaza Agenda y Semana). El guard NO cambió de
+ * propósito: donde antes vigilaba el cable `pantalla → AgendaTimeline`, hoy vigila que la agenda
+ * no vuelva a montarse y que las acciones del gesto sigan teniendo entrada mientras el riel no
+ * monte su propia capa.
+ *
+ * T7 (L11) · El riel YA monta su capa de swipe, así que la sección `superficie 3` dejó de vigilar
+ * "la agenda no vuelve" a secas y ahora PINEA la superficie nueva con la misma vara: el bloque
+ * del riel declara el hueco sin default y el punto de render lo envuelve con `ActivitySwipeBox`.
+ * El agujero temporal que abrió `c817fd0` (riel sin capa de gesto) queda cerrado y guardado.
  */
 class SwipeMountingTest {
 
@@ -244,6 +253,13 @@ class SwipeMountingTest {
                 "🔴 `${site.callee}()` en ${site.file} NO monta el gesto (falta `swipe =`). " +
                     "La superficie de la lista se quedaría sin gesto aunque compile.",
             )
+            // T7 · La tarjeta de `AgendaList` sobrevive en disco hasta T8: su capa de gesto se
+            // sigue exigiendo aquí para no perder la asserción que se movió de sitio al
+            // reescribir la sección `superficie 3` (el riel es ahora la superficie viva).
+            assertTrue(
+                "ActivitySwipeBox(" in site.arguments,
+                "🔴 El hueco `swipe` de `ActivityCard()` en ${site.file} no crea la capa de gesto.",
+            )
         }
     }
 
@@ -293,24 +309,104 @@ class SwipeMountingTest {
     }
 
     @Test
-    fun `superficie 3 — modo LISTA — la tarjeta monta el gesto y la pantalla se lo pasa`() {
-        // La lista AGENDA ya no pinta filas: pinta TARJETAS (`ActivityCard`). El guard
-        // sigue siendo el MISMO —"toda superficie deslizable monta el gesto"—, cambia la
-        // pieza que vigila. Debilitarlo (borrarlo) sería dejar la lista sin gesto en
-        // silencio, que es exactamente como se rompió esto la primera vez.
-        val list = callSites("ActivityCard", listOf(File(uiDir, "AgendaList.kt")))
-        assertEquals(1, list.size, "Se esperaba exactamente un sitio de tarjeta en la lista")
-        assertTrue("swipe =" in list.single().arguments, "La tarjeta de la lista no monta el gesto")
-        assertTrue("ActivitySwipeBox(" in list.single().arguments, "El hueco no crea la capa de gesto")
+    fun `superficie 3 — el riel — todo bloque declara el hueco y lo monta en el punto de render`() {
+        // La superficie de lista es el RIEL, y su unidad deslizable es el BLOQUE. El guard es el
+        // MISMO de siempre —"toda superficie deslizable declara el hueco sin default y su punto
+        // de render lo envuelve"—, cambia la pieza que vigila: antes `ActivityCard` en
+        // `AgendaList.kt`, hoy el bloque del día y la fila sin fecha del riel (T7, L11).
+        listOf(
+            "RailBlockPill" to "RailCanvas.kt",
+            "RailUndatedRow" to "RailTimeline.kt",
+        ).forEach { (row, file) ->
+            val firma = declaredParameters(source(file), row)
+            assertTrue(
+                "swipe: @Composable (content: @Composable () -> Unit) -> Unit" in firma,
+                "`$row` debe declarar el hueco con el tipo exacto de ranura. Firma real:\n$firma",
+            )
+            val linea = firma.lines().firstOrNull { "swipe:" in it }
+            assertTrue(linea != null, "No se encuentra el parámetro `swipe` de `$row` en:\n$firma")
+            assertFalse(
+                "=" in linea,
+                "🔴 `$row.swipe` lleva valor por defecto. ESO ES EL DEFECTO del que salieron 46 " +
+                    "pruebas en verde con dos superficies sin gesto: un hueco con default convierte " +
+                    "«no monté el gesto» en un `c()` silencioso.\nFirma real:\n$firma",
+            )
+        }
 
-        // Y el cable de arriba: sin esto el gesto se pintaría pero no dispararía nada.
-        val agendaTimeline = callSites("AgendaTimeline")
-        assertEquals(
-            1, agendaTimeline.size,
-            "Se esperaba un único llamante de `AgendaTimeline` en toda la UI (la pantalla). " +
-                "Varios significa que alguna superficie se dibujaría sin el callback.",
+        // Una llamada por superficie y con la capa de gesto DENTRO del hueco: la fila sigue
+        // siendo función pura de sus datos y quién crea el gesto es el punto de render.
+        listOf(
+            "RailBlockPill" to 1,
+            "RailUndatedRow" to 1,
+        ).forEach { (row, expected) ->
+            val sites = callSites(row)
+            assertEquals(expected, sites.size, "Se esperaba exactamente $expected sitio de `$row`")
+            sites.forEach { site ->
+                assertTrue(
+                    "swipe =" in site.arguments,
+                    "🔴 `$row()` en ${site.file} NO monta el gesto (falta `swipe =`). " +
+                        "Esa superficie se queda sin swipe aunque todo lo demás compile.",
+                )
+                assertTrue(
+                    "ActivitySwipeBox(" in site.arguments,
+                    "🔴 El hueco `swipe` de `$row()` en ${site.file} no crea la capa de gesto: " +
+                        "la actividad se dibuja sin acciones y compila igual.",
+                )
+            }
+        }
+
+        // Y la acción se dispara para la actividad de ESA fila, no para otra: el id sale del
+        // bloque y no del estado de la pantalla.
+        assertTrue(
+            "block.row.actividad.id" in callSites("RailBlockPill").single().arguments,
+            "🔴 El bloque no reenvía el id de SU actividad: la acción caería en otra fila.",
         )
-        assertEquals("ActivitiesScreen.kt", agendaTimeline.single().file)
+        assertTrue(
+            "undatedRow.actividad.id" in callSites("RailUndatedRow").single().arguments,
+            "🔴 La fila sin fecha no reenvía el id de SU actividad.",
+        )
+    }
+
+    @Test
+    fun `el callback del gesto se EXIGE en toda la cadena del riel`() {
+        // El hueco sin default sólo sirve si el callback llega hasta el bloque. Estos tres
+        // eslabones son la cadena entera: si uno lo declara con default, el gesto se puede
+        // quedar sin consumidor desde arriba y nadie se entera.
+        listOf(
+            "RailTimeline" to "RailTimeline.kt",
+            "RailDayCanvas" to "RailCanvas.kt",
+        ).forEach { (callee, file) ->
+            val firma = declaredParameters(source(file), callee)
+            val linea = firma.lines().firstOrNull { "onSwipeAction:" in it }
+            assertTrue(linea != null, "`$callee` no declara `onSwipeAction`:\n$firma")
+            assertTrue(
+                "(String, SwipeAction) -> Unit" in linea,
+                "`$callee` no recibe el par (id, acción): la política de acciones se perdería.\n$firma",
+            )
+            assertFalse(
+                "=" in linea,
+                "🔴 `$callee.onSwipeAction` lleva valor por defecto: un llamante nuevo se olvida de " +
+                    "pasarlo y la lista se dibuja sin gesto, compilando.\n$firma",
+            )
+        }
+    }
+
+    @Test
+    fun `la pantalla monta el riel como unica superficie y el motivo sigue siendo obligatorio`() {
+        // T6 · LA PANTALLA CAMBIÓ DE FORMA, el guard no se borra: se reescribe para la forma
+        // nueva. `TimelineMode` desapareció (L6: el riel REEMPLAZA Agenda y Semana), así que
+        // `ActivitiesScreen.kt` ya no monta `AgendaTimeline` ni le pasa su `onSwipeAction`: el
+        // feed de la lista es el riel. Dos feeds a la vez es justo lo que el guard no puede
+        // dejar pasar.
+        val agendaTimeline = callSites("AgendaTimeline")
+        assertTrue(
+            agendaTimeline.isEmpty(),
+            "🔴 La pantalla vuelve a montar `AgendaTimeline` en ${agendaTimeline.map { it.file }}. " +
+                "L6 decidió que el riel es la única vista; la agenda se retira en T8 y hasta " +
+                "entonces sólo se sostiene con sus propias pruebas.",
+        )
+        // La firma sigue declarada en `AgendaList.kt` (T8 borra el fichero): mientras exista,
+        // el parámetro no puede recuperar un valor por defecto.
         val firma = declaredParameters(source("AgendaList.kt"), "AgendaTimeline")
         val linea = firma.lines().firstOrNull { "onSwipeAction:" in it }
         assertTrue(linea != null, "`AgendaTimeline` no declara `onSwipeAction`:\n$firma")
@@ -320,12 +416,27 @@ class SwipeMountingTest {
                 "repite el defecto del hueco: si un llamante nuevo se olvida de pasarlo, la " +
                 "lista se dibuja sin gesto y compila.",
         )
-        val screen = callSites("AgendaTimeline", listOf(File(uiDir, "ActivitiesScreen.kt")))
-        assertEquals(1, screen.size, "Se esperaba un único llamante de `AgendaTimeline` en la pantalla")
+
+        // El cable de la pantalla al riel: sin él, los bloques tendrían gesto y nada que hacer.
+        val screen = stripCommentsAndStrings(source("ActivitiesScreen.kt"))
         assertTrue(
-            "onSwipeAction = onSwipeAction" in screen.single().arguments,
-            "`ActivitiesScreen.kt` no le pasa su `onSwipeAction` a `AgendaTimeline`: el modo " +
-                "LISTA se desliza y no hace nada.",
+            "RailTimeline(" in screen,
+            "La pantalla no monta el riel: sin feed de lista, el gesto se quedaría sin superficie.",
+        )
+        assertTrue(
+            "onSwipeAction = viewModel::startSwipeAction" in screen,
+            "🔴 La pantalla no cablea el gesto del riel: `ActivitySwipeBox` dispararía acciones " +
+                "hacia la nada.",
+        )
+        assertTrue(
+            "SwipeReasonDialog(" in screen && "viewModel::submitSwipeReason" in screen,
+            "🔴 La pantalla dejó de montar el diálogo de motivo: el gesto de " +
+                "\"No asistir\" se quedaría sin su mitad obligatoria.",
+        )
+        assertTrue(
+            "SwipeAction.DECLINE" in screen,
+            "🔴 La pantalla dejó de abrir el gesto de no asistir desde el detalle: esa acción se " +
+                "quedaría sin NINGUNA entrada.",
         )
     }
 
