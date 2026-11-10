@@ -24,6 +24,7 @@ import com.parental.shared.core.ui.components.CategoryInfo
 import com.parental.shared.core.ui.components.StatusTag
 import com.parental.shared.core.ui.components.categoryTagTriple
 import com.parental.shared.core.ui.components.isDoneStatus
+import com.parental.shared.core.ui.components.isOverdueStatus
 import com.parental.shared.core.ui.theme.AgendaGeometry
 import com.parental.shared.core.ui.theme.ParentalShapes
 import com.parental.shared.core.ui.theme.RailGeometry
@@ -337,11 +338,3 @@ private fun railDurationLabel(block: RailBlock): String {
         else -> "$hours h $rest min"
     }
 }
-
-/**
- * ¿Está vencida la fila? El estado llega en minúsculas del backend.
- *
- * No hay mapa de alias reutilizable: `isDoneStatus` existe porque `Done` tiene tres alias, y
- * `Overdue` entra con una sola clave. `ActivityCard.kt` tiene el mismo predicado `private`.
- */
-private fun isOverdueStatus(status: String): Boolean = status.uppercase() == "OVERDUE"
