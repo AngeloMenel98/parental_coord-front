@@ -148,6 +148,89 @@ class RailIndexTest {
         assertEquals(0, railContentCount(datedSection(day12, isExpanded = false)))
     }
 
+    // ── S15 · anclaje inicial del riel ───────────────────────────────────
+
+    private fun block(startMinute: Int, endMinute: Int, id: String = "b-$startMinute"): RailBlock =
+        RailBlock(
+            row = row(id),
+            startMinute = startMinute,
+            endMinute = endMinute,
+            lane = 0,
+            laneCount = 1,
+        )
+
+    @Test
+    fun `hay algo en curso ahora y el riel se ancla en la linea de ahora`() {
+        // 10:00–11:40 con el reloj en 10:30: el bloque que contiene `now` manda.
+        val sections = listOf(datedSection(day13, blocks = listOf(block(600, 700))))
+
+        assertEquals(
+            RailAnchor(date = day13, minuteOfDay = 630, kind = RailAnchorKind.InProgress),
+            railInitialAnchor(sections, day13, 630),
+        )
+    }
+
+    @Test
+    fun `sin nada en curso el anclaje cae en el primer bloque del primer dia con contenido`() {
+        // El 12 no tiene bloques: el anclaje salta al 13, en su bloque MÁS TEMPRANO.
+        val sections = listOf(
+            datedSection(day12),
+            datedSection(day13, blocks = listOf(block(600, 660), block(540, 580, id = "temprano"))),
+        )
+
+        assertEquals(
+            RailAnchor(date = day13, minuteOfDay = 540, kind = RailAnchorKind.FirstBlock),
+            railInitialAnchor(sections, day13, 400),
+        )
+    }
+
+    @Test
+    fun `un bloque de otro dia que contiene el minuto de ahora no esta en curso`() {
+        // 10:00–11:40 del día 12 contiene el minuto 630 del reloj, pero HOY es el 13.
+        val sections = listOf(datedSection(day12, blocks = listOf(block(600, 700))), datedSection(day13))
+
+        assertEquals(
+            RailAnchor(date = day12, minuteOfDay = 600, kind = RailAnchorKind.FirstBlock),
+            railInitialAnchor(sections, day13, 630),
+        )
+    }
+
+    @Test
+    fun `el inicio del bloque cuenta como en curso y el fin no`() {
+        val sections = listOf(datedSection(day13, blocks = listOf(block(600, 660))))
+
+        assertEquals(RailAnchorKind.InProgress, railInitialAnchor(sections, day13, 600)?.kind)
+        // `[start, end)`: a las 11:00 exactas el bloque ya terminó, así que cae al primer bloque.
+        assertEquals(RailAnchorKind.FirstBlock, railInitialAnchor(sections, day13, 660)?.kind)
+    }
+
+    @Test
+    fun `un dia de hoy plegado se ancla igual`() {
+        // El plegado es de la VISTA; los bloques del día siguen en la sección.
+        val sections = listOf(datedSection(day13, isExpanded = false, blocks = listOf(block(600, 700))))
+
+        assertEquals(
+            RailAnchor(date = day13, minuteOfDay = 630, kind = RailAnchorKind.InProgress),
+            railInitialAnchor(sections, day13, 630),
+        )
+    }
+
+    @Test
+    fun `sin bloques en ninguna seccion no hay anclaje`() {
+        val sections = listOf(datedSection(day12), datedSection(day13))
+
+        assertNull(railInitialAnchor(sections, day13, 630))
+        assertNull(railInitialAnchor(emptyList(), day13, 630))
+    }
+
+    @Test
+    fun `la seccion sin fecha nunca es el anclaje inicial`() {
+        // Sus filas no tienen eje horario ni minuto, así que no hay dónde posarse.
+        val sections = listOf(undatedSection(2))
+
+        assertNull(railInitialAnchor(sections, day13, 630))
+    }
+
     // ── S3 · rótulo compacto del día ─────────────────────────────────────
 
     @Test
