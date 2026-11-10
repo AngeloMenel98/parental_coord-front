@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "chosen": "03-riel-del-tiempo.html",
+  "handoffs": {
+    "03-riel-del-tiempo.html": {
+      "status": "in_progress",
+      "queued": false,
+      "sentAt": "2026-11-10T12:05:21.138Z",
+      "startedAt": "2026-11-10T12:05:43.098Z",
+      "implementedAt": null,
+      "note": "Mapping the rail onto the existing Compose screen: proportional layout as a pure function, sticky day headers, density map reusing buildMonthGrid, day disclosure, FAB. Starting with exploration and the ODD feature document."
+    }
+  }
+}
