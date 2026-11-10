@@ -184,6 +184,110 @@ object AgendaGeometry {
     val skeletonDateHeight: Dp = 48.dp
 }
 
+/**
+ * Geometría del RIEL del tiempo — T2/T3 de `odd/tasks/activity-rail.md` (S3, S11).
+ *
+ * A diferencia de [AgendaGeometry], estos valores NO nombran literales que ya existían: son
+ * la medida del artboard `design/activity-calendar-ui/03-riel-del-tiempo.html` traducida a
+ * dp. Por eso viven en su propio objeto y no se “absorben” en la escala de [Spacing].
+ *
+ * 🔴 AQUÍ NO HAY COLORES. La paleta de la canaleta, del bloque y de la línea de “ahora” sale
+ * de `MaterialTheme.colorScheme` en el call-site; `Color.kt` sigue siendo el único dueño de
+ * los literales hex y este archivo no declara ninguno.
+ */
+object RailGeometry {
+    /**
+     * Alto de una hora de eje — 76f. Es `PXH` del artboard (`:264`), la unidad de la que
+     * cuelgan la altura proporcional del bloque y la posición de cada tick.
+     *
+     * **Es `Float` porque así lo pide `railOffsetDp`/`railHeightDp`**: la escala
+     * minutos→dp de `RailDerivation.kt` opera en `Float` y convertir a `Dp` en cada tick
+     * añadiría una ronda de redondeo por hora a lo largo de un eje de 14 horas.
+     */
+    val DpPerHour: Float = 76f
+
+    /**
+     * Alto MÍNIMO de un bloque — 48dp. El piso de toque de S11: una actividad de 20
+     * minutos mide 25,3dp por proporción, y un bloque de esa altura no se puede tocar.
+     *
+     * 48dp es el mismo valor de [AgendaGeometry.touchTargetLegacy] y del `heightIn` de
+     * `ActivityBody`; NO se deriva de ahí porque [AgendaGeometry] no es su dueño.
+     */
+    val MinBlockHeight: Dp = 48.dp
+
+    /**
+     * Alpha del tinte de fondo de un bloque sobre `surface` — 0.14f.
+     *
+     * El fondo NO sale de `CategoryInfo.colorHex` ni del `container` del triple: cuando el
+     * servidor manda un hex, `container == content == dot` (`TagColors.kt`) y el título
+     * quedaba del mismo color que su propio fondo. Un tinte del `dot` al 14% siempre compone
+     * un fondo claro sobre `surface`, así que el título va en `onSurface` y el bloque se lee
+     * con cualquier hex, sin depender de qué rama del resolver ganó.
+     */
+    val BlockTintAlpha: Float = 0.14f
+
+    /**
+     * Alpha de la línea de media hora sobre `outlineVariant` — 0.5f.
+     *
+     * La media hora tiene que ser MÁS sutil que la hora sin ser otro color: el artboard lo
+     * resuelve con un `rgba()` de la misma tinta (`:90`), que en Compose es el mismo rol con
+     * alpha. Por debajo de 0.35 el trazo de 1dp desaparece en pantallas de baja densidad.
+     */
+    val HalfHourLineAlpha: Float = 0.5f
+
+    /**
+     * Separación entre carriles solapados — 4dp. Es el hueco de 4px del artboard (`:372`):
+     * sin él dos bloques del mismo grupo se leen como uno solo.
+     */
+    val LaneGap: Dp = 4.dp
+
+    /**
+     * Riel de categoría dentro del bloque — 4dp de ancho.
+     *
+     * El artboard lo llama `urow .rail` (`:147`) y es el ancla de identidad de la categoría
+     * dentro del bloque; el fondo sólo da el tono.
+     */
+    val CategoryRail: Dp = 4.dp
+
+    /** Grosor de la línea de “ahora” — 2dp, como `.now` del artboard (`:119`). */
+    val NowLineStroke: Dp = 2.dp
+
+    /**
+     * Borde de bloque vencido — 1,5dp en `error`, como `.pill.late` (`:118`).
+     *
+     * Es 1,5 y no 1 porque comparte bloque con el riel de 4dp y con el borde redondeado de
+     * 12dp: a 1dp el contorno se pierde entre el antialiasing de la esquina.
+     */
+    val OverdueBorderWidth: Dp = 1.5.dp
+
+    /**
+     * Alpha de un bloque `Done` — 0.62f, el `.pill.done` del artboard (`:115`).
+     *
+     * ⚠ No es la ÚNICA señal de “cumplida”: el título va tachado y `StatusTag` dice el
+     * estado en palabras (S11 — el estado nunca se codifica sólo con color u opacidad).
+     */
+    val DoneAlpha: Float = 0.62f
+
+    /**
+     * Umbral de bloque CORTO — 64dp, `shortPill` del artboard (`:375`).
+     *
+     * Por debajo, el bloque pierde la fila de chip y muestra `hora · estado` en una sola
+     * línea: a 64dp un chip de 24dp no cabe junto a título y hora. El estado sigue siendo
+     * una PALABRA (`statusSemanticLabel`), nunca sólo el punto de color.
+     */
+    val ShortBlockHeight: Dp = 64.dp
+
+    /**
+     * Altura mínima para dibujar la fila de chip de estado — 76dp.
+     *
+     * Derivación, no un número inventado: título `titleSmall` (20) + hueco (4) + rango
+     * `TypeTokens.time` (16) + hueco (4) + `StatusTag` (16 de línea + 8 de relleno = 24) +
+     * relleno vertical del bloque (8) = **76**. Un bloque de entre 64 y 76dp conserva el
+     * rango con la duración y NO dibuja chip: pintarlo lo dejaría cortado por el clip.
+     */
+    val ChipRowMinHeight: Dp = 76.dp
+}
+
 /** Grosor de trazo de un indicador circular. Un trazo no es un espaciado. */
 object ProgressStroke {
     val thin: Dp = 2.dp

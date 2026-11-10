@@ -221,7 +221,7 @@ private fun ceilToHour(minuteOfDay: Int): Int =
     (minuteOfDay.coerceAtLeast(0) + MINUTES_PER_HOUR - 1) / MINUTES_PER_HOUR * MINUTES_PER_HOUR
 
 /** Ticks cada hora desde el inicio del eje, sin pasar del fin. */
-private fun railHourTicks(axis: RailAxis): List<Int> =
+internal fun railHourTicks(axis: RailAxis): List<Int> =
     generateSequence(axis.startMinute) { minute -> minute + MINUTES_PER_HOUR }
         .takeWhile { minute -> minute <= axis.endMinute }
         .toList()
