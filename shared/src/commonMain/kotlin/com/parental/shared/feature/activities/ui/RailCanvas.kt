@@ -237,8 +237,10 @@ private fun RailNowLine(y: Dp, modifier: Modifier) {
  *  · entre `ShortBlockHeight` y `ChipRowMinHeight` → lo mismo sin chip: no cabe.
  *  · `< ShortBlockHeight` → título a 1 línea + `hora–hora · estado` en una sola línea.
  *
- * Un bloque `Done` baja a [RailGeometry.DoneAlpha], tacha el título Y conserva el estado en
- * palabras: la opacidad nunca es la única señal.
+ * Un bloque `Done` tacha el título y conserva el estado en palabras; el bloque NO se atenúa.
+ * Antes bajaba entero a `DoneAlpha` y sobre el tinte de categoría eso dejaba la actividad
+ * cumplida casi ilegible en el dispositivo: el estado ya lo dicen el tachado y `StatusTag`,
+ * así que la opacidad sobraba como señal y costaba legibilidad (S11).
  *
  * T7 · DOS CAJAS, y el reparto importa. La EXTERNA es geometría (posición, tamaño, foco) y la
  * INTERNA es la píldora. El hueco `swipe` se monta entre las dos para que:
@@ -313,7 +315,6 @@ private fun RailBlockBody(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .alpha(if (isDone) RailGeometry.DoneAlpha else 1f)
             .clip(ParentalShapes.medium)
             .background((triple?.dot ?: MaterialTheme.colorScheme.outline).copy(alpha = RailGeometry.BlockTintAlpha))
             .then(overdueBorder)
