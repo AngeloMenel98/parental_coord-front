@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Actividades · Dirección 03 — Tarjetas a la vista</title>
+<style>
+  :root {
+    --primary: #00696D; --on-primary: #FFFFFF;
+    --primary-container: #9CF1F6; --on-primary-container: #002022;
+    --secondary-container: #CCE8EA; --on-secondary-container: #051F21;
+    --surface: #FAFDFC; --on-surface: #191C1D;
+    --surface-variant: #DAE4E5; --on-surface-variant: #3F4849;
+    --outline: #6F797A; --outline-variant: #BEC8C9;
+    --serif: Georgia, 'Times New Roman', serif;
+    --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    --mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: var(--sans); background: #E4ECEC; min-height: 100vh; padding: 24px 0; }
+  .stage { display: flex; gap: 40px; justify-content: center; align-items: flex-start; flex-wrap: wrap; padding: 0 24px; }
+  .frame-label { font-size: 11px; font-weight: 500; font-variant: small-caps; letter-spacing: .5px; color: #3F4849; margin-bottom: 8px; }
+  .frame-note { font-size: 12px; color: #3F4849; max-width: 390px; margin-top: 10px; line-height: 1.5; }
+  .phone { width: 390px; min-height: 844px; background: var(--surface-variant); color: var(--on-surface); display: flex; flex-direction: column; border-radius: 24px; overflow: hidden; box-shadow: 0 8px 32px rgba(0,32,34,.18); position: relative; }
+  button { font-family: inherit; }
+  :focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 4px; }
+
+  /* ── Cabecera compacta ── */
+  .topbar { background: var(--surface); display: flex; align-items: center; height: 56px; padding: 0 8px 0 16px; flex: none; border-bottom: 1px solid var(--outline-variant); }
+  .topbar h1 { font-size: 22px; font-weight: 400; flex: 1; }
+  .icon-btn { width: 44px; height: 44px; border: 0; background: transparent; border-radius: 50%; display: grid; place-items: center; cursor: pointer; color: var(--on-surface-variant); position: relative; }
+  .icon-btn:hover { background: rgba(0,105,109,.06); }
+  .icon-btn.active { color: var(--primary); background: rgba(0,105,109,.08); }
+
+  /* ── Filtros en una sola línea ── */
+  .filters { display: flex; gap: 8px; padding: 12px 16px; overflow-x: auto; flex: none; scrollbar-width: none; }
+  .filters::-webkit-scrollbar { display: none; }
+  .fchip { height: 32px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--outline); background: var(--surface); font-size: 14px; color: var(--on-surface-variant); cursor: pointer; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; flex: none; }
+  .fchip[aria-pressed="true"] { background: var(--secondary-container); border-color: transparent; color: var(--on-secondary-container); font-weight: 500; }
+  .fchip .count { font-size: 11px; background: rgba(0,32,34,.08); border-radius: 8px; padding: 0 6px; line-height: 16px; }
+  .fchip svg { width: 16px; height: 16px; }
+
+  /* ── Grupos y tarjetas ── */
+  .feed { flex: 1; overflow-y: auto; padding: 0 16px 16px; }
+  .group-title { font-size: 11px; font-weight: 500; font-variant: small-caps; letter-spacing: .5px; color: var(--on-surface-variant); padding: 16px 4px 8px; display: flex; align-items: baseline; gap: 8px; }
+  .group-title .rel { color: var(--primary); }
+  .card { background: var(--surface); border-radius: 12px; margin-bottom: 12px; overflow: hidden; display: flex; cursor: pointer; border: 1px solid var(--outline-variant); }
+  .card:hover { box-shadow: 0 2px 8px rgba(0,32,34,.1); }
+  .card .rail-cat { width: 4px; flex: none; }
+  .card .content { flex: 1; min-width: 0; padding: 12px; }
+  .card .head { display: flex; align-items: flex-start; gap: 8px; }
+  .card h3 { font-size: 16px; font-weight: 500; line-height: 24px; flex: 1; }
+  .card.done h3 { color: var(--on-surface-variant); font-weight: 400; text-decoration: line-through; text-decoration-color: var(--outline-variant); }
+  .status-pill { flex: none; display: inline-flex; align-items: center; gap: 6px; border-radius: 12px; padding: 3px 8px; font-size: 11px; font-weight: 500; }
+  .status-pill i { width: 6px; height: 6px; border-radius: 50%; }
+  .card .meta { display: flex; align-items: center; gap: 12px; margin-top: 6px; font-size: 12px; color: var(--on-surface-variant); }
+  .card .meta .time { font-family: var(--mono); font-weight: 500; letter-spacing: .5px; display: inline-flex; align-items: center; gap: 4px; }
+  .card .meta svg { width: 14px; height: 14px; }
+  .card .meta .overdue { color: #C62828; font-weight: 500; }
+  .card .foot { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+  .cat-label { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 500; }
+  .cat-label i { width: 8px; height: 8px; border-radius: 50%; }
+  .btn-confirm { margin-left: auto; border: 1px solid var(--primary); background: transparent; color: var(--primary); font-size: 12px; font-weight: 500; border-radius: 12px; min-height: 36px; padding: 0 14px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; }
+  .btn-confirm:hover { background: rgba(0,105,109,.08); }
+  .swipe-hint { display: flex; align-items: center; gap: 6px; justify-content: center; font-size: 11px; color: var(--on-surface-variant); padding: 2px 0 10px; }
+  .swipe-hint svg { width: 14px; height: 14px; }
+
+  /* ── Nav ── */
+  .navbar { flex: none; display: flex; border-top: 1px solid var(--outline-variant); background: var(--surface); }
+  .nav-item { flex: 1; border: 0; background: none; padding: 8px 0 12px; font-size: 12px; color: var(--on-surface-variant); cursor: pointer; }
+  .nav-item svg { display: block; margin: 0 auto 2px; }
+  .nav-item .pill { display: inline-block; padding: 3px 16px; border-radius: 16px; }
+  .nav-item[aria-current="page"] { color: var(--primary); font-weight: 600; }
+  .nav-item[aria-current="page"] .pill { background: var(--primary-container); }
+
+  /* ── Hoja de calendario (salto de día) ── */
+  .scrim { position: absolute; inset: 0; background: rgba(25,28,29,.32); z-index: 5; border: 0; cursor: pointer; }
+  .sheet { position: absolute; left: 0; right: 0; bottom: 0; z-index: 6; background: var(--surface); border-radius: 24px 24px 0 0; padding: 6px 16px 12px; box-shadow: 0 -4px 24px rgba(0,32,34,.2); }
+  .handle { width: 32px; height: 4px; border-radius: 2px; background: var(--outline-variant); margin: 6px auto 10px; }
+  .sheet-head { display: flex; align-items: center; padding-left: 8px; }
+  .sheet-head h2 { font-family: var(--serif); font-size: 22px; font-weight: 400; flex: 1; }
+  .weekdays, .days { display: grid; grid-template-columns: repeat(7, 1fr); }
+  .weekdays { margin-top: 4px; }
+  .weekdays span { text-align: center; font-size: 11px; font-weight: 500; font-variant: small-caps; letter-spacing: .5px; color: var(--on-surface-variant); padding: 4px 0; }
+  .day { height: 48px; border: 0; background: none; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; cursor: pointer; border-radius: 8px; color: var(--on-surface); font-size: 14px; }
+  .day:hover:not(:disabled) { background: rgba(0,105,109,.06); }
+  .day .num { width: 28px; height: 28px; display: grid; place-items: center; border-radius: 50%; }
+  .day.today .num { background: var(--primary); color: var(--on-primary); font-weight: 600; }
+  .day.out { color: var(--outline-variant); cursor: default; }
+  .daydots { display: flex; gap: 2px; height: 6px; align-items: center; }
+  .daydots i { width: 6px; height: 6px; border-radius: 50%; }
+  .sheet-foot { display: flex; justify-content: space-between; margin-top: 6px; }
+  .text-btn { border: 0; background: none; color: var(--primary); font-weight: 500; font-size: 14px; padding: 10px 12px; border-radius: 12px; cursor: pointer; min-height: 44px; }
+  .text-btn:hover { background: rgba(0,105,109,.08); }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .card, .btn-confirm, .fchip, .icon-btn, .day, .text-btn { transition: box-shadow 150ms, background 150ms; }
+  }
+</style>
+</head>
+<body>
+<div class="stage">
+
+  <section class="frame" aria-label="Estado lista">
+    <p class="frame-label">01 · Lista de tarjetas</p>
+    <div class="phone">
+      <header class="topbar">
+        <h1>Actividades</h1>
+        <button class="icon-btn" aria-label="Abrir calendario para saltar a un día">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M19 4h-1V2h-2v2H8V2H6v2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2zm0 16H5V10h14v10zM5 8V6h14v2H5z"/></svg>
+        </button>
+        <button class="icon-btn" aria-label="Vista: lista. Cambiar a semana">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 5H3c-.55 0-1 .45-1 1v12c0 .55.45 1 1 1h3c.55 0 1-.45 1-1V6c0-.55-.45-1-1-1zm14 0h-3c-.55 0-1 .45-1 1v12c0 .55.45 1 1 1h3c.55 0 1-.45 1-1V6c0-.55-.45-1-1-1zm-7 0h-4c-.55 0-1 .45-1 1v12c0 .55.45 1 1 1h4c.55 0 1-.45 1-1V6c0-.55-.45-1-1-1z"/></svg>
+        </button>
+        <button class="icon-btn" aria-label="Nueva actividad">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+        </button>
+      </header>
+
+      <div class="filters" role="group" aria-label="Filtrar">
+        <button class="fchip" aria-pressed="true">Todos <span class="count">7</span></button>
+        <button class="fchip" aria-pressed="false">Eventos <span class="count">4</span></button>
+        <button class="fchip" aria-pressed="false">Obligaciones <span class="count">3</span></button>
+        <button class="fchip" aria-pressed="false" aria-label="Más filtros">
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 5h18v2H3zm4 6h10v2H7zm3 6h4v2h-4z"/></svg>
+        </button>
+      </div>
+
+      <main class="feed">
+        <p class="swipe-hint">
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8.59 16.59 13.17 12 8.59 7.41 10 6l6 6-6 6z"/></svg>
+          Deslizá una tarjeta para completar o posponer
+        </p>
+
+        <h2 class="group-title">lunes 12 de mayo <span class="rel">· hoy</span></h2>
+
+        <div class="card" tabindex="0" role="button" aria-label="09:30, Turno con el pediatra, Salud, Asignada. Acción disponible: confirmar">
+          <span class="rail-cat" style="background:#D81B60" aria-hidden="true"></span>
+          <div class="content">
+            <div class="head">
+              <h3>Turno con el pediatra</h3>
+              <span class="status-pill" style="background:rgba(30,136,229,.15);color:#1565C0"><i style="background:#1E88E5"></i>Asignada</span>
+            </div>
+            <div class="meta">
+              <span class="time"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm4.2 14.2L11 13V7h1.5v5.2l4.5 2.7z"/></svg>09:30</span>
+              <span>Consultorio Ramos Mejía</span>
+            </div>
+            <div class="foot">
+              <span class="cat-label" style="color:#AD1457"><i style="background:#D81B60"></i>Salud</span>
+              <button class="btn-confirm">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+                Confirmar
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card done" tabindex="0" role="button" aria-label="11:00, Entrega de la libreta de comunicaciones, Educación, Cumplida">
+          <span class="rail-cat" style="background:#3F51B5" aria-hidden="true"></span>
+          <div class="content">
+            <div class="head">
+              <h3>Entrega de la libreta de comunicaciones</h3>
+              <span class="status-pill" style="background:rgba(67,160,71,.15);color:#2E7D32"><i style="background:#43A047"></i>Cumplida</span>
+            </div>
+            <div class="meta">
+              <span class="time"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm4.2 14.2L11 13V7h1.5v5.2l4.5 2.7z"/></svg>11:00</span>
+            </div>
+            <div class="foot">
+              <span class="cat-label" style="color:#303F9F"><i style="background:#3F51B5"></i>Educación</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" tabindex="0" role="button" aria-label="17:30, Clase de natación, Recreación, Vencida. Venció hoy a las 16:00">
+          <span class="rail-cat" style="background:#F4511E" aria-hidden="true"></span>
+          <div class="content">
+            <div class="head">
+              <h3>Clase de natación</h3>
+              <span class="status-pill" style="background:rgba(229,57,53,.15);color:#C62828"><i style="background:#E53935"></i>Vencida</span>
+            </div>
+            <div class="meta">
+              <span class="time"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm4.2 14.2L11 13V7h1.5v5.2l4.5 2.7z"/></svg>17:30</span>
+              <span class="overdue">Límite vencido: hoy 16:00</span>
+            </div>
+            <div class="foot">
+              <span class="cat-label" style="color:#B42C0E"><i style="background:#F4511E"></i>Recreación</span>
+            </div>
+          </div>
+        </div>
+
+        <h2 class="group-title">martes 13 de mayo</h2>
+
+        <div class="card" tabindex="0" role="button" aria-label="18:00, Cena con los abuelos, Familiar, Creada">
+          <span class="rail-cat" style="background:#8E24AA" aria-hidden="true"></span>
+          <div class="content">
+            <div class="head">
+              <h3>Cena con los abuelos</h3>
+              <span class="status-pill" style="background:rgba(117,117,117,.15);color:#616161"><i style="background:#757575"></i>Creada</span>
+            </div>
+            <div class="meta">
+              <span class="time"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm4.2 14.2L11 13V7h1.5v5.2l4.5 2.7z"/></svg>18:00</span>
+            </div>
+            <div class="foot">
+              <span class="cat-label" style="color:#6A1B9A"><i style="background:#8E24AA"></i>Familiar</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" tabindex="0" role="button" aria-label="19:30, Cumpleaños de Martina, Social, Por verificar">
+          <span class="rail-cat" style="background:#00897B" aria-hidden="true"></span>
+          <div class="content">
+            <div class="head">
+              <h3>Cumpleaños de Martina</h3>
+              <span class="status-pill" style="background:rgba(178,106,0,.15);color:#9E5F00"><i style="background:#B26A00"></i>Por verificar</span>
+            </div>
+            <div class="meta">
+              <span class="time"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm4.2 14.2L11 13V7h1.5v5.2l4.5 2.7z"/></svg>19:30</span>
+            </div>
+            <div class="foot">
+              <span class="cat-label" style="color:#00695C"><i style="background:#00897B"></i>Social</span>
+            </div>
+          </div>
+        </div>
+      </main>
+
+      <nav class="navbar" aria-label="Navegación principal">
+        <button class="nav-item"><span class="pill"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg></span>Inicio</button>
+        <button class="nav-item" aria-current="page"><span class="pill"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M19 4h-1V2h-2v2H8V2H6v2H5a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2zm0 16H5V10h14v10zM5 8V6h14v2H5z"/></svg></span>Actividades</button>
+        <button class="nav-item"><span class="pill"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M21 7H3a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h18a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2zm-2 8a2 2 0 1 1 0-4 2 2 0 0 1 0 4z"/></svg></span>Gastos</button>
+        <button class="nav-item"><span class="pill"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16 11c1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3 1.34 3 3 3zm-8 0c1.66 0 3-1.34 3-3S9.66 5 8 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5C15 14.17 10.33 13 8 13zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg></span>Terceros</button>
+      </nav>
+    </div>
+    <p class="frame-note">El ícono de calendario abre la hoja para saltar a un día; el de semana cambia de vista, como hoy.</p>
+  </section>
+
+  <section class="frame" aria-label="Estado calendario abierto">
+    <p class="frame-label">02 · Calendario abierto (salto de día)</p>
+    <div class="phone">
+      <header class="topbar">
+        <h1>Actividades</h1>
+        <button class="icon-btn active" aria-label="Cerrar calendario" aria-expanded="true">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M19 4h-1V2h-2v2H8V2H6v2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2zm0 16H5V10h14v10zM5 8V6h14v2H5z"/></svg>
+        </button>
+        <button class="icon-btn" aria-label="Vista: lista. Cambiar a semana">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 5H3c-.55 0-1 .45-1 1v12c0 .55.45 1 1 1h3c.55 0 1-.45 1-1V6c0-.55-.45-1-1-1zm14 0h-3c-.55 0-1 .45-1 1v12c0 .55.45 1 1 1h3c.55 0 1-.45 1-1V6c0-.55-.45-1-1-1zm-7 0h-4c-.55 0-1 .45-1 1v12c0 .55.45 1 1 1h4c.55 0 1-.45 1-1V6c0-.55-.45-1-1-1z"/></svg>
+        </button>
+        <button class="icon-btn" aria-label="Nueva actividad">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+        </button>
+      </header>
+
+      <div class="filters" role="group" aria-label="Filtrar">
+        <button class="fchip" aria-pressed="true">Todos <span class="count">7</span></button>
+        <button class="fchip" aria-pressed="false">Eventos <span class="count">4</span></button>
+        <button class="fchip" aria-pressed="false">Obligaciones <span class="count">3</span></button>
+      </div>
+
+      <main class="feed">
+        <h2 class="group-title">lunes 12 de mayo <span class="rel">· hoy</span></h2>
+        <div class="card" tabindex="0" role="button" aria-label="09:30, Turno con el pediatra, Salud, Asignada">
+          <span class="rail-cat" style="background:#D81B60" aria-hidden="true"></span>
+          <div class="content">
+            <div class="head">
+              <h3>Turno con el pediatra</h3>
+              <span class="status-pill" style="background:rgba(30,136,229,.15);color:#1565C0"><i style="background:#1E88E5"></i>Asignada</span>
+            </div>
+            <div class="meta">
+              <span class="time"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm4.2 14.2L11 13V7h1.5v5.2l4.5 2.7z"/></svg>09:30</span>
+              <span>Consultorio Ramos Mejía</span>
+            </div>
+          </div>
+        </div>
+      </main>
+
+      <button class="scrim" aria-label="Cerrar calendario" tabindex="-1"></button>
+
+      <div class="sheet" role="dialog" aria-modal="true" aria-label="Calendario: elegí un día para saltar">
+        <div class="handle" aria-hidden="true"></div>
+        <div class="sheet-head">
+          <h2>mayo 2026</h2>
+          <button class="icon-btn" aria-label="Mes anterior">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M15.41 7.41 10.83 12l4.58 4.59L14 18l-6-6 6-6z"/></svg>
+          </button>
+          <button class="icon-btn" aria-label="Mes siguiente">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8.59 16.59 13.17 12 8.59 7.41 10 6l6 6-6 6z"/></svg>
+          </button>
+        </div>
+        <div class="weekdays" aria-hidden="true">
+          <span>L</span><span>M</span><span>X</span><span>J</span><span>V</span><span>S</span><span>D</span>
+        </div>
+        <div class="days" role="grid" aria-label="Días de mayo 2026">
+          <div role="row" style="display:contents">
+            <button class="day out" disabled aria-hidden="true"><span class="num">27</span></button>
+            <button class="day out" disabled aria-hidden="true"><span class="num">28</span></button>
+            <button class="day out" disabled aria-hidden="true"><span class="num">29</span></button>
+            <button class="day out" disabled aria-hidden="true"><span class="num">30</span></button>
+            <button class="day" aria-label="viernes 1 de mayo, sin actividades"><span class="num">1</span><span class="daydots"></span></button>
+            <button class="day" aria-label="sábado 2 de mayo, sin actividades"><span class="num">2</span><span class="daydots"></span></button>
+            <button class="day" aria-label="domingo 3 de mayo, sin actividades"><span class="num">3</span><span class="daydots"></span></button>
+          </div>
+          <div role="row" style="display:contents">
+            <button class="day" aria-label="lunes 4 de mayo, sin actividades"><span class="num">4</span><span class="daydots"></span></button>
+            <button class="day" aria-label="martes 5 de mayo, 1 actividad, Familiar"><span class="num">5</span><span class="daydots"><i style="background:#8E24AA"></i></span></button>
+            <button class="day" aria-label="miércoles 6 de mayo, sin actividades"><span class="num">6</span><span class="daydots"></span></button>
+            <button class="day" aria-label="jueves 7 de mayo, sin actividades"><span class="num">7</span><span class="daydots"></span></button>
+            <button class="day" aria-label="viernes 8 de mayo, 1 actividad, Salud"><span class="num">8</span><span class="daydots"><i style="background:#D81B60"></i></span></button>
+            <button class="day" aria-label="sábado 9 de mayo, sin actividades"><span class="num">9</span><span class="daydots"></span></button>
+            <button class="day" aria-label="domingo 10 de mayo, sin actividades"><span class="num">10</span><span class="daydots"></span></button>
+          </div>
+          <div role="row" style="display:contents">
+            <button class="day" aria-label="lunes 11 de mayo, sin actividades"><span class="num">11</span><span class="daydots"></span></button>
+            <button class="day today" aria-current="date" aria-label="lunes 12 de mayo, hoy, 3 actividades: Salud, Educación, Recreación"><span class="num">12</span><span class="daydots"><i style="background:#D81B60"></i><i style="background:#3F51B5"></i><i style="background:#F4511E"></i></span></button>
+            <button class="day" aria-label="martes 13 de mayo, 2 actividades: Familiar, Social"><span class="num">13</span><span class="daydots"><i style="background:#8E24AA"></i><i style="background:#00897B"></i></span></button>
+            <button class="day" aria-label="miércoles 14 de mayo, sin actividades"><span class="num">14</span><span class="daydots"></span></button>
+            <button class="day" aria-label="jueves 15 de mayo, 1 actividad, Salud"><span class="num">15</span><span class="daydots"><i style="background:#D81B60"></i></span></button>
+            <button class="day" aria-label="sábado 16 de mayo, sin actividades"><span class="num">16</span><span class="daydots"></span></button>
+            <button class="day" aria-label="domingo 17 de mayo, sin actividades"><span class="num">17</span><span class="daydots"></span></button>
+          </div>
+          <div role="row" style="display:contents">
+            <button class="day" aria-label="lunes 18 de mayo, 2 actividades: Educación, Familiar"><span class="num">18</span><span class="daydots"><i style="background:#3F51B5"></i><i style="background:#8E24AA"></i></span></button>
+            <button class="day" aria-label="martes 19 de mayo, sin actividades"><span class="num">19</span><span class="daydots"></span></button>
+            <button class="day" aria-label="miércoles 20 de mayo, sin actividades"><span class="num">20</span><span class="daydots"></span></button>
+            <button class="day" aria-label="jueves 21 de mayo, 3 actividades: Recreación, Otros, Social"><span class="num">21</span><span class="daydots"><i style="background:#F4511E"></i><i style="background:#8D6E63"></i><i style="background:#00897B"></i></span></button>
+            <button class="day" aria-label="viernes 22 de mayo, sin actividades"><span class="num">22</span><span class="daydots"></span></button>
+            <button class="day" aria-label="sábado 23 de mayo, sin actividades"><span class="num">23</span><span class="daydots"></span></button>
+            <button class="day" aria-label="domingo 24 de mayo, sin actividades"><span class="num">24</span><span class="daydots"></span></button>
+          </div>
+          <div role="row" style="display:contents">
+            <button class="day" aria-label="lunes 25 de mayo, sin actividades"><span class="num">25</span><span class="daydots"></span></button>
+            <button class="day" aria-label="martes 26 de mayo, 1 actividad, Educación"><span class="num">26</span><span class="daydots"><i style="background:#3F51B5"></i></span></button>
+            <button class="day" aria-label="miércoles 27 de mayo, sin actividades"><span class="num">27</span><span class="daydots"></span></button>
+            <button class="day" aria-label="jueves 28 de mayo, sin actividades"><span class="num">28</span><span class="daydots"></span></button>
+            <button class="day" aria-label="viernes 29 de mayo, sin actividades"><span class="num">29</span><span class="daydots"></span></button>
+            <button class="day" aria-label="sábado 30 de mayo, sin actividades"><span class="num">30</span><span class="daydots"></span></button>
+            <button class="day" aria-label="domingo 31 de mayo, sin actividades"><span class="num">31</span><span class="daydots"></span></button>
+          </div>
+        </div>
+        <div class="sheet-foot">
+          <button class="text-btn">Hoy</button>
+          <button class="text-btn">Cerrar</button>
+        </div>
+      </div>
+    </div>
+    <p class="frame-note">Un punto por categoría presente en el día (máximo 3, en orden de hora de inicio). Al tocar un día, la hoja se cierra y la lista salta a ese día — o al grupo con actividades más cercano hacia adelante si no tiene. «Hoy» vuelve al día actual.</p>
+  </section>
+
+</div>
+</body>
+</html>

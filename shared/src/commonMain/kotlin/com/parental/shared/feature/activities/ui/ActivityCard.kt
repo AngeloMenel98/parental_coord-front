@@ -1,0 +1,403 @@
+package com.parental.shared.feature.activities.ui
+
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import com.parental.shared.core.ui.components.CategoryInfo
+import com.parental.shared.core.ui.components.TagDot
+import com.parental.shared.core.ui.components.categoryTagTriple
+import com.parental.shared.core.ui.components.isDoneStatus
+import com.parental.shared.core.ui.components.statusTagTriple
+import com.parental.shared.core.ui.theme.AgendaGeometry
+import com.parental.shared.core.ui.theme.ParentalShapes
+import com.parental.shared.core.ui.theme.ProgressStroke
+import com.parental.shared.core.ui.theme.Spacing
+import com.parental.shared.core.ui.theme.TypeTokens
+import com.parental.shared.feature.activities.domain.model.resolveChildNames
+import com.parental.shared.feature.bonds.domain.model.VinculoChild
+import kotlinx.datetime.Instant
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
+
+/*
+ * Tarjeta de actividad — dirección de diseño 03 ("Tarjetas a la vista"), T2 de
+ * `odd/tasks/activities-cards-ui.md` (S2, S4).
+ *
+ * REEMPLAZA a la fila de la agenda (columna de fecha + riel + `ActivityBody`) en el modo
+ * AGENDA. El modo SEMANA no se toca: sigue pintando con `AgendaTimelineRow`.
+ *
+ * ⚠ CERO COLORES NUEVOS. La tarjeta es una RECOMPOSICIÓN de piezas que ya existen:
+ * `TagDot` (punto), `categoryTagTriple`/`statusTagTriple` (color de etiqueta),
+ * `TypeTokens.time` (la hora monoespaciada), `ParentalShapes.medium` (radio 12). No se
+ * declara ningún hex ni ningún token de tema — `Color.kt` sigue siendo su único dueño.
+ *
+ * ⚠ EL BOTÓN "CONFIRMAR" ES HERMANO DEL CUERPO, NO HIJO (regla `R2-T2-8`, que el
+ * `sdd-verify` de `activity-swipe-actions` convirtió en ley). Anidarlo dentro del área
+ * clickeable haría que un toque cerca del botón ABRIERA EL DETALLE en vez de confirmar.
+ * Por eso el cuerpo clickeable (título + hora + límite) y la fila de pie (categoría +
+ * botón) son DOS hermanos: un nodo de semántica y el otro.
+ */
+
+/**
+ * Tarjeta de una actividad, con su hueco de gesto.
+ *
+ * @param swipe envuelve la TARJETA entera. NO TIENE VALOR POR DEFECTO: la omisión tiene
+ *   que ser un error de compilación, no un fallo silencioso (misma regla que el hueco de
+ *   `AgendaTimelineRow`).
+ * @param focusRequesters destino de foco por id — lo registra el `SideEffect`, igual que
+ *   la fila de la agenda, para que el retorno de foco desde la hoja de detalle encuentre
+ *   la tarjeta y no el contenedor de la lista.
+ */
+@Composable
+internal fun ActivityCard(
+    row: TimelineRow,
+    info: CategoryInfo?,
+    zone: TimeZone,
+    semanticLabel: String,
+    canConfirm: Boolean,
+    isConfirming: Boolean,
+    focusRequesters: MutableMap<String, FocusRequester>,
+    memberNames: Map<String, String>,
+    children: List<VinculoChild>,
+    onSelectActividad: (String) -> Unit,
+    onConfirm: (String) -> Unit,
+    swipe: @Composable (content: @Composable () -> Unit) -> Unit,
+) {
+    // R4-T1-2 (mismo patrón que la fila): `SideEffect` + no-leer-en-composición ⇒
+    // escribir el mapa no recompone a nadie.
+    val focusRequester = remember { FocusRequester() }
+    SideEffect { focusRequesters[row.actividad.id] = focusRequester }
+
+    // El `focusRequester` vive FUERA del hueco de gesto: el hueco es un
+    // `SubcomposeLayout` y los `ParentDataModifier` no lo atraviesan (R2-T2-7).
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .focusRequester(focusRequester),
+    ) {
+        swipe {
+            ActivityCardBody(
+                row = row,
+                info = info,
+                zone = zone,
+                semanticLabel = semanticLabel,
+                canConfirm = canConfirm,
+                isConfirming = isConfirming,
+                memberNames = memberNames,
+                children = children,
+                onClick = { onSelectActividad(row.actividad.id) },
+                onConfirm = { onConfirm(row.actividad.id) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun ActivityCardBody(
+    row: TimelineRow,
+    info: CategoryInfo?,
+    zone: TimeZone,
+    semanticLabel: String,
+    canConfirm: Boolean,
+    isConfirming: Boolean,
+    memberNames: Map<String, String>,
+    children: List<VinculoChild>,
+    onClick: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    val category = categoryTagTriple(info)
+    val railColor = category?.dot ?: MaterialTheme.colorScheme.outline
+    val isDone = isDoneStatus(row.actividad.status)
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = ParentalShapes.medium,
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(Spacing.hairline, MaterialTheme.colorScheme.outlineVariant),
+    ) {
+        Row(
+            // `IntrinsicSize.Min` + `fillMaxHeight()` en el riel: es el mismo patrón que
+            // usa la línea del timeline. Sin él, el riel mediría 0 en una `LazyColumn`
+            // (alto no acotado) y la tarjeta perdería su color de categoría.
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(IntrinsicSize.Min),
+        ) {
+            Box(
+                modifier = Modifier
+                    .width(Spacing.xs)
+                    .fillMaxHeight()
+                    .background(railColor),
+            )
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(Spacing.md),
+            ) {
+                // ── Cuerpo clickeable: UN nodo de semántica ──────────────────────
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = AgendaGeometry.touchTargetLegacy)
+                        .clickable(onClick = onClick)
+                        .semantics(mergeDescendants = true) { contentDescription = semanticLabel },
+                ) {
+                    Row(verticalAlignment = Alignment.Top) {
+                        Text(
+                            text = row.actividad.title,
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = if (isDone) FontWeight.Normal else FontWeight.Medium,
+                            color = if (isDone) {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            } else {
+                                MaterialTheme.colorScheme.onSurface
+                            },
+                            textDecoration = if (isDone) TextDecoration.LineThrough else null,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Spacer(modifier = Modifier.width(Spacing.sm))
+                        StatusPill(status = row.actividad.status)
+                    }
+
+                    row.localStart?.let { localStart ->
+                        Spacer(modifier = Modifier.height(Spacing.xs))
+                        Text(
+                            text = formatTime(localStart.hour, localStart.minute),
+                            style = TypeTokens.time,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
+                    row.deadline?.let { deadline ->
+                        Spacer(modifier = Modifier.height(Spacing.xs))
+                        DeadlineLabel(deadline = deadline, zone = zone, overdue = isOverdue(row))
+                    }
+
+                    // S7/S8 · Asignatario e hijos DENTRO del cuerpo clickeable,
+                    // bajo la misma etiqueta de semántica fusionada.
+                    val assigneeName = row.actividad.assignedTo
+                        ?.let { memberNames[it]?.takeIf { name -> name.isNotBlank() } }
+                    if (assigneeName != null) {
+                        Spacer(modifier = Modifier.height(Spacing.xs))
+                        AssigneeLine(name = assigneeName)
+                    }
+
+                    val childNames = remember(row.actividad.childrenIds, children) {
+                        resolveChildNames(children, row.actividad.childrenIds)
+                    }
+                    if (childNames.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(Spacing.xs))
+                        ChildrenLine(names = childNames)
+                    }
+                }
+
+                // ── Pie: categoría + acción. FUERA del cuerpo clickeable ────────
+                // 🔴 SIN CHIP "CONFIRMADA" (A-1 · R4). El dato POR PERSONA vive en la hoja
+                // de detalle ("Asignación confirmada"); en la tarjeta la insignia de
+                // estado ya dice cómo va la actividad, y un segundo aviso la contradice.
+                // Por eso aquí ya no se mira `assignedConfirmed` para nada.
+                if (canConfirm || info != null) {
+                    Spacer(modifier = Modifier.height(Spacing.sm))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        CategoryLabel(info = info, category = category)
+                        if (canConfirm) {
+                            Spacer(modifier = Modifier.weight(1f))
+                            ConfirmButton(
+                                isConfirming = isConfirming,
+                                onClick = onConfirm,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Insignia de estado: punto + etiqueta sobre el contenedor de alfa 0,15 — la receta de
+ * `StatusTag`, con el punto delante. El punto es decorativo (`TagDot` limpia su
+ * semántica); el estado lo anuncia el rótulo combinado de la tarjeta.
+ */
+@Composable
+private fun StatusPill(status: String) {
+    val dot = statusTagTriple(status)?.dot ?: MaterialTheme.colorScheme.outline
+    Surface(
+        shape = ParentalShapes.medium,
+        color = dot.copy(alpha = 0.15f),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = Spacing.sm, vertical = Spacing.xs),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            TagDot(color = dot, size = AgendaGeometry.statusBadge)
+            Spacer(modifier = Modifier.width(Spacing.xs))
+            Text(
+                text = statusSemanticLabel(status),
+                style = MaterialTheme.typography.labelSmall,
+                color = dot,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+            )
+        }
+    }
+}
+
+/** Etiqueta de categoría: punto + nombre, en el color de contenido de la categoría. */
+@Composable
+private fun CategoryLabel(info: CategoryInfo?, category: com.parental.shared.core.ui.theme.TagTriple?) {
+    val dot = category?.dot ?: MaterialTheme.colorScheme.outline
+    val content = category?.content ?: MaterialTheme.colorScheme.outline
+    TagDot(color = dot, size = AgendaGeometry.statusBadge)
+    Spacer(modifier = Modifier.width(Spacing.xs))
+    Text(
+        text = info?.name?.takeIf { it.isNotBlank() } ?: "Categoría",
+        style = MaterialTheme.typography.labelSmall,
+        color = content,
+        fontWeight = FontWeight.Medium,
+        maxLines = 1,
+    )
+}
+
+/**
+ * Botón "Confirmar" en la forma del arteboard (contorno `primary`, fondo transparente).
+ *
+ * `OutlinedButton` y no un `Surface` + `clickable` a mano: el botón de Material aplica
+ * `minimumInteractiveComponentSize()`, así que el objetivo táctil real es de 48dp aunque
+ * la caja visible mida menos — S8 exige 48dp y el arteboard dibujaba 36dp.
+ */
+@Composable
+private fun ConfirmButton(
+    isConfirming: Boolean,
+    onClick: () -> Unit,
+) {
+    OutlinedButton(
+        onClick = onClick,
+        enabled = !isConfirming,
+        shape = ParentalShapes.medium,
+    ) {
+        if (isConfirming) {
+            CircularProgressIndicator(
+                modifier = Modifier.height(Spacing.md),
+                strokeWidth = ProgressStroke.thin,
+            )
+        } else {
+            Icon(
+                imageVector = Icons.Filled.Check,
+                contentDescription = null,
+                modifier = Modifier.height(Spacing.md),
+            )
+            Spacer(modifier = Modifier.width(Spacing.xs))
+            Text(
+                text = "Confirmar",
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
+    }
+}
+
+/**
+ * Línea de límite: "Límite: 12 may 16:00", o "Límite vencido: …" cuando la actividad
+ * está vencida. El límite se pinta en `error` sólo cuando la actividad lo está: el
+ * color nunca es la única señal — la insignia de estado dice "Vencida" en palabras.
+ */
+@Composable
+private fun DeadlineLabel(deadline: Instant, zone: TimeZone, overdue: Boolean) {
+    val local = deadline.toLocalDateTime(zone)
+    val stamp = "${formatDeadline(deadline, zone)} ${formatTime(local.hour, local.minute)}"
+    Text(
+        text = if (overdue) "Límite vencido: $stamp" else "Límite: $stamp",
+        style = MaterialTheme.typography.bodySmall,
+        color = if (overdue) {
+            MaterialTheme.colorScheme.error
+        } else {
+            MaterialTheme.colorScheme.onSurfaceVariant
+        },
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+    )
+}
+
+/** Línea de asignatario — S7. Se omite si no hay nombre resuelto (sin "Sin asignar"). */
+@Composable
+private fun AssigneeLine(name: String) {
+    Text(
+        text = "Asignada a: $name",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+    )
+}
+
+/**
+ * Línea de hijos — S8. No se pinta si no hay nombres resueltos.
+ *
+ * 🔴 LOS NOMBRES EN UNA LÍNEA, NO UNA FILA DE CHIPS. El PRD sugiere "avatares o una
+ *   lista compacta de chips (`+N` si desborda)", pero medir chips con
+ *   `SubcomposeLayout` dentro de una tarjeta de una lista es un motor de medición por
+ *   cada tarjeta — y su caso degradado es malo: un nombre largo hace que NINGÚN chip
+ *   quepa y la tarjeta acaba mostrando "+1" sin el nombre de nadie. Una línea con los
+ *   dos primeros nombres y el "+N" del resto dice lo mismo, no se corta a medias y no
+ *   mide nada.
+ */
+@Composable
+private fun ChildrenLine(names: List<String>) {
+    if (names.isEmpty()) return
+    val visible = names.take(MAX_VISIBLE_CHILDREN)
+    val overflow = names.size - visible.size
+    val suffix = if (overflow > 0) " +$overflow" else ""
+    Text(
+        text = "Para: ${visible.joinToString(", ")}$suffix",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+    )
+}
+
+/** Cuántos hijos se nombran en la tarjeta antes de resumir el resto como "+N". */
+private const val MAX_VISIBLE_CHILDREN = 2
+
+/**
+ * ¿Está vencida? El estado llega en minúsculas del backend (`overdue`). No hay mapa de
+ * alias aquí: es el MISMO valor que `statusSemanticLabel` traduce a "Vencida", y la
+ * insignia de estado ya lo dice en palabras.
+ */
+private fun isOverdue(row: TimelineRow): Boolean =
+    row.actividad.status.uppercase() == "OVERDUE"
