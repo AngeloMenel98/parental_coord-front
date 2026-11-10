@@ -6,6 +6,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -34,12 +35,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.parental.shared.core.ui.theme.Spacing
@@ -91,6 +95,15 @@ private val SettleSpec = tween<Float>(durationMillis = 200)
  * servidor no habilitó (`can_*` en `false`) no debe capturar un solo toque. [content]
  * se dibuja igualmente, pero sin superficie alrededor. Es donde R1 se nota de verdad en
  * la UI — sin `can_*`, no hay swipe, no hay 403.
+ *
+ * 🔴 DOS MODOS DE BARRA, y los decide el ANCHO MEDIDO de este componente, nunca quien llama
+ * (T9, L12). Por encima de [SwipeNarrowBarMinWidth] de barra revelada, cada acción es un
+ * botón con ícono + texto, como siempre. Por debajo, cada acción es un botón SÓLO ÍCONO con
+ * su etiqueta como `contentDescription`: en un bloque de media calle la barra mide ~80dp y
+ * tres botones con texto necesitan ~286dp, así que el último quedaba recortado — se veía por
+ * `customActions` de TalkBack y no se alcanzaba con el dedo. La bandera NO puede ser un
+ * parámetro: quien monta el envoltorio no sabe cuánto mide su bloque, y dos pantallas
+ * acabarían decidiendo distinto con el mismo ancho.
  *
  * @param actividad se pasa ENTERA y no un `List<SwipeAction>`: la política es del
  *   servidor (R1) y [availableSwipeActions] sólo la LEE. Si esta función derivara las
@@ -149,7 +162,15 @@ fun ActivitySwipeBox(
     // observa con `onSizeChanged` (0dp/0px hasta el primer layout), que no es un
     // `SubcomposeLayout` y por tanto no rompe la medición intrínseca.
     var fullWidthPx by remember { mutableStateOf(0f) }
-    val barWidthPx = fullWidthPx * BAR_WIDTH_FRACTION
+    // T9 · El ancho se observa en PX y el umbral se convierte a px con la densidad del
+    // dispositivo: comparar dp contra px elegiría un modo angosto distinto en cada pantalla.
+    val density = LocalDensity.current
+    val narrowThresholdPx = with(density) { SwipeNarrowBarMinWidth.toPx() }
+    val narrowBar = isNarrowSwipeBar(fullWidthPx, narrowThresholdPx)
+    val barWidthPx = swipeBarWidthPx(fullWidthPx, narrowThresholdPx)
+    // En modo angosto la barra se reparte ENTERA entre las acciones: el ancho de cada botón
+    // es `barra / acciones`, no un dp adivinado.
+    val narrowActionWidth = with(density) { (barWidthPx / actions.size).toDp() }
 
     Box(
         modifier = modifier.onSizeChanged { fullWidthPx = it.width.toFloat() },
@@ -197,15 +218,38 @@ fun ActivitySwipeBox(
                 },
         ) {
             // ── Barra de acciones, revelada al desplazar ──────────────────────
-            Row(
-                modifier = Modifier
-                    .matchParentSize()
-                    .background(MaterialTheme.colorScheme.surfaceVariant),
-                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                actions.forEach { action ->
-                    ActionButton(action = action, onClick = { onSwipe(action) })
+            if (narrowBar) {
+                // T9 (L12) · MODO ANGOSTO. `Arrangement.End` sin separación y cada acción con
+                // `barra / acciones` de ancho: es la ÚNICA distribución que deja el objetivo
+                // táctil de 48dp en media calle (146dp / 3 = 48,6dp). Con la separación de 8dp
+                // de siempre, tres objetivos de 48dp piden 160dp y en 146dp quedarían en 43,3dp
+                // — por eso el umbral y el reparto son la misma aritmética.
+                Row(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .background(MaterialTheme.colorScheme.surfaceVariant),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    actions.forEach { action ->
+                        NarrowActionButton(
+                            action = action,
+                            onClick = { onSwipe(action) },
+                            modifier = Modifier.width(narrowActionWidth),
+                        )
+                    }
+                }
+            } else {
+                Row(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .background(MaterialTheme.colorScheme.surfaceVariant),
+                    horizontalArrangement = Arrangement.spacedBy(ActionGap, Alignment.End),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    actions.forEach { action ->
+                        ActionButton(action = action, onClick = { onSwipe(action) })
+                    }
                 }
             }
 
@@ -227,6 +271,86 @@ fun ActivitySwipeBox(
 /** Fracción del ancho que ocupa la barra revelada. */
 private const val BAR_WIDTH_FRACTION = 0.55f
 
+/** Separación entre acciones de la barra — 8dp, la misma de siempre y en los dos modos. */
+private val ActionGap = 8.dp
+
+/**
+ * Lado mínimo de un botón de acción en MODO ANGOSTO — 48dp, el objetivo táctil de R2/S11.
+ *
+ * Es el mismo número que [SwipeTouchTargetHeight] pero no se deriva de ahí: alto y ancho son
+ * dos decisiones distintas y el modo angosto necesita el ANCHO.
+ */
+internal val SwipeTouchTargetWidth = 48.dp
+
+/**
+ * Umbral del MODO ANGOSTO — **160dp**, medido sobre la BARRA REVELADA y no sobre el bloque.
+ *
+ * 🔴 Es aritmética, no un número redondo: tres acciones de ícono con el objetivo táctil de 48dp
+ * y la separación de siempre ocupan `3 × 48 + 2 × 8 = 160dp`. Por debajo de eso la barra de
+ * íconos tampoco cabe, así que ahí lo que se ajusta es el ancho revelado (ver
+ * [swipeBarWidthPx]), no el botón. La comparación va sobre la barra y no sobre el bloque a
+ * propósito: `BAR_WIDTH_FRACTION` es lo que decide cuánta barra hay, y es ese ancho —no el del
+ * bloque— el que tiene que alojar las acciones.
+ *
+ * ⚠ Las consecuencias del umbral están calculadas con el ancho de contenido del riel del
+ * artboard (≈300dp, pantalla de ~392dp): calle completa 296dp → barra 162,8dp ≥ 160 → ETIQUETA;
+ * dos calles 146dp → barra 80,3dp → ÍCONOS; tres calles 96dp → barra 52,8dp → ÍCONOS. En una
+ * pantalla de 360dp el riel pierde más ancho (≈268dp), así que la calle completa se queda en
+ * 264dp → barra 145,2dp → también ÍCONOS: es lo correcto, porque esa barra tampoco cabe los
+ * botones con texto, y no es una regresión de nadie (hoy se recortan ahí igual).
+ */
+internal val SwipeNarrowBarMinWidth: Dp = SwipeTouchTargetWidth * 3f + ActionGap * 2f
+
+/**
+ * `true` si la barra revelada de un bloque de [widthPx] no llega a [thresholdPx]: MODO ANGOSTO.
+ *
+ * Las dos cifras van en la MISMA unidad (las dos en px, o las dos en dp): el sitio de composición
+ * convierte el umbral a px con `LocalDensity`, y así esta decisión se puede probar sin densidad.
+ *
+ * ⚠ `widthPx > 0f` no es defensa: `onSizeChanged` entrega 0 hasta el primer layout, y sin la
+ * guarda TODA fila empezaría en modo angosto y la barra cambiaría de forma en el primer frame.
+ */
+internal fun isNarrowSwipeBar(widthPx: Float, thresholdPx: Float): Boolean =
+    widthPx > 0f && widthPx * BAR_WIDTH_FRACTION < thresholdPx
+
+/**
+ * Ancho REVELADO de la barra, en la unidad de [widthPx] — la geometría de la que cuelgan el
+ * `offsetX` del tope del arrastre y el ancho real de la barra.
+ *
+ * Modo ancho: la fracción de siempre (`BAR_WIDTH_FRACTION`), intacta. Modo angosto: el bloque
+ * ENTERO, acotado al umbral — revelar una fracción de un bloque estrecho es justamente el defecto
+ * que dejaba acciones fuera del alcance del dedo, pero en un bloque más ancho que el umbral no hay
+ * razón para tapar la tarjeta de más, así que se revela lo que la barra necesita (160dp) y no más.
+ *
+ * ⚠ Suelo geométrico: en un bloque de un tercio (~96dp) tres objetivos de 48dp son 144dp y no
+ * caben en 96dp de ancho disponible. Ahí la barra se revela entera y las acciones se reparten
+ * 96/3 = 32dp: se ven y se tocan las tres, por debajo del objetivo de 48dp, pero hoy ese bloque no
+ * ofrece NINGUNA acción alcanzable con el dedo. El camino que sí cumple 48dp para un bloque así es
+ * la hoja de detalle, y elegir entre las dos cosas es una decisión de producto, no de geometría.
+ */
+internal fun swipeBarWidthPx(widthPx: Float, thresholdPx: Float): Float =
+    if (isNarrowSwipeBar(widthPx, thresholdPx)) {
+        minOf(widthPx, thresholdPx)
+    } else {
+        widthPx * BAR_WIDTH_FRACTION
+    }
+
+/** Papel de color del contenedor de cada acción — el color DISTINGUE la acción, no la decora. */
+@Composable
+private fun SwipeAction.containerColor(): Color = when (this) {
+    SwipeAction.DELETE -> MaterialTheme.colorScheme.errorContainer
+    SwipeAction.CANCEL -> MaterialTheme.colorScheme.secondaryContainer
+    SwipeAction.DECLINE -> MaterialTheme.colorScheme.primaryContainer
+}
+
+/** Tinta sobre [containerColor]: el par del rol, nunca un literal. */
+@Composable
+private fun SwipeAction.contentColor(): Color = when (this) {
+    SwipeAction.DELETE -> MaterialTheme.colorScheme.onErrorContainer
+    SwipeAction.CANCEL -> MaterialTheme.colorScheme.onSecondaryContainer
+    SwipeAction.DECLINE -> MaterialTheme.colorScheme.onPrimaryContainer
+}
+
 @Composable
 private fun ActionButton(action: SwipeAction, onClick: () -> Unit) {
     // 🔴 EL COLOR DISTINGUE LA ACCIÓN. Antes los tres botones eran `primary` lleno: el
@@ -235,16 +359,8 @@ private fun ActionButton(action: SwipeAction, onClick: () -> Unit) {
     // siente mal el tipo de botones"). Ahora cada acción usa su propio papel del
     // esquema: la destructiva en `error`, la reversible en `secondary` y la de la
     // asistencia en `primary`. CERO colores nuevos: son papeles, no literales.
-    val container = when (action) {
-        SwipeAction.DELETE -> MaterialTheme.colorScheme.errorContainer
-        SwipeAction.CANCEL -> MaterialTheme.colorScheme.secondaryContainer
-        SwipeAction.DECLINE -> MaterialTheme.colorScheme.primaryContainer
-    }
-    val content = when (action) {
-        SwipeAction.DELETE -> MaterialTheme.colorScheme.onErrorContainer
-        SwipeAction.CANCEL -> MaterialTheme.colorScheme.onSecondaryContainer
-        SwipeAction.DECLINE -> MaterialTheme.colorScheme.onPrimaryContainer
-    }
+    val container = action.containerColor()
+    val content = action.contentColor()
     Button(
         onClick = onClick,
         colors = ButtonDefaults.buttonColors(
@@ -274,8 +390,57 @@ private fun SwipeAction.icon(): ImageVector = when (this) {
     SwipeAction.DECLINE -> Icons.Filled.PersonOff
 }
 
+/**
+ * T9 (L12) · Botón de acción en MODO ANGOSTO: sólo ícono, con la ETIQUETA como nombre accesible.
+ *
+ * 🔴 `contentDescription = action.label` no es opcional. En modo ancho el nombre lo pone el
+ * `Text` del botón y el ícono es decorativo; aquí el ícono ES la acción, así que sin esto TalkBack
+ * anunciaría "Botón" tres veces seguidas y la acción se volvería adivinanza. Se usa la MISMA
+ * etiqueta del enum —`"Eliminar"`, `"Cancelar"`, `"No asistir"`— para que el nombre hablado y el
+ * nombre escrito del modo ancho no puedan divergir.
+ *
+ * ⚠ `contentPadding` en cero porque el relleno por defecto de un `Button` (24dp por lado) es más
+ * ancho que el botón entero de un bloque de un tercio: el ícono no cabría y el botón quedaría
+ * vacío, que se lee como un hueco y no como una acción.
+ *
+ * Los colores salen de los MISMOS roles que el modo ancho ([containerColor]/[contentColor]): el
+ * modo angosto cambia la FORMA del botón, no su lectura.
+ */
+@Composable
+private fun NarrowActionButton(
+    action: SwipeAction,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Button(
+        onClick = onClick,
+        colors = ButtonDefaults.buttonColors(
+            containerColor = action.containerColor(),
+            contentColor = action.contentColor(),
+        ),
+        contentPadding = PaddingValues(0.dp),
+        // 48dp de alto (R2 · objetivo táctil): el ancho lo pone el reparto de la barra, no el botón.
+        modifier = modifier.heightIn(min = SwipeTouchTargetHeight),
+    ) {
+        Icon(
+            imageVector = action.icon(),
+            contentDescription = action.label,
+            modifier = Modifier.size(SwipeNarrowIconSize),
+        )
+    }
+}
+
 /** Alto mínimo de los botones de acción — 48dp según R2 (target táctil). */
 internal val SwipeTouchTargetHeight = 48.dp
 
 /** Lado del icono del botón de acción — 18dp (es texto de apoyo, no el protagonist). */
 private val SwipeIconSize = 18.dp
+
+/**
+ * Lado del icono en MODO ANGOSTO — 24dp.
+ *
+ * Más grande que [SwipeIconSize] porque ahí el ícono no acompaña a un texto: ES el botón. 24dp es
+ * el tamaño de ícono de Material y cabe en el botón de 32dp del bloque más estrecho (96dp / 3) sin
+ * tocar el borde.
+ */
+private val SwipeNarrowIconSize = 24.dp
