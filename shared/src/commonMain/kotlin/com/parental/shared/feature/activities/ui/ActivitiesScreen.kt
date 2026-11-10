@@ -2,29 +2,28 @@ package com.parental.shared.feature.activities.ui
 
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.CalendarViewWeek
-import androidx.compose.material.icons.filled.DateRange
-import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.filled.Today
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import com.parental.shared.core.ui.components.AppTopBar
 import com.parental.shared.core.ui.components.BottomNavBar
 import com.parental.shared.core.ui.components.CategoryInfo
+import com.parental.shared.core.ui.theme.AgendaGeometry
 import com.parental.shared.core.ui.theme.MotionTokens
 import com.parental.shared.core.ui.theme.Spacing
 import com.parental.shared.feature.activities.ui.detail.ActividadDetailSheet
@@ -33,20 +32,36 @@ import com.parental.shared.feature.activities.ui.openedId
 import com.parental.shared.feature.activities.ui.swipe.SwipeAction
 import com.parental.shared.feature.activities.ui.swipe.SwipeReasonDialog
 import com.parental.shared.feature.activities.ui.swipe.SWIPE_UNDO_LABEL
-import com.parental.shared.feature.bonds.domain.model.VinculoChild
+import kotlinx.coroutines.delay
+import kotlinx.datetime.Clock
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.plus
+import kotlinx.datetime.toLocalDateTime
 
-// T4-4: internal (no private) porque `TimelineControls`, que se mudó a
-// CalendarChrome.kt, lo recibe como tipo de parámetro. Sigue viviendo en este
-// archivo (F1 lo retiene); un símbolo top-level private es invisible entre
-// archivos, así que la mudanza y su rewire son un solo commit.
-internal enum class TimelineMode(val label: String) {
-    AGENDA("Agenda"),
-    SEMANA("Semana"),
-}
+/*
+ * T6 (S3, S6, S7) · Constantes del cromo del riel.
+ *
+ * `MINUTES_PER_HOUR` es la unidad del eje que ya usan `RailDerivation.kt` y `RailCanvas.kt`
+ * (allí privadas): aquí sólo convierte la lectura del reloj en minuto de día. No se importa
+ * de ninguno de los dos porque en los dos es `private`.
+ *
+ * `NOW_TICK_MILLIS` es el período del marcador de "ahora": un minuto, que es la resolución
+ * con la que el eje dibuja la línea.
+ */
+private const val MINUTES_PER_HOUR = 60
+private const val NOW_TICK_MILLIS = 60_000L
+
+/**
+ * Hueco reservado bajo el riel para los dos controles flotantes — el `.fabgap` del artboard
+ * (`03-riel-del-tiempo.html:152`: "keeps the floating create button clear of every pill").
+ *
+ * Derivado, no medido a ojo: el FAB de Material mide 56dp y se apoya con 16dp de margen, así
+ * que el objetivo táctil (48) más el peldaño grande de la escala (24) deja el contenido del
+ * último día POR ENCIMA del FAB y del pill "Hoy" (S6 no admite un control que tape el riel).
+ */
+private val RAIL_FLOATING_CLEARANCE = AgendaGeometry.touchTargetLegacy + Spacing.xl
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -65,11 +80,15 @@ fun ActividadesScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val initialToday = remember { currentDate() }
     // R4-T1-2 · id → `FocusRequester` de la fila que la pintó; T2-2 lo lee al cerrar.
+    // T6 · El riel todavía NO registra sus filas (`RailTimeline` no recibe este mapa), así que
+    // hoy el retorno de foco cae siempre en el contenedor de la lista. El mecanismo se conserva
+    // entero —`retainAll` por conjunto de datos y las dos caídas de `returnFocus`— para que
+    // T7/T8 lo restablezcan sin volver a escribir la aritmética.
     val focusRequesters = remember { mutableStateMapOf<String, FocusRequester>() }
 
-    // Estado local de presentación; selectedTab sigue perteneciendo al ViewModel.
-    var timelineMode by rememberSaveable { mutableStateOf(TimelineMode.AGENDA) }
-    var weekStartIso by rememberSaveable { mutableStateOf(mondayStart(initialToday).toString()) }
+    // T6 (L6) · Estado local de presentación. El riel es la ÚNICA vista, así que ya no hay un
+    // modo que recordar; lo que se recuerda es el día marcado en el mapa de densidad, que es
+    // el mismo que el mapa pinta como seleccionado. `selectedTab` sigue siendo del ViewModel.
     var selectedDateIso by rememberSaveable { mutableStateOf(initialToday.toString()) }
 
     // D-B-1 · El `SheetState` lo posee el host. `show()` se vuelve a PEDIR en cada apertura, así
@@ -157,23 +176,14 @@ fun ActividadesScreen(
             onClearChildren = viewModel::clearChildFilter,
             onSelectActividad = { id -> originId = id; viewModel.selectActividad(id) },
             onRetryList = viewModel::retry,
-            resolve = resolve,
             snackbarHostState = snackbarHostState,
             onNavigateBottom = onNavigateBottom,
             unreadCount = unreadCount,
             onOpenNotifications = onOpenNotifications,
             onLogout = onLogout,
-            onConfirm = viewModel::confirmAssignment,
-            isConfirming = uiState.isConfirming,
             onOpenCreate = viewModel::openCreate,
-            onSwipeAction = viewModel::startSwipeAction,
-            timelineMode = timelineMode,
-            onTimelineModeChange = { timelineMode = it },
-            weekStartIso = weekStartIso,
-            onWeekStartChange = { weekStartIso = it },
             selectedDateIso = selectedDateIso,
             onSelectedDateChange = { selectedDateIso = it },
-            focusRequesters = focusRequesters,
             // Hogar de foco: SIN nodo anunciable nuevo, sólo un destino al que caer si la fila
             // que abrió la hoja ya no existe.
             listFocusRequester = listFallback,
@@ -265,57 +275,57 @@ private fun ActividadesListScreen(
     onClearChildren: () -> Unit,
     onSelectActividad: (String) -> Unit,
     onRetryList: () -> Unit,
-    resolve: (String) -> CategoryInfo?,
     snackbarHostState: SnackbarHostState,
     onNavigateBottom: (String) -> Unit,
     unreadCount: Int,
     onOpenNotifications: (() -> Unit)?,
     onLogout: () -> Unit,
-    onConfirm: (String) -> Unit,
-    isConfirming: Boolean,
     /**
-     * T-FE-17 · Abre el modal de alta. Sustituye a `onInertAction` en esta firma: el "+" era su
-     * ÚNICO consumidor aquí y era un placeholder inerte, así que al dejar de serlo, mantener el
-     * parámetro sería dejar un cable muerto. La hoja de detalle sigue usando `onInertAction`
-     * por su propio canal.
+     * T-FE-17 · Abre el modal de alta. Con T6 es el ÚNICO camino de alta de la pantalla: el
+     * "+" de la barra se fue con S7 (un solo FAB, circular y abajo).
      */
     onOpenCreate: () -> Unit,
-    /**
-     * R2-T2-7 · Reenvía una acción de swipe desde la agenda. Se declara aquí y NO dentro
-     * de `TimelineView`: el cable tiene que existir aunque la semana no esté visible, o
-     * la firma de `TimelineView` cambiaría cada vez que se añadiera una acción.
-     */
-    onSwipeAction: (String, SwipeAction) -> Unit,
-    timelineMode: TimelineMode,
-    onTimelineModeChange: (TimelineMode) -> Unit,
-    weekStartIso: String,
-    onWeekStartChange: (String) -> Unit,
     selectedDateIso: String,
     onSelectedDateChange: (String) -> Unit,
-    focusRequesters: MutableMap<String, FocusRequester>,
     listFocusRequester: FocusRequester,
 ) {
     val zone = remember { TimeZone.currentSystemDefault() }
     val today = remember(zone) { currentDateIn(zone) }
-    val weekStart = parseIsoDate(weekStartIso) ?: mondayStart(today)
     val selectedDate = parseIsoDate(selectedDateIso) ?: today
 
-    // T4 (S3) · Estado de la hoja de calendario y del salto de día.
-    // `showCalendar` es `rememberSaveable`: sobrevive a la rotación con la hoja abierta.
-    var showCalendar by rememberSaveable { mutableStateOf(false) }
-    // El mes visible es una FECHA (cadena ISO), no un `LocalDate`: `LocalDate` no es
-    // `Saveable` y la hoja debe reabrirse en el mismo mes tras rotar.
+    // T6 (S4) · El mapa de densidad se pliega desde el pill de SU encabezado —el único
+    // control (S4)— y el mes visible se recuerda como FECHA ISO, no como `LocalDate`: el
+    // `LocalDate` no es `Saveable` y el mapa debe reabrirse en el mismo mes tras rotar.
+    // Plegado por defecto: en un móvil el mapa abierto ocupa ~280dp de alto y el riel es el
+    // contenido; S4 sólo pide que se muestre u oculte desde su pill, no que arranque abierto.
+    var densityExpanded by rememberSaveable { mutableStateOf(false) }
     var visibleMonthIso by rememberSaveable { mutableStateOf(today.toString()) }
-    val calendarSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    // El destino del salto se guarda un instante y lo consume un `LaunchedEffect`: el
-    // índice del encabezado depende de los grupos, que pueden cambiar con los datos.
-    var pendingJumpDate by remember { mutableStateOf<LocalDate?>(null) }
-    // En modo Semana, el día elegido en la hoja es una SELECCIÓN EXPRESA: no la puede
-    // pisar la regla que re-resuelve el día al cambiar de semana. Se guarda un instante
-    // y se aplica DESPUÉS de esa regla (los dos `LaunchedEffect` corren en orden de
-    // declaración), así que la última palabra es la del usuario.
-    var pendingWeekSelection by remember { mutableStateOf<LocalDate?>(null) }
+    // T6 (S5) · Días PLEGADOS, como lista de cadenas ISO. Es la forma más simple que un
+    // `Saver` escribe en el bundle y la que no depende de que `LocalDate` sea serializable.
+    // Se guarda la lista de días PLEGADOS (y no la de desplegados) para que el estado por
+    // defecto sea "todos desplegados" con una lista vacía.
+    var collapsedDaysIso by rememberSaveable(
+        stateSaver = listSaver<List<String>, String>(save = { it }, restore = { it }),
+    ) { mutableStateOf(emptyList()) }
+    val collapsedDays = remember(collapsedDaysIso) { collapsedDaysIso.toSet() }
+
     val listState = rememberLazyListState()
+    // El destino del salto se guarda un instante y lo consume un `LaunchedEffect`: el índice
+    // del encabezado depende de las secciones, que cambian con los datos y con el plegado.
+    var pendingJumpDate by remember { mutableStateOf<LocalDate?>(null) }
+
+    // T6 (S3) · El reloj del riel se lee FUERA de composición, una vez por minuto. Arranca en
+    // `null` —no en una lectura en el `remember`— y la primera lectura ocurre al lanzarse el
+    // efecto. El `LaunchedEffect` se cancela solo cuando la pantalla deja la composición, así
+    // que no queda un bucle vivo detrás.
+    var nowMinute by remember(zone) { mutableStateOf<Int?>(null) }
+    LaunchedEffect(zone) {
+        while (true) {
+            val now = Clock.System.now().toLocalDateTime(zone)
+            nowMinute = now.hour * MINUTES_PER_HOUR + now.minute
+            delay(NOW_TICK_MILLIS)
+        }
+    }
 
     val filteredRows = remember(uiState.actividades, uiState.selectedTab, uiState.selectedChildren, zone) {
         buildTimelineRows(
@@ -323,61 +333,60 @@ private fun ActividadesListScreen(
             zone,
         )
     }
-    val agendaGroups = remember(filteredRows) { buildAgendaGroups(filteredRows) }
-    // Los puntos se calculan una vez por lista Y por catálogo de categorías: si las
-    // actividades llegan antes que las categorías, un `remember` con sólo la lista
-    // dejaría los puntos en `outline` para siempre.
-    val dayDots = remember(filteredRows, uiState.categories) {
-        buildDayDots(filteredRows, resolve)
-    }
-    val weekDates = remember(weekStart) { buildWeekDates(weekStart) }
-    val dayBuckets = remember(filteredRows, weekDates) {
-        weekDates.associateWith { date -> buildDayBucket(date, filteredRows) }
-    }
-
-    // La regla de selección se resuelve al cargar, al cambiar de filtro o al
-    // navegar de semana; una selección explícita de un día vacío se conserva.
-    var selectionInitialized by rememberSaveable { mutableStateOf(false) }
-    var previousTab by remember { mutableStateOf(uiState.selectedTab) }
-    var previousWeekIso by remember { mutableStateOf(weekStartIso) }
-    var previousRowCount by remember { mutableStateOf(-1) }
-
-    LaunchedEffect(
-        uiState.selectedTab,
-        uiState.actividades,
-        weekStartIso,
-        uiState.isLoading,
-    ) {
-        if (uiState.isLoading && uiState.actividades.isEmpty()) return@LaunchedEffect
-
-        val tabChanged = previousTab != uiState.selectedTab
-        val weekChanged = previousWeekIso != weekStartIso
-        val dataArrived = previousRowCount == 0 && filteredRows.isNotEmpty()
-        if (!selectionInitialized || tabChanged || weekChanged || dataArrived) {
-            onSelectedDateChange(
-                resolveSelectedDate(
-                    weekStart = weekStart,
-                    today = today,
-                    rows = filteredRows,
-                ).toString(),
-            )
-            selectionInitialized = true
+    // El agrupador es el MISMO de la agenda: días ascendentes y "sin fecha de inicio" al
+    // final. El riel no ordena, sólo traduce cada grupo a su sección (T4).
+    val dayGroups = remember(filteredRows) { buildAgendaGroups(filteredRows) }
+    val sections = remember(dayGroups, zone, collapsedDays) {
+        dayGroups.map { group ->
+            val date = group.date
+            if (date == null) {
+                // La sección sin fecha no se pliega y no tiene eje horario.
+                RailSection(date = null, railDay = null, undatedRows = group.rows)
+            } else {
+                RailSection(
+                    date = date,
+                    // Las filas del grupo son exactamente las de ese día, así que alimentan
+                    // el eje sin volver a filtrar la lista entera por día.
+                    railDay = buildRailDay(group.rows, date, zone),
+                    isExpanded = date.toString() !in collapsedDays,
+                )
+            }
         }
-        previousTab = uiState.selectedTab
-        previousWeekIso = weekStartIso
-        previousRowCount = filteredRows.size
+    }
+    val visibleMonth = parseIsoDate(visibleMonthIso) ?: today
+    // La densidad sale de las filas FILTRADAS: si el usuario está en "Eventos", el mapa
+    // cuenta eventos. Un mapa sobre `uiState.actividades` ignoraría la pestaña y el hijo.
+    val density = remember(filteredRows, visibleMonth.year, visibleMonth.monthNumber, zone) {
+        buildMonthDensity(filteredRows, visibleMonth.year, visibleMonth.monthNumber, zone)
+    }
+    // La línea de "ahora" sólo se pasa si HOY es una sección del riel: en un riel sin hoy
+    // sería una hora sin eje que la pinte.
+    val railNowMinute = if (sections.any { it.date == today }) nowMinute else null
+
+    // S5 · Un día se pliega desde el chevron de SU encabezado y desde ningún otro sitio.
+    val toggleDay: (LocalDate) -> Unit = { date ->
+        val iso = date.toString()
+        collapsedDaysIso = if (iso in collapsedDays) {
+            collapsedDaysIso - iso
+        } else {
+            collapsedDaysIso + iso
+        }
     }
 
-    val navigateWeek: (Int) -> Unit = { direction ->
-        val nextWeekStart = weekStart.plus(direction * 7, DateTimeUnit.DAY)
-        onWeekStartChange(nextWeekStart.toString())
-        onSelectedDateChange(
-            resolveSelectedDate(
-                weekStart = nextWeekStart,
-                today = today,
-                rows = filteredRows,
-            ).toString(),
-        )
+    // S6 · "Hoy": despliega el día de hoy si estaba plegado y lleva el riel a su encabezado.
+    // Las dos cosas ocurren en el MISMO toque: el desplegado cambia las secciones y el índice
+    // se calcula después, en el efecto, sobre las secciones ya desplegadas.
+    val goToToday: () -> Unit = {
+        val iso = today.toString()
+        if (iso in collapsedDays) collapsedDaysIso = collapsedDaysIso - iso
+        pendingJumpDate = today
+    }
+
+    // El mes visible se mueve desde las flechas del mapa. Se navega desde el día 1 para que
+    // el 31 de enero + 1 mes no herede el recorte de febrero.
+    val shiftMonth: (Int) -> Unit = { delta ->
+        val firstOfMonth = LocalDate(visibleMonth.year, visibleMonth.monthNumber, 1)
+        visibleMonthIso = firstOfMonth.plus(delta, DateTimeUnit.MONTH).toString()
     }
 
     // R4 · Hogar de foco de la lista: `focusable()` da destino a `requestFocus()` cuando la
@@ -418,54 +427,10 @@ private fun ActividadesListScreen(
                         actionIconContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
                     ),
                     actions = {
-                        // T4 (S3) · El ícono de calendario abre la hoja con los días que
-                        // tienen actividades. Se abre SIEMPRE en el mes de la fecha
-                        // seleccionada, para que "Hoy" y el mes no se contradigan.
-                        IconButton(
-                            onClick = {
-                                visibleMonthIso = selectedDate.toString()
-                                showCalendar = true
-                            },
-                        ) {
-                            Icon(
-                                imageVector = Icons.Filled.DateRange,
-                                contentDescription = "Abrir calendario para saltar a un día",
-                            )
-                        }
-                        // El control segmentado de "Vista" se fue: ahora es un ícono.
-                        // En modo Agenda ofrece la semana; en modo Semana, la lista.
-                        IconButton(
-                            onClick = {
-                                onTimelineModeChange(
-                                    if (timelineMode == TimelineMode.AGENDA) {
-                                        TimelineMode.SEMANA
-                                    } else {
-                                        TimelineMode.AGENDA
-                                    },
-                                )
-                            },
-                        ) {
-                            Icon(
-                                imageVector = if (timelineMode == TimelineMode.AGENDA) {
-                                    Icons.Filled.CalendarViewWeek
-                                } else {
-                                    Icons.AutoMirrored.Filled.List
-                                },
-                                contentDescription = if (timelineMode == TimelineMode.AGENDA) {
-                                    "Vista: lista. Cambiar a semana"
-                                } else {
-                                    "Vista: semana. Cambiar a lista"
-                                },
-                            )
-                        }
-                        // T-FE-17 · El "+" abre el modal de alta (`openCreate`). Antes era un
-                        // placeholder inerte (PRD §8); ya no lo es: el backend de `create` existe.
-                        IconButton(onClick = onOpenCreate) {
-                            Icon(
-                                imageVector = Icons.Default.Add,
-                                contentDescription = "Nueva actividad",
-                            )
-                        }
+                        // T6 (S7, L6) · La barra se queda SIN acciones propias. El "+" se fue
+                        // —el alta es el FAB ÚNICO de abajo— y el ícono de calendario se fue con la
+                        // hoja modal: el mapa de densidad es el calendario de esta vista y el salto
+                        // de día lo dan sus celdas y el pill "Hoy".
                     },
                 )
                 HorizontalDivider(
@@ -480,6 +445,31 @@ private fun ActividadesListScreen(
                 onNavigate = onNavigateBottom,
             )
         },
+        // S7 + S6 · Dos controles flotantes en el mismo sitio: el pill "Hoy" a la izquierda y el
+        // FAB de alta a la derecha, que es donde el artboard los pone. El FAB es CIRCULAR y
+        // `primary` —"Poneme el boton de agregar en un circulo abajo"— y es el ÚNICO camino de
+        // alta de la pantalla. El pill NO es un FAB (S7 pide uno solo) sino un botón elevado con
+        // su palabra. Si hoy no tiene sección, el toque de "Hoy" no hace nada: ver `goToToday`,
+        floatingActionButton = {
+            Row(
+                modifier = Modifier.padding(end = Spacing.lg),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                RailTodayButton(today = today, onClick = goToToday)
+                FloatingActionButton(
+                    onClick = onOpenCreate,
+                    shape = CircleShape,
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = "Nueva actividad",
+                    )
+                }
+            }
+        },
         // R-8 / G-1 · Un ÚNICO `SnackbarHost` en toda la pantalla. La lista lo hospeda sólo
         // cuando NO hay hoja; mientras hay hoja lo hospeda la hoja. Dos hosts siempre activos
         // serían doble pintada y doble anuncio.
@@ -489,6 +479,27 @@ private fun ActividadesListScreen(
             modifier = Modifier.fillMaxSize().padding(padding),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
+            // T6 (S4) · El mapa de densidad va ARRIBA de los filtros y se pliega desde el pill
+            // de su PROPIO encabezado: no hay un segundo control en ninguna otra parte ("que se
+            // muestra u oculta desde el pill del encabezado del calendario").
+            MonthDensityMap(
+                year = visibleMonth.year,
+                monthNumber = visibleMonth.monthNumber,
+                density = density,
+                selected = selectedDate,
+                today = today,
+                expanded = densityExpanded,
+                onToggleExpanded = { densityExpanded = !densityExpanded },
+                onSelectDay = { date ->
+                    // Elegir un día en el mapa es un SALTO en el riel, no una vista nueva: si
+                    // ese día no tiene actividades, se va al día con actividades más cercano
+                    // —el mismo criterio que usaba la hoja modal de calendario—.
+                    onSelectedDateChange(date.toString())
+                    pendingJumpDate = jumpTargetDate(date, dayGroups)
+                },
+                onPrevMonth = { shiftMonth(-1) },
+                onNextMonth = { shiftMonth(1) },
+            )
             // T3 (S5) · Los filtros son UNA línea de chips con contador. Los rótulos
             // "Vista" y "Filtrar" y el control segmentado se fueron con el nuevo cromo.
             ActivityFiltersRow(
@@ -508,189 +519,113 @@ private fun ActividadesListScreen(
                     onToggleChild = onToggleChild,
                 )
             }
-            when {
-                uiState.isLoading && uiState.actividades.isEmpty() -> ListSkeleton()
-                uiState.listError != null -> EmptyState(
-                    title = "No pudimos cargar",
-                    message = uiState.listError!!,
-                    actionLabel = "Reintentar",
-                    onAction = onRetryList,
-                )
-                // R4-T5-4 · SITIO 2 de 2. La condición de vacío es ahora el
-                // `targetState`, no una rama: es la única forma de que la
-                // transición ocurra REALMENTE — dos `Crossfade` separados, cada
-                // uno con un target constante, no animarían nunca y serían dos
-                // sitios de motion que no motion. La precedencia de 4 ramas y el
-                // guard `isLoading && isEmpty` de la rama 1 quedan intactos: el
-                // mismo test, en el mismo orden, después de los mismos dos.
-                //
-                // ⚠ DESVIACIÓN DE RC-1, declarada: la línea de predicado
-                // `uiState.actividades.isEmpty() ->` desaparece de la `when`. Es
-                // la única línea de predicado que T5-4 mueve y no se puede
-                // tener ambas cosas — ver el informe de apply. Sin cambio de
-                // comportamiento.
-                else -> Crossfade(
-                    targetState = uiState.actividades.isEmpty(),
-                    animationSpec = tween(MotionTokens.durationStandard),
-                    label = "listEmptyToContent",
-                ) { isEmpty ->
-                    if (isEmpty) {
-                        EmptyState(
-                            title = "No hay actividades",
-                            message = "",
-                        )
-                    } else TimelineContent(
-                        mode = timelineMode,
-                        rows = filteredRows,
-                        agendaGroups = agendaGroups,
-                        weekStart = weekStart,
-                        weekDates = weekDates,
-                        dayBuckets = dayBuckets,
-                        selectedDate = selectedDate,
-                        zone = zone,
-                        resolve = resolve,
-                        onSelectActividad = onSelectActividad,
-                        onConfirm = onConfirm,
-                        isConfirming = isConfirming,
-                        memberNames = uiState.memberNames,
-                        children = uiState.children,
-                        onSwipeAction = onSwipeAction,
-                        onSelectDate = { date -> onSelectedDateChange(date.toString()) },
-                        onPreviousWeek = { navigateWeek(-1) },
-                        onNextWeek = { navigateWeek(1) },
-                        focusRequesters = focusRequesters,
-                        listState = listState,
+            // T6 · El contenido ocupa el alto que queda y deja libre el hueco de los dos
+            // controles flotantes (el `.fabgap` del artboard): así ni el FAB ni el pill "Hoy"
+            // tapan el final del riel. La `Column` no scrollea —lo que scrollea es el riel—, así
+            // que el pill queda siempre alcanzable sin taparlo todo.
+            Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
+                when {
+                    uiState.isLoading && uiState.actividades.isEmpty() -> ListSkeleton()
+                    uiState.listError != null -> EmptyState(
+                        title = "No pudimos cargar",
+                        message = uiState.listError!!,
+                        actionLabel = "Reintentar",
+                        onAction = onRetryList,
                     )
+                    // R4-T5-4 · SITIO 2 de 2. La condición de vacío es ahora el
+                    // `targetState`, no una rama: es la única forma de que la
+                    // transición ocurra REALMENTE — dos `Crossfade` separados, cada
+                    // uno con un target constante, no animarían nunca y serían dos
+                    // sitios de motion que no motion. La precedencia de 4 ramas y el
+                    // guard `isLoading && isEmpty` de la rama 1 quedan intactos: el
+                    // mismo test, en el mismo orden, después de los mismos dos.
+                    //
+                    // ⚠ DESVIACIÓN DE RC-1, declarada: la línea de predicado
+                    // `uiState.actividades.isEmpty() ->` desaparece de la `when`. Es
+                    // la única línea de predicado que T5-4 mueve y no se puede
+                    // tener ambas cosas — ver el informe de apply. Sin cambio de
+                    // comportamiento.
+                    else -> Crossfade(
+                        targetState = uiState.actividades.isEmpty(),
+                        animationSpec = tween(MotionTokens.durationStandard),
+                        label = "listEmptyToContent",
+                    ) { isEmpty ->
+                        if (isEmpty) {
+                            EmptyState(
+                                title = "No hay actividades",
+                                message = "",
+                            )
+                        } else RailTimeline(
+                            // T6 (S3) · El riel es la ÚNICA vista de Actividades (L6). Las
+                            // secciones ya vienen derivadas y en orden: el riel no agrupa ni
+                            // ordena, sólo pinta encabezados pegajosos y cuerpos de día.
+                            sections = sections,
+                            categories = uiState.categories,
+                            memberNames = uiState.memberNames,
+                            children = uiState.children,
+                            zone = zone,
+                            today = today,
+                            nowMinute = railNowMinute,
+                            // El estado de la lista lo posee la pantalla: es lo que mueve el
+                            // salto a un día con el índice de `railItemIndexOf`.
+                            listState = listState,
+                            onOpen = { row -> onSelectActividad(row.actividad.id) },
+                            onToggleDay = toggleDay,
+                        )
+                    }
                 }
             }
+            Spacer(modifier = Modifier.height(RAIL_FLOATING_CLEARANCE))
         }
         }
 
-        // T4 (S3) · La hoja de calendario se compone como HERMANA del Scaffold, dentro
-        // de la misma `Box` que la lista. Es una ventana modal real: su scrim cubre el
-        // feed y el árbol accesible queda acotado por ella (mismo patrón que la hoja de
-        // detalle, que vive un nivel más arriba).
-        if (showCalendar) {
-            LaunchedEffect(Unit) { calendarSheetState.show() }
-            CalendarJumpSheet(
-                sheetState = calendarSheetState,
-                today = today,
-                visibleMonth = parseIsoDate(visibleMonthIso) ?: today,
-                onMonthChange = { visibleMonthIso = it.toString() },
-                // Los puntos son de los días con actividades DEL FILTRO ACTIVO: si el
-                // usuario está en "Eventos", la hoja muestra los días con eventos.
-                dayDots = dayDots,
-                onSelectDate = { date ->
-                    showCalendar = false
-                    if (timelineMode == TimelineMode.SEMANA) {
-                        // En modo Semana el día elegido SE SELECCIONA: la semana se
-                        // reancla a ese día y la vista muestra su agenda.
-                        onWeekStartChange(mondayStart(date).toString())
-                        pendingWeekSelection = date
-                    } else {
-                        // En modo Agenda el día elegido es un SALTO: la lista se
-                        // desplaza al encabezado de ese día (o al grupo más cercano
-                        // hacia adelante, si ese día no tiene actividades).
-                        pendingJumpDate = jumpTargetDate(date, agendaGroups)
-                    }
-                },
-                onDismiss = { showCalendar = false },
-            )
-        }
-
-        // El salto se APLICA cuando ya se sabe el índice del encabezado: los grupos
-        // dependen de los datos, que pueden llegar después del toque.
-        LaunchedEffect(pendingJumpDate, agendaGroups) {
+        // T6 (S6) · El salto se APLICA cuando ya se sabe el índice del encabezado: las
+        // secciones dependen de los datos y del plegado, que pueden cambiar después del toque.
+        // `railItemIndexOf` es la MISMA cuenta que monta el riel (`RailIndex.kt`), así que el
+        // destino no puede desalinearse de la lista.
+        LaunchedEffect(pendingJumpDate, sections) {
             val target = pendingJumpDate ?: return@LaunchedEffect
-            val index = agendaHeaderIndex(agendaGroups, target)
+            val index = railItemIndexOf(sections, target)
             if (index != null) listState.scrollToItem(index)
             pendingJumpDate = null
         }
-
-        // La selección expresa de la hoja se aplica DESPUÉS de la regla que re-resuelve
-        // el día al cambiar de semana. Este efecto está declarado después de aquél a
-        // propósito: en el mismo frame, el orden de ejecución es el orden de declaración.
-        LaunchedEffect(pendingWeekSelection, weekStartIso) {
-            val picked = pendingWeekSelection ?: return@LaunchedEffect
-            onSelectedDateChange(picked.toString())
-            pendingWeekSelection = null
-        }
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
+/**
+ * T6 (S6) · El pill "Hoy": un botón ELEVADO, no un FAB (S7 pide uno solo).
+ *
+ * Hace las dos cosas que el artboard le pide a su `#hoyBtn`
+ * (`03-riel-del-tiempo.html:219`, `aria-label="Ir a hoy, miércoles 13 de mayo"`): despliega el
+ * día de hoy si estaba plegado y lleva el riel a su encabezado. La etiqueta accesible nombra
+ * el DÍA —no sólo repite la palabra del botón— y sale de `formatDayTitle`, el mismo
+ * formateador del encabezado del día.
+ *
+ * ⚠ `ElevatedButton` y no una `Surface` con `clickable`: trae el rol de botón, el estado de
+ * pulsado y la elevación del tema sin que este archivo declare un dp de sombra. El
+ * `heightIn` con el objetivo táctil mantiene el piso de S11 aunque un tema encoja el botón.
+ */
 @Composable
-private fun TimelineContent(
-    mode: TimelineMode,
-    rows: List<TimelineRow>,
-    agendaGroups: List<AgendaGroup>,
-    weekStart: LocalDate,
-    weekDates: List<LocalDate>,
-    dayBuckets: Map<LocalDate, DayBucket>,
-    selectedDate: LocalDate,
-    zone: TimeZone,
-    resolve: (String) -> CategoryInfo?,
-    onSelectActividad: (String) -> Unit,
-    onConfirm: (String) -> Unit,
-    isConfirming: Boolean,
-    memberNames: Map<String, String>,
-    children: List<VinculoChild>,
-    onSwipeAction: (String, SwipeAction) -> Unit,
-    onSelectDate: (LocalDate) -> Unit,
-    onPreviousWeek: () -> Unit,
-    onNextWeek: () -> Unit,
-    focusRequesters: MutableMap<String, FocusRequester>,
-    listState: androidx.compose.foundation.lazy.LazyListState,
-) {
-    // R4-T5-4 · SITIO 1 de 2. `Crossfade` (no `AnimatedContent`: es experimental
-    // en CMP 1.7.1 y añadiría un `@OptIn`, contra la disciplina de DD-2). El
-    // `when` conserva sus dos ramas y su orden; lo único que envuelve es el
-    // contenido, así que la precedencia es idéntica.
-    //
-    // `selectedDate` y `weekStart` NO se tocan: viven en `rememberSaveable` de la
-    // pantalla (:102-103), un nivel por encima de aquí, así que un crossfade no
-    // puede reiniciarlos. Ese es el guard de T5-4.
-    Crossfade(
-        targetState = mode,
-        animationSpec = tween(MotionTokens.durationStandard),
-        label = "timelineMode",
-    ) { targetMode ->
-        when (targetMode) {
-            TimelineMode.AGENDA -> AgendaTimeline(
-                groups = agendaGroups,
-                zone = zone,
-                resolve = resolve,
-                onSelectActividad = onSelectActividad,
-                onConfirm = onConfirm,
-                isConfirming = isConfirming,
-                memberNames = memberNames,
-                children = children,
-                // R2-T2-7 · La LISTA es la superficie principal de la acción y hasta ahora
-                // no tenía gesto: sólo lo tenía la agenda de día. Sin este argumento
-                // `AgendaTimeline` ni siquiera compila.
-                onSwipeAction = onSwipeAction,
-                focusRequesters = focusRequesters,
-                listState = listState,
-            )
-
-            TimelineMode.SEMANA -> WeekTimeline(
-                rows = rows,
-                weekStart = weekStart,
-                weekDates = weekDates,
-                dayBuckets = dayBuckets,
-                selectedDate = selectedDate,
-                zone = zone,
-                resolve = resolve,
-                onSelectActividad = onSelectActividad,
-                onConfirm = onConfirm,
-                isConfirming = isConfirming,
-                onSwipeAction = onSwipeAction,
-                onSelectDate = onSelectDate,
-                onPreviousWeek = onPreviousWeek,
-                onNextWeek = onNextWeek,
-                focusRequesters = focusRequesters,
-            )
-        }
+private fun RailTodayButton(today: LocalDate, onClick: () -> Unit) {
+    ElevatedButton(
+        onClick = onClick,
+        shape = CircleShape,
+        contentPadding = PaddingValues(horizontal = Spacing.lg, vertical = Spacing.sm),
+        modifier = Modifier
+            .heightIn(min = AgendaGeometry.touchTargetLegacy)
+            .semantics { contentDescription = "Ir a hoy, ${formatDayTitle(today)}" },
+    ) {
+        Icon(
+            imageVector = Icons.Filled.Today,
+            contentDescription = null,
+            modifier = Modifier.size(Spacing.lg),
+        )
+        Spacer(modifier = Modifier.width(Spacing.xs))
+        Text(
+            text = "Hoy",
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+        )
     }
 }
-
