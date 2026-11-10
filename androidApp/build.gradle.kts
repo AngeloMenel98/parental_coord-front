@@ -19,7 +19,11 @@ android {
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.parental.android"
+        // El id sale de `-PappId=…` cuando se pasa, y si no del de siempre. Así la app de
+        // desarrollo (`com.parental.android.local`) y la de producción conviven en el mismo
+        // teléfono sin editar el archivo a mano, y `:androidApp:assembleDebug` sigue
+        // produciendo exactamente el mismo id que antes.
+        applicationId = (project.findProperty("appId") as String?) ?: "com.parental.android"
         minSdk = 26
         targetSdk = 35
         versionCode = 1
