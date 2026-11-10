@@ -1,0 +1,493 @@
+package com.parental.shared.feature.activities.ui
+
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import com.parental.shared.core.ui.components.CategoryInfo
+import com.parental.shared.core.ui.components.StatusTag
+import com.parental.shared.core.ui.components.categoryTagTriple
+import com.parental.shared.core.ui.theme.AgendaGeometry
+import com.parental.shared.core.ui.theme.ParentalShapes
+import com.parental.shared.core.ui.theme.RailGeometry
+import com.parental.shared.core.ui.theme.Spacing
+import com.parental.shared.feature.bonds.domain.model.VinculoChild
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.TimeZone
+
+/*
+ * Secciones de día del RIEL del tiempo — T4 de `odd/tasks/activity-rail.md` (S3, S5, S11).
+ * **Archivo nuevo.** Traducción del artboard `design/activity-calendar-ui/03-riel-del-tiempo.html`:
+ * encabezado de día pegajoso y plegable, cuerpo del día (canaleta + lienzo de T2/T3) y la
+ * sección "Sin fecha de inicio". No se copia HTML.
+ *
+ * NO HACE: montarse en `ActivitiesScreen` (T6), borrar `AgendaList`/`WeekAgenda`/`DayAgenda`
+ * (T8), dibujar el mapa de densidad (T5), leer el reloj (`today` y `nowMinute` entran por
+ * parámetro) ni re-derivar el día (`RailDay` de T1 ya trae eje, bloques y ticks).
+ *
+ * 🔴 LA FORMA DE LA LISTA LA DECIDE `RailIndex.kt`, NO ESTE ARCHIVO. Cada sección pone UN
+ * encabezado (`stickyHeader`) más `railContentCount(section)` ítems de contenido. El salto a
+ * un día (T6) pide su índice a `railItemIndexOf` sobre la MISMA lista, así que el número y
+ * esta `LazyColumn` no pueden separarse: si un `item` de más o de menos aparece aquí, la
+ * prueba pura de `RailIndexTest` sigue en verde y el salto aterriza en el día equivocado.
+ *
+ * Nada de hex, nada de dp crudo: `Spacing`, `AgendaGeometry`, `RailGeometry`, `ParentalShapes`
+ * y `MaterialTheme.colorScheme`.
+ */
+
+/** Chip de "hoy" del encabezado. Misma palabra que ya usa el encabezado del agenda. */
+private const val RAIL_TODAY_CHIP = "hoy"
+
+/** Copy del día sin bloques — `"Día libre: sin actividades cargadas"` del artboard (`:481`).
+ *  Sin botón: el alta es el FAB único de S7, que no vive en la fila. */
+private const val RAIL_FREE_DAY_LABEL = "Día libre: sin actividades cargadas"
+
+/** Clave de lista de la sección sin fecha (el `date` es `null` y una clave nula no vale). */
+private const val RAIL_UNDATED_KEY = "sin-fecha"
+
+/**
+ * El riel completo: una `LazyColumn` de secciones de día con encabezado PEGAJOSO (S3).
+ *
+ * `stickyHeader` es `@ExperimentalFoundationApi` en la Foundation que resuelve Compose
+ * Multiplatform 1.7.1 (verificado en las fuentes de `androidx.compose.foundation`
+ * 1.7.5), de ahí el `@OptIn`. NO se degrada a un `item` normal si algún día deja de
+ * compilar: S3 pide encabezados pegajosos y un encabezado que se va con el scroll es otra
+ * pantalla.
+ *
+ * @param sections secciones ya derivadas y ordenadas por la pantalla; el riel no ordena.
+ * @param today día de hoy en [zone], para el chip "hoy" y la línea de "ahora".
+ * @param nowMinute minuto de día actual, o `null` si la pantalla no lo conoce. Sólo se
+ *   pinta en la sección de hoy (`RailDayCanvas` descarta además lo que caiga fuera del eje).
+ * @param listState el estado de la lista lo posee la pantalla: es lo que el salto a un día
+ *   (T6) mueve con el índice de `railItemIndexOf`.
+ * @param onToggleDay pliega o despliega el día tocado. Sólo el chevron lo dispara (S5): el
+ *   encabezado NO es un botón, así que el chevron nunca queda anidado en otro `clickable`.
+ */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+internal fun RailTimeline(
+    sections: List<RailSection>,
+    categories: Map<String, CategoryInfo>,
+    memberNames: Map<String, String>,
+    children: List<VinculoChild>,
+    zone: TimeZone,
+    today: LocalDate,
+    nowMinute: Int?,
+    listState: LazyListState,
+    onOpen: (TimelineRow) -> Unit,
+    onToggleDay: (LocalDate) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    LazyColumn(
+        state = listState,
+        modifier = modifier.fillMaxWidth(),
+        // Sólo abajo: un `contentPadding` superior desplaza el borde en el que se pega el
+        // encabezado y el día quedaría flotando un renglón.
+        contentPadding = PaddingValues(bottom = Spacing.lg),
+    ) {
+        sections.forEach { section ->
+            val date = section.date
+            stickyHeader(key = "rail-header-${date ?: RAIL_UNDATED_KEY}") {
+                RailDayHeader(
+                    section = section,
+                    today = today,
+                    onToggleDay = onToggleDay,
+                )
+            }
+            when {
+                // La sección sin fecha no se pliega: sus filas siempre están.
+                date == null -> section.undatedRows.forEach { undatedRow ->
+                    item(key = "rail-undated-${undatedRow.actividad.id}") {
+                        RailUndatedRow(
+                            row = undatedRow,
+                            info = categories[undatedRow.actividad.categoryId],
+                            zone = zone,
+                            memberNames = memberNames,
+                            children = children,
+                            onClick = { onOpen(undatedRow) },
+                        )
+                    }
+                }
+                // Un día plegado no aporta ítem de contenido (`railContentCount` = 0).
+                section.isExpanded -> item(key = "rail-day-$date") {
+                    RailDayBody(
+                        section = section,
+                        categories = categories,
+                        memberNames = memberNames,
+                        children = children,
+                        zone = zone,
+                        today = today,
+                        nowMinute = nowMinute,
+                        onOpen = onOpen,
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Encabezado PEGAJOSO de una sección — S3 ("encabezados de día pegajosos") y S5 (plegar).
+ *
+ * Anatomía del `.dayheader` del artboard: rótulo compacto (`railDayLabel`), chip "hoy",
+ * contador (`margin-left:auto`), marca de vencidas en `error` y chevron a la derecha.
+ *
+ * DOS NODOS, y el reparto importa (mismo criterio que `EmptyState`): el bloque de texto se
+ * fusiona en UN nodo con `heading()`, y el chevron queda FUERA — fusionarlo escondería su
+ * acción de plegado y el usuario oiría un encabezado sin control. El contador y la marca
+ * de vencidas ya están en PALABRAS, así que la fusión anuncia la información completa
+ * (S11: el estado nunca se codifica sólo con color).
+ *
+ * `background(surface)` es obligatorio: el encabezado se pega encima del lienzo del día y
+ * sin fondo opaco el eje horario se leería a través del texto.
+ */
+@Composable
+private fun RailDayHeader(
+    section: RailSection,
+    today: LocalDate,
+    onToggleDay: (LocalDate) -> Unit,
+) {
+    val date = section.date
+    val isToday = date == today
+    val titleColor = if (isToday) {
+        MaterialTheme.colorScheme.primary
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    Column(modifier = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface)) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = AgendaGeometry.touchTargetLegacy)
+                .padding(start = Spacing.lg, end = Spacing.sm),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Row(
+                modifier = Modifier
+                    .weight(1f)
+                    .semantics(mergeDescendants = true) { heading() },
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    // La sección sin fecha se rotula con la constante que ya existe.
+                    text = date?.let(::railDayLabel) ?: NO_START_LABEL,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = titleColor,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (isToday) {
+                    Spacer(modifier = Modifier.width(Spacing.xs))
+                    RailTodayChip()
+                }
+                Spacer(modifier = Modifier.weight(1f))
+                Text(
+                    text = railCountLabel(section),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                val overdue = railOverdueCount(section)
+                if (overdue > 0) {
+                    Spacer(modifier = Modifier.width(Spacing.xs))
+                    Text(
+                        text = railOverdueLabel(overdue),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.error,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+            // El chevron es el ÚNICO elemento interactivo del encabezado y no va anidado en
+            // ningún `clickable`: `toggleable` expone el estado (equivalente a
+            // `aria-expanded`) y su acción de plegado.
+            if (date != null) {
+                RailDayToggle(
+                    isExpanded = section.isExpanded,
+                    label = formatGroupTitle(date, today),
+                    onClick = { onToggleDay(date) },
+                )
+            }
+        }
+        // Separador del artboard (`box-shadow: 0 1px 0 var(--outline-variant)`).
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(Spacing.hairline)
+                .background(MaterialTheme.colorScheme.outlineVariant),
+        )
+    }
+}
+
+/**
+ * Chevron de plegado — S5: "Esto me imagino que es para plegar y desplegar el dia."
+ *
+ * `toggleable` (no `clickable`) porque el control TIENE estado: TalkBack anuncia el valor
+ * como encendido/apagado y `stateDescription` lo dice en las palabras del riel
+ * ("Desplegado"/"Plegado"). El objetivo táctil es [AgendaGeometry.touchTargetLegacy] (S11).
+ *
+ * ⚠ DESVIACIÓN DEL ARTBOARD: allí el mismo chevron gira 180° con una transición; aquí se
+ * elige el ícono por estado (`ExpandLess`/`ExpandMore`) para no arrastrar una dependencia
+ * de animación sólo por el giro. Mismo significado, cero estados intermedios.
+ */
+@Composable
+private fun RailDayToggle(isExpanded: Boolean, label: String, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .size(AgendaGeometry.touchTargetLegacy)
+            .clip(CircleShape)
+            .toggleable(value = isExpanded, role = Role.Button, onValueChange = { onClick() })
+            .semantics {
+                contentDescription = if (isExpanded) "Plegar el día $label" else "Desplegar el día $label"
+                stateDescription = if (isExpanded) "Desplegado" else "Plegado"
+            },
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            imageVector = if (isExpanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+            // El texto alternativo lo lleva el contenedor: dos nodos dirían lo mismo dos veces.
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(Spacing.xl),
+        )
+    }
+}
+
+/** Chip "hoy" — `primaryContainer`/`onPrimaryContainer` del `.hoy` del artboard (`:76`). */
+@Composable
+private fun RailTodayChip() {
+    Surface(
+        shape = ParentalShapes.extraSmall,
+        color = MaterialTheme.colorScheme.primaryContainer,
+        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+    ) {
+        Text(
+            text = RAIL_TODAY_CHIP,
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            modifier = Modifier.padding(horizontal = Spacing.xxs, vertical = Spacing.xs),
+        )
+    }
+}
+
+/**
+ * Cuerpo de un día: canaleta horaria (T2) + lienzo proporcional (T3), y el "día libre"
+ * cuando el día no tiene ni un bloque.
+ *
+ * La altura del contenedor es la MISMA que la del lienzo —
+ * `railOffsetDp(axis.endMinute, axis, RailGeometry.DpPerHour).dp` —, no un alto adivinado:
+ * un contenedor más bajo recorta el final del eje y uno más alto deja un hueco muerto
+ * antes del día siguiente.
+ */
+@Composable
+private fun RailDayBody(
+    section: RailSection,
+    categories: Map<String, CategoryInfo>,
+    memberNames: Map<String, String>,
+    children: List<VinculoChild>,
+    zone: TimeZone,
+    today: LocalDate,
+    nowMinute: Int?,
+    onOpen: (TimelineRow) -> Unit,
+) {
+    val railDay = section.railDay ?: return
+    if (railDay.blocks.isEmpty()) {
+        RailFreeDay()
+        return
+    }
+    val axis = railDay.axis
+    val canvasHeight = railOffsetDp(axis.endMinute, axis, RailGeometry.DpPerHour).dp
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(canvasHeight)
+            .padding(end = Spacing.md),
+        verticalAlignment = Alignment.Top,
+    ) {
+        RailHourGutter(axis = axis, dpPerHour = RailGeometry.DpPerHour)
+        RailDayCanvas(
+            railDay = railDay,
+            categories = categories,
+            memberNames = memberNames,
+            children = children,
+            zone = zone,
+            onOpen = onOpen,
+            // La línea de "ahora" sólo tiene sentido en el día de hoy: en cualquier otro
+            // día diría una hora que no es la de ese eje.
+            nowMinute = nowMinute.takeIf { section.date == today },
+            modifier = Modifier.weight(1f),
+        )
+    }
+}
+
+/**
+ * Día sin actividades: una fila de borde PUNTEADO con el texto del artboard y **sin botón**.
+ *
+ * El punteado no existe en `Modifier.border`, así que se dibuja con `drawBehind` y un
+ * [PathEffect] de guiones derivado de [Spacing] (`xs` de guion, `xxs` de hueco), con el
+ * radio de [ParentalShapes.medium] — ni un dp crudo ni un color fuera del tema. Se resta
+ * medio trazo al rectángulo porque el trazo se centra en el borde y la mitad quedaría
+ * recortada por el clip.
+ */
+@Composable
+private fun RailFreeDay() {
+    val shape = ParentalShapes.medium
+    val outline = MaterialTheme.colorScheme.outlineVariant
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = Spacing.lg, vertical = Spacing.sm)
+            .drawBehind {
+                val stroke = Spacing.hairline.toPx()
+                drawRoundRect(
+                    color = outline,
+                    topLeft = Offset(stroke / 2, stroke / 2),
+                    size = Size(size.width - stroke, size.height - stroke),
+                    cornerRadius = CornerRadius(shape.topStart.toPx(size, this)),
+                    style = Stroke(
+                        width = stroke,
+                        pathEffect = PathEffect.dashPathEffect(
+                            floatArrayOf(Spacing.xs.toPx(), Spacing.xxs.toPx()),
+                        ),
+                    ),
+                )
+            }
+            .padding(horizontal = Spacing.md, vertical = Spacing.lg),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = RAIL_FREE_DAY_LABEL,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+        )
+    }
+}
+
+/**
+ * Una fila de la sección "Sin fecha de inicio" — el `.urow` del artboard (`:146`).
+ *
+ * ⚠ FILA PROPIA Y NO `AgendaTimelineRow`: esa firma pide `resolve`, `onSelectActividad`,
+ * `onConfirm`, `isConfirming`, `focusRequesters` y el hueco `swipe`, y `RailTimeline` sólo
+ * recibe `onOpen`. "Sin fecha" TAMPOCO tiene un `date` que pasarle, y cambiar su firma para
+ * acomodar este caso tocaría las dos superficies que todavía la montan (`AgendaList` y
+ * `WeekAgenda`), que se retiran en T8. Es la fila mínima del arteboard: riel de categoría,
+ * título y estado en palabras.
+ */
+@Composable
+private fun RailUndatedRow(
+    row: TimelineRow,
+    info: CategoryInfo?,
+    zone: TimeZone,
+    memberNames: Map<String, String>,
+    children: List<VinculoChild>,
+    onClick: () -> Unit,
+) {
+    val railColor = categoryTagTriple(info)?.dot ?: MaterialTheme.colorScheme.outline
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = Spacing.lg, vertical = Spacing.xs)
+            .heightIn(min = AgendaGeometry.touchTargetLegacy)
+            .clip(ParentalShapes.medium)
+            .border(Spacing.hairline, MaterialTheme.colorScheme.outlineVariant, ParentalShapes.medium)
+            // El riel de categoría se DIBUJA en vez de maquetarse: `fillMaxHeight` dentro de
+            // una fila sin alto fijo (la de `LazyColumn`) no tiene contra qué resolverse, y
+            // `IntrinsicSize.Min` ataría la altura del riel al texto, no al objetivo táctil.
+            .drawBehind {
+                drawRect(
+                    color = railColor,
+                    size = Size(RailGeometry.CategoryRail.toPx(), size.height),
+                )
+            }
+            .clickable(role = Role.Button, onClick = onClick)
+            .semantics(mergeDescendants = true) {
+                // La etiqueta del calendario ya compone fecha ("Sin fecha de inicio" cuando
+                // no hay inicio), título, categoría, tipo y estado: no se reescribe aquí.
+                contentDescription = activitySemanticLabel(row, info, zone, memberNames, children)
+            },
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = row.actividad.title,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier
+                .weight(1f)
+                .padding(horizontal = Spacing.sm),
+        )
+        StatusTag(status = row.actividad.status, modifier = Modifier.padding(end = Spacing.sm))
+    }
+}
+
+/**
+ * Contador del encabezado: `"sin actividades"`, `"1 actividad"`, `"2 actividades"`.
+ *
+ * Es el mismo copy del `dcount` del artboard (`:431`) y el mismo criterio de plural del
+ * `dayCellSemanticLabel` del calendario.
+ */
+private fun railCountLabel(section: RailSection): String {
+    val count = section.railDay?.blocks?.size ?: section.undatedRows.size
+    return when (count) {
+        0 -> "sin actividades"
+        1 -> "1 actividad"
+        else -> "$count actividades"
+    }
+}
+
+/** Vencidas del día. El estado llega en minúsculas del backend y con una sola clave. */
+private fun railOverdueCount(section: RailSection): Int =
+    section.railDay?.blocks?.count { block -> block.row.actividad.status.uppercase() == "OVERDUE" } ?: 0
+
+/** Marca de vencidas en PALABRAS: el color de `error` no es la única señal (S11). */
+private fun railOverdueLabel(overdue: Int): String =
+    if (overdue == 1) "· 1 vencida" else "· $overdue vencidas"
