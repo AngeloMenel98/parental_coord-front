@@ -59,102 +59,87 @@ class BitacoraDerivationTest {
     private val luis = VinculoChild(id = "c2", firstName = "Luis", lastName = "García")
     private val zone = TimeZone.UTC
 
+    private fun nodos(actividad: ActividadDetalle) = stageRail(actividad).nodes
+
     private fun etapaActual(actividad: ActividadDetalle) =
-        activityStages(actividad).single { it.current }
+        nodos(actividad).single { it.current }
 
     // ── Riel de etapas ────────────────────────────────────────────────
 
     @Test
     fun `S3 el riel siempre tiene las cinco etapas en orden`() {
-        val labels = activityStages(detalle()).map { it.stage.label }
+        val labels = nodos(detalle()).map { it.stage.label }
         assertEquals(
-            listOf("Creada", "Asignada", "Confirmada", "En progreso", "Finalizada"),
+            listOf("Creada", "Asignada", "Asiste", "En progreso", "Finalizada"),
             labels,
         )
     }
 
     @Test
     fun `S3 created deja la etapa actual en Creada`() {
-        val stages = activityStages(detalle(status = "created", assignedTo = null))
+        val stages = nodos(detalle(status = "created", assignedTo = null))
         assertEquals("Creada", etapaActual(detalle(status = "created", assignedTo = null)).stage.label)
         assertFalse(stages.single { it.stage.label == "Asignada" }.reached)
     }
 
     @Test
-    fun `S3 assigned sin confirmar deja Confirmada sin alcanzar`() {
-        val stages = activityStages(detalle(status = "assigned"))
+    fun `S3 assigned sin confirmar deja Asiste sin alcanzar`() {
+        val stages = nodos(detalle(status = "assigned"))
         assertTrue(stages.single { it.stage.label == "Asignada" }.reached)
-        assertFalse(stages.single { it.stage.label == "Confirmada" }.reached)
+        assertFalse(stages.single { it.stage.label == "Asiste" }.reached)
     }
 
     @Test
-    fun `S3 assignedConfirmed alcanza la etapa Confirmada`() {
-        val stages = activityStages(detalle(status = "assigned", assignedConfirmed = true))
-        assertTrue(stages.single { it.stage.label == "Confirmada" }.reached)
-        assertEquals("Confirmada", etapaActual(detalle(status = "assigned", assignedConfirmed = true)).stage.label)
+    fun `S3 assignedConfirmed alcanza la etapa Asiste`() {
+        val stages = nodos(detalle(status = "assigned", assignedConfirmed = true))
+        assertTrue(stages.single { it.stage.label == "Asiste" }.reached)
+        assertEquals("Asiste", etapaActual(detalle(status = "assigned", assignedConfirmed = true)).stage.label)
     }
 
     @Test
     fun `S3 in_progress confirmado deja En progreso como etapa actual`() {
         val actividad = detalle(status = "in_progress", assignedConfirmed = true)
         assertEquals("En progreso", etapaActual(actividad).stage.label)
-        assertFalse(activityStages(actividad).single { it.stage.label == "Finalizada" }.reached)
+        assertFalse(nodos(actividad).single { it.stage.label == "Finalizada" }.reached)
     }
 
     @Test
     fun `S6 in_progress sin confirmacion no afirma que la asignacion se confirmo`() {
         // A4: `in_progress` sin `confirmedAt` es un estado que el servidor puede mandar, y el
-        // riel no puede pintar "Confirmada" como alcanzada: sería inventar un hito. La etapa
-        // actual sigue siendo la del ESTADO —el hueco queda visible en "Confirmada"— en vez
+        // riel no puede pintar "Asiste" como alcanzada: sería inventar un hito. La etapa
+        // actual sigue siendo la del ESTADO —el hueco queda visible en "Asiste"— en vez
         // de retroceder el riel entero a "Asignada".
         val actividad = detalle(status = "in_progress", assignedConfirmed = false)
-        val stages = activityStages(actividad)
-        assertFalse(stages.single { it.stage.label == "Confirmada" }.reached)
+        val stages = nodos(actividad)
+        assertFalse(stages.single { it.stage.label == "Asiste" }.reached)
         assertEquals("En progreso", etapaActual(actividad).stage.label)
     }
 
     @Test
-    fun `S3 assisting se ubica en En progreso y no en Creada`() {
-        // `ASSISTING` es un estado real del DTO y el proyecto ya lo rotula ("Asistiendo").
-        // Antes caía en el `else` del mapa y el riel decía "Etapa 1 de 5: Creada".
-        val stages = activityStages(detalle(status = "assisting", assignedConfirmed = true))
-        assertEquals("En progreso", stages.single { it.current }.stage.label)
+    fun `S2 assisting se ubica en Asiste y no en Creada`() {
+        // PRD §2: "Asiste" es su propio paso, y el servidor sólo pasa a `assisting` cuando el
+        // asignado confirma. Antes `ASSISTING` saltaba a "En progreso" y se comía el paso 3.
+        val stages = nodos(detalle(status = "assisting", assignedConfirmed = true))
+        assertEquals("Asiste", stages.single { it.current }.stage.label)
     }
 
     @Test
-    fun `S6 done sin marca de confirmacion no alcanza Confirmada`() {
+    fun `S6 done sin marca de confirmacion no alcanza Asiste`() {
         // Cerrar no prueba que se haya confirmado: el hueco tiene que quedar a la vista aunque
         // la actividad esté terminada.
-        val stages = activityStages(detalle(status = "done", assignedConfirmed = false, confirmedAt = null))
-        assertFalse(stages.single { it.stage.label == "Confirmada" }.reached)
+        val stages = nodos(detalle(status = "done", assignedConfirmed = false, confirmedAt = null))
+        assertFalse(stages.single { it.stage.label == "Asiste" }.reached)
         assertTrue(stages.single { it.stage.label == "Finalizada" }.reached)
         assertEquals("Finalizada", stages.single { it.current }.stage.label)
     }
 
-    @Test
-    fun `S3 el riel tiene siempre una sola etapa actual y Creada alcanzada`() {
-        val estados = listOf(
-            "created", "assigned", "assisting", "in_progress", "verify",
-            "overdue", "done", "completed", "not_assisting", "cancelled", "WEIRD",
-        )
-        for (status in estados) {
-            for (confirmed in listOf(false, true)) {
-                for (raw in listOf(null, "2026-08-02T11:00:00Z", "basura")) {
-                    val stages = activityStages(
-                        detalle(status = status, assignedConfirmed = confirmed, confirmedAt = raw),
-                    )
-                    assertEquals(5, stages.size, "tamaño: $status/$confirmed/$raw")
-                    assertEquals(1, stages.count { it.current }, "una actual: $status/$confirmed/$raw")
-                    assertTrue(stages.first().reached, "Creada siempre: $status/$confirmed/$raw")
-                }
-            }
-        }
-    }
+    // La invariante "a lo sumo una etapa actual / el terminal la reemplaza" vive ahora en
+    // `BitacoraStagesMatrixTest`, junto con la matriz completa de estados terminales.
 
     @Test
     fun `S3 done alcanza Finalizada`() {
         val actividad = detalle(status = "done", assignedConfirmed = true, completedAt = "2026-08-05T18:00:00Z")
-        val stages = activityStages(actividad)
+        val stages = nodos(actividad)
         assertTrue(stages.all { it.reached })
         assertEquals("Finalizada", etapaActual(actividad).stage.label)
     }
