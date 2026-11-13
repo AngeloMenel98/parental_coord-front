@@ -1,0 +1,93 @@
+{
+  "version": 1,
+  "comments": [
+    {
+      "id": "7t04eh6a",
+      "file": "03-permiso-explicito.html",
+      "selector": "body > div > section > div:nth-of-type(2) > div:nth-of-type(1) > div > main > section:nth-of-type(3) > div:nth-of-type(1)",
+      "excerpt": "Tu permiso, en concreto",
+      "comment": "Esto me gustaria que sea un pop up, la primera vez que entra como usuario.",
+      "createdAt": "2026-11-12T16:55:38.987Z",
+      "status": "resolved",
+      "sentAt": "2026-11-12T16:55:39.012Z",
+      "resolvedAt": "2026-11-12T16:56:18.638Z"
+    },
+    {
+      "id": "w0ohfk6c",
+      "file": "03-permiso-explicito.html",
+      "selector": "body > div > section > div:nth-of-type(2) > div:nth-of-type(2) > div > main",
+      "excerpt": "Para finalizar 2 Control pediátrico de Tomás HOY 08:30 Salud · ya pasó la hora Finalizar Retirar a Emma de la escuela HOY 15:40 Educación Finalizar Asignadas, sin empezar 1 Comprar leche y pañales JUE 18:00 Familiar · podés finalizar el jueves Esperando Sin acción posible 1 Buscar la receta del pedi",
+      "comment": "Que sean por chips, en donde selecciono un chip que diga asignadas, En Progreso, Vencidas, Finalizadas",
+      "createdAt": "2026-11-12T16:57:24.043Z",
+      "status": "resolved",
+      "sentAt": "2026-11-12T17:00:59.376Z",
+      "resolvedAt": "2026-11-12T17:01:50.770Z"
+    },
+    {
+      "id": "eae9t03w",
+      "file": "03-permiso-explicito.html",
+      "selector": "body > div > section > div:nth-of-type(2) > div:nth-of-type(3) > div > main > section:nth-of-type(3) > div:nth-of-type(1)",
+      "excerpt": "Lo que no podés hacer acá",
+      "comment": "Esto tambien que sea un pop up",
+      "createdAt": "2026-11-12T16:58:22.971Z",
+      "status": "resolved",
+      "sentAt": "2026-11-12T17:00:59.376Z",
+      "resolvedAt": "2026-11-12T17:01:50.770Z"
+    },
+    {
+      "id": "fa5x85i3",
+      "file": "03-permiso-explicito.html",
+      "selector": "#limits-open",
+      "excerpt": "¿Por qué no puedo rechazarla?",
+      "comment": "Que aparezca arriba a la derecha con un icono de informacion",
+      "createdAt": "2026-11-12T17:02:36.097Z",
+      "status": "resolved",
+      "sentAt": "2026-11-12T17:05:07.401Z",
+      "resolvedAt": "2026-11-12T17:06:25.742Z"
+    },
+    {
+      "id": "iqr1wjse",
+      "file": "03-permiso-explicito.html",
+      "selector": "body > div > section > div:nth-of-type(2) > div:nth-of-type(2) > div > main > p",
+      "excerpt": "No hay botón de alta y no se puede deslizar una tarea para cancelarla o rechazarla. \"Por verificar\" vive dentro de En progreso: el chip agrupa la etapa, el chip de estado de cada fila dice el paso exacto.",
+      "comment": "todos esos comentarios no hacen falta",
+      "createdAt": "2026-11-12T17:03:26.065Z",
+      "status": "resolved",
+      "sentAt": "2026-11-12T17:05:07.401Z",
+      "resolvedAt": "2026-11-12T17:06:25.742Z"
+    },
+    {
+      "id": "wxbd8qs6",
+      "file": "03-permiso-explicito.html",
+      "selector": "body > div > section > div:nth-of-type(2) > div:nth-of-type(3) > div > main > section:nth-of-type(2)",
+      "excerpt": "Archivos Adjuntar Podés adjuntar la foto de la libreta firmada. Ángelo la va a ver al cerrar la tarea.",
+      "comment": "Me imagino que estas cards se reutilizan de las actividades de progenitores",
+      "createdAt": "2026-11-12T17:03:50.408Z",
+      "status": "resolved",
+      "sentAt": "2026-11-12T17:05:07.401Z",
+      "resolvedAt": "2026-11-12T17:06:25.742Z"
+    },
+    {
+      "id": "zce8kcw6",
+      "file": "03-permiso-explicito.html",
+      "selector": "body > div > section > div:nth-of-type(2) > div:nth-of-type(2) > div > main > section > div:nth-of-type(3)",
+      "excerpt": "Retirar a Emma de la escuela HOY 15:40 Educación En progreso Finalizar",
+      "comment": "Me imagino que estas cards se reutilizan del mismo ;componente' que en activity de progenitores",
+      "createdAt": "2026-11-12T17:04:34.543Z",
+      "status": "resolved",
+      "sentAt": "2026-11-12T17:05:07.401Z",
+      "resolvedAt": "2026-11-12T17:06:25.742Z"
+    },
+    {
+      "id": "ivaso2yy",
+      "file": "03-permiso-explicito.html",
+      "selector": "body > div > section > div:nth-of-type(2) > div:nth-of-type(1) > div > main > div",
+      "excerpt": "Tu permiso: finalizar y adjuntar Vence el 12 de diciembre Ver",
+      "comment": "utiliza el icono deinformacion aca tambien",
+      "createdAt": "2026-11-12T17:05:05.701Z",
+      "status": "resolved",
+      "sentAt": "2026-11-12T17:05:07.401Z",
+      "resolvedAt": "2026-11-12T17:06:25.742Z"
+    }
+  ]
+}

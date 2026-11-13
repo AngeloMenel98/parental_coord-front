@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Terciario · Dirección 01 — Sólo lo tuyo</title>
+<style>
+  /* Tokens = design/system.md (Color.kt, Spacing.kt, Shape.kt, Type.kt). Los roles de
+     superficie (--stage, --screen, --card, --track, --divider) se derivan del par
+     surface/surfaceVariant y del overlay de elevación, igual que home-ui/04: no hay un
+     hex nuevo que no esté en el sistema. */
+  :root {
+    color-scheme: light;
+    --primary: #00696D; --on-primary: #FFFFFF;
+    --primary-container: #9CF1F6; --on-primary-container: #002022;
+    --secondary: #4A6365; --secondary-container: #CCE8EA; --on-secondary-container: #051F21;
+    --on-surface: #191C1D; --on-surface-variant: #3F4849;
+    --outline: #6F797A; --error: #BA1A1A; --badge-fg: #FFFFFF;
+
+    --stage: #E4ECEC; --screen: #DAE4E5; --card: #FAFDFC;
+    --track: #DAE4E5; --divider: #BEC8C9;
+
+    --nav-selected: #00696D;
+    --salud-dot: #D81B60; --educacion-dot: #3F51B5; --familiar-dot: #8E24AA;
+    --asiste-text: #1565C0; --asiste-bg: rgba(30,136,229,.15);
+    --progreso-text: #BF360C; --progreso-bg: rgba(230,81,0,.15);
+    --verificar-text: #9E5F00; --verificar-bg: rgba(178,106,0,.15);
+    --cumplida-text: #2E7D32; --cumplida-bg: rgba(67,160,71,.15);
+    --vencida: #C62828; --vencida-bg: rgba(229,57,53,.12);
+    --ok-text: #2E7D32;
+    --hover: rgba(0,105,109,.05); --hover-strong: rgba(0,105,109,.10);
+    --phone-shadow: 0 8px 32px rgba(0,32,34,.18);
+    --card-hover-shadow: 0 2px 8px rgba(0,32,34,.10);
+
+    --serif: Georgia, 'Times New Roman', serif;
+    --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    --mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  }
+  [data-theme="dark"] {
+    color-scheme: dark;
+    --primary: #BB86FC; --on-primary: #000000;
+    --primary-container: #3700B3; --on-primary-container: #FFFFFF;
+    --secondary: #03DAC6; --secondary-container: #018786; --on-secondary-container: #000000;
+    --on-surface: #FFFFFF; --on-surface-variant: rgba(255,255,255,.70);
+    --outline: rgba(255,255,255,.40); --error: #CF6679; --badge-fg: #000000;
+
+    --stage: #0B0B0B; --screen: #121212; --card: #1E1E1E;
+    --track: rgba(255,255,255,.12); --divider: rgba(255,255,255,.12);
+
+    --nav-selected: #FFFFFF;
+    --asiste-text: #BBDEFB; --asiste-bg: rgba(30,136,229,.22);
+    --progreso-text: #FFCCBC; --progreso-bg: rgba(230,81,0,.22);
+    --verificar-text: #FFECB3; --verificar-bg: rgba(178,106,0,.26);
+    --cumplida-text: #C8E6C9; --cumplida-bg: rgba(67,160,71,.22);
+    --vencida: #FFCDD2; --vencida-bg: rgba(229,57,53,.22);
+    --ok-text: #C8E6C9;
+    --hover: rgba(187,134,252,.10); --hover-strong: rgba(187,134,252,.18);
+    --phone-shadow: 0 8px 32px rgba(0,0,0,.65);
+    --card-hover-shadow: 0 2px 8px rgba(0,0,0,.55);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: var(--sans); background: var(--stage); color: var(--on-surface); min-height: 100vh; padding: 24px 0; }
+  .stage { display: flex; justify-content: center; padding: 0 24px; }
+
+  .scaffold { border: 1px dashed var(--divider); border-radius: 8px; padding: 6px 10px; margin-bottom: 12px; }
+  .frame-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .frame-label { font-size: 11px; font-weight: 500; font-variant: small-caps; letter-spacing: .5px; color: var(--on-surface-variant); }
+  .scaffold-caption { font-size: 10px; font-family: var(--mono); letter-spacing: .2px; color: var(--on-surface-variant); margin-top: 4px; }
+  .theme-toggle .switch { width: 60px; height: 28px; border-radius: 14px; border: 0; box-shadow: inset 0 0 0 1px var(--divider); background: var(--track); position: relative; cursor: pointer; padding: 0; }
+  .theme-toggle .knob { position: absolute; top: 4px; left: 4px; width: 20px; height: 20px; border-radius: 50%; background: var(--card); box-shadow: 0 1px 2px rgba(0,0,0,.32); z-index: 1; }
+  .theme-toggle .icon { position: absolute; top: 6.5px; width: 15px; height: 15px; z-index: 2; pointer-events: none; color: var(--outline); }
+  .theme-toggle .icon.sun { left: 6.5px; } .theme-toggle .icon.moon { left: 38.5px; }
+  .theme-toggle .switch[aria-checked="false"] .sun { color: var(--primary); }
+  .theme-toggle .switch[aria-checked="true"] .moon { color: var(--on-primary); }
+  .theme-toggle .switch[aria-checked="true"] .knob { transform: translateX(32px); background: var(--primary); }
+  @media (prefers-reduced-motion: no-preference) { .theme-toggle .knob { transition: transform 150ms, background 150ms; } }
+
+  .phones { display: flex; gap: 32px; align-items: flex-start; }
+  .phone { width: 390px; height: 844px; background: var(--screen); color: var(--on-surface); display: flex; flex-direction: column; border-radius: 24px; overflow: hidden; box-shadow: var(--phone-shadow); }
+  .phone-label { font-size: 11px; font-weight: 500; font-variant: small-caps; letter-spacing: .5px; color: var(--on-surface-variant); margin-bottom: 6px; display: block; }
+  button { font-family: inherit; }
+  :focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 4px; }
+  @media (prefers-reduced-motion: no-preference) { .icon-btn, .text-btn, .row, .perm-row, .btn { transition: background 150ms; } }
+
+  .topbar { background: var(--card); display: flex; align-items: center; height: 56px; padding: 0 8px 0 16px; flex: none; border-bottom: 1px solid var(--divider); }
+  .topbar h1 { font-size: 18px; font-weight: 500; flex: 1; white-space: nowrap; }
+  .icon-btn { width: 44px; height: 44px; border: 0; background: transparent; border-radius: 50%; display: grid; place-items: center; cursor: pointer; color: var(--on-surface-variant); position: relative; flex: none; }
+  .icon-btn:hover { background: var(--hover); }
+  .badge { position: absolute; top: 6px; right: 6px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: var(--error); color: var(--badge-fg); font-size: 10px; font-weight: 700; display: grid; place-items: center; }
+
+  .feed { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; scrollbar-width: none; }
+  .feed::-webkit-scrollbar { display: none; }
+  .feed > * { flex: none; }
+
+  .navbar { flex: none; display: flex; border-top: 1px solid var(--divider); background: var(--card); }
+  .nav-item { flex: 1; border: 0; background: none; padding: 8px 0 10px; font-size: 12px; color: var(--on-surface-variant); cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+  .nav-item .pill { display: block; padding: 3px 16px; border-radius: 16px; }
+  .nav-item[aria-current="page"] { color: var(--nav-selected); font-weight: 600; }
+  .nav-item[aria-current="page"] .pill { background: var(--primary-container); }
+
+  .eyebrow { font-size: 11px; font-weight: 500; font-variant: small-caps; letter-spacing: .5px; color: var(--on-surface-variant); }
+  .text-btn { border: 0; background: none; color: var(--primary); font-size: 12px; font-weight: 500; padding: 6px 8px; border-radius: 8px; cursor: pointer; min-height: 32px; }
+  .text-btn:hover { background: var(--hover); }
+
+  .greeting { display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; }
+  .greeting h2 { font-family: var(--serif); font-size: 26px; font-weight: 400; line-height: 32px; }
+  .access-chip { display: inline-flex; align-items: center; gap: 6px; border-radius: 12px; padding: 4px 10px; font-size: 11px; font-weight: 500; color: var(--on-secondary-container); background: var(--secondary-container); white-space: nowrap; }
+
+  .card { background: var(--card); border: 1px solid var(--divider); border-radius: 16px; }
+  .section-card { padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+  .card-head { display: flex; align-items: baseline; gap: 8px; }
+  .card-head h3 { font-size: 16px; font-weight: 600; flex: 1; }
+  .card-head .note { font-size: 12px; color: var(--on-surface-variant); }
+
+  .row { display: grid; grid-template-columns: 44px 1fr auto; column-gap: 10px; align-items: start; padding: 10px 4px; border: 0; background: none; text-align: left; width: 100%; color: inherit; cursor: pointer; border-radius: 8px; }
+  .row:hover { background: var(--hover); }
+  .row + .row { border-top: 1px solid var(--divider); }
+  .time { font-family: var(--mono); font-size: 12px; font-weight: 500; letter-spacing: .5px; color: var(--on-surface-variant); padding-top: 4px; }
+  .main { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+  .title { font-size: 16px; font-weight: 500; line-height: 22px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .meta { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--on-surface-variant); }
+  .cat-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+  .tag { display: inline-flex; align-items: center; gap: 6px; border-radius: 12px; padding: 3px 8px; font-size: 11px; font-weight: 500; flex: none; white-space: nowrap; }
+  .tag i { width: 6px; height: 6px; border-radius: 50%; }
+  .tag.asiste { color: var(--asiste-text); background: var(--asiste-bg); } .tag.asiste i { background: #1E88E5; }
+  .tag.progreso { color: var(--progreso-text); background: var(--progreso-bg); } .tag.progreso i { background: #E65100; }
+  .tag.verificar { color: var(--verificar-text); background: var(--verificar-bg); } .tag.verificar i { background: #B26A00; }
+  .tag.cumplida { color: var(--cumplida-text); background: var(--cumplida-bg); } .tag.cumplida i { background: #43A047; }
+  .tag.vencida { color: var(--vencida); background: var(--vencida-bg); } .tag.vencida i { background: #E53935; }
+
+  .stats { display: grid; grid-template-columns: 1fr 1fr; background: var(--card); border: 1px solid var(--divider); border-radius: 12px; overflow: hidden; }
+  .stat { border: 0; background: none; padding: 8px 12px; cursor: pointer; color: inherit; min-height: 66px; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 1px; }
+  .stat + .stat { border-left: 1px solid var(--divider); }
+  .stat:hover, .stat:focus-visible { background: var(--hover); box-shadow: inset 0 0 0 2px var(--primary); }
+  .stat .label { font-size: 11px; font-weight: 500; font-variant: small-caps; letter-spacing: .5px; color: var(--on-surface-variant); }
+  .stat .value { font-family: var(--serif); font-size: 23px; font-weight: 600; line-height: 28px; }
+  .stat .value.alert { color: var(--vencida); }
+
+  .perm-row { display: grid; grid-template-columns: 20px 1fr; gap: 8px; align-items: start; font-size: 13px; line-height: 19px; padding: 5px 0; border: 0; background: none; text-align: left; color: inherit; width: 100%; border-radius: 8px; }
+  .perm-row + .perm-row { border-top: 1px solid var(--divider); }
+  .perm-row.yes .mark { color: var(--ok-text); }
+  .perm-row.no { color: var(--on-surface-variant); }
+  .perm-row.no .mark { color: var(--vencida); }
+  .mark { font-size: 14px; line-height: 19px; font-weight: 700; }
+
+  .access-card { padding: 12px; display: flex; flex-direction: column; gap: 6px; }
+  .access-head { display: flex; align-items: center; gap: 10px; }
+  .avatar { width: 36px; height: 36px; border-radius: 50%; background: var(--primary-container); color: var(--on-primary-container); display: grid; place-items: center; font-size: 15px; font-weight: 600; flex: none; }
+  .access-head b { font-size: 14px; font-weight: 500; display: block; }
+  .access-head small { font-size: 11px; color: var(--on-surface-variant); }
+  .access-line { font-size: 12px; color: var(--on-surface-variant); line-height: 18px; }
+
+  .list-note { font-size: 11px; line-height: 17px; color: var(--on-surface-variant); padding: 2px 4px; }
+
+  .sheet-head { padding: 12px 16px 8px; border-bottom: 1px solid var(--divider); background: var(--card); flex: none; }
+  .sheet-head .grab { width: 32px; height: 4px; border-radius: 2px; background: var(--divider); margin: 0 auto 10px; }
+  .sheet-head h2 { font-size: 18px; font-weight: 600; line-height: 24px; }
+  .sheet-head .sub { font-size: 12px; color: var(--on-surface-variant); margin-top: 4px; display: flex; align-items: center; gap: 6px; }
+
+  .rail { display: flex; flex-direction: column; gap: 0; margin-top: 4px; }
+  .step { display: grid; grid-template-columns: 22px 1fr; gap: 10px; }
+  .step .node { display: flex; flex-direction: column; align-items: center; }
+  .step .dot { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--outline); background: var(--card); margin-top: 3px; flex: none; }
+  .step.done .dot { background: var(--primary); border-color: var(--primary); }
+  .step.current .dot { background: var(--card); border-color: var(--primary); box-shadow: inset 0 0 0 2px var(--card), inset 0 0 0 4px var(--primary); }
+  .step .line { width: 1px; flex: 1; background: var(--divider); min-height: 18px; }
+  .step:last-child .line { display: none; }
+  .step .body { padding-bottom: 12px; }
+  .step .name { font-size: 14px; font-weight: 500; line-height: 19px; }
+  .step.pending .name { color: var(--on-surface-variant); font-weight: 400; }
+  .step .hint { font-size: 11px; color: var(--on-surface-variant); line-height: 16px; margin-top: 1px; }
+
+  .footer { flex: none; border-top: 1px solid var(--divider); background: var(--card); padding: 10px 16px 14px; display: flex; gap: 10px; }
+  .btn { flex: 1; min-height: 48px; border-radius: 24px; border: 0; font-size: 15px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+  .btn.primary { background: var(--primary); color: var(--on-primary); }
+  .btn.primary:hover { box-shadow: var(--card-hover-shadow); }
+  .btn.tonal { background: var(--secondary-container); color: var(--on-secondary-container); flex: 0 0 auto; padding: 0 18px; }
+
+  .frame-note { font-size: 12px; line-height: 1.55; color: var(--on-surface-variant); max-width: 854px; margin-top: 12px; }
+  .frame-note b { color: var(--on-surface); }
+</style>
+</head>
+<body>
+<div class="stage">
+  <section class="frame" aria-label="Vista del terciario temporal: Sólo lo tuyo">
+    <div class="scaffold">
+      <div class="frame-head">
+        <p class="frame-label">01 · Sólo lo tuyo</p>
+        <div class="theme-toggle">
+          <button type="button" class="switch" role="switch" aria-checked="false" aria-label="Tema oscuro">
+            <span class="knob" aria-hidden="true"></span>
+            <svg class="icon sun" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 7a5 5 0 1 0 0 10 5 5 0 0 0 0-10zm-1-5v2a1 1 0 1 0 2 0V2a1 1 0 1 0-2 0zm0 18v2a1 1 0 1 0 2 0v-2a1 1 0 1 0-2 0zM2 11a1 1 0 1 0 0 2h2a1 1 0 1 0 0-2H2zm18 0a1 1 0 1 0 0 2h2a1 1 0 1 0 0-2h-2zM4.6 5.99a1 1 0 0 0 1.4 1.42l1.06-1.06A1 1 0 0 0 5.65 4.93L4.6 5.99zm12.37 12.37a1 1 0 0 0 1.4 1.42l1.07-1.06a1 1 0 0 0-1.42-1.42l-1.05 1.06zm2.47-12.37-1.06 1.06a1 1 0 0 0 1.42 1.42l1.06-1.06a1 1 0 0 0-1.42-1.42zM7.05 18.36l-1.06 1.06a1 1 0 0 0 1.42 1.42l1.06-1.06a1 1 0 0 0-1.42-1.42z"/></svg>
+            <svg class="icon moon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 3a9 9 0 1 0 9 9c0-.46-.04-.92-.1-1.36A6.4 6.4 0 0 1 12 3z"/></svg>
+          </button>
+        </div>
+      </div>
+      <p class="scaffold-caption">Andamiaje de revisión · fuera de la pantalla</p>
+    </div>
+
+    <div class="phones">
+
+      <!-- ── 1. Inicio ── -->
+      <div>
+        <span class="phone-label">Inicio</span>
+        <div class="phone">
+          <header class="topbar">
+            <h1>Inicio</h1>
+            <button class="icon-btn" aria-label="Notificaciones: 1 sin leer">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 22a2 2 0 0 0 2-2h-4a2 2 0 0 0 2 2zm6-6V11c0-3.07-1.63-5.64-4.5-6.32V4a1.5 1.5 0 0 0-3 0v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></svg>
+              <span class="badge" aria-hidden="true">1</span>
+            </button>
+            <button class="icon-btn" aria-label="Cerrar sesión">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/></svg>
+            </button>
+          </header>
+
+          <main class="feed">
+            <div class="greeting">
+              <p class="eyebrow">Martes 3 de noviembre</p>
+              <h2>Hola, Rosa</h2>
+              <span class="access-chip">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm1 10.6V6h-2v7.4l5.2 3.1 1-1.7-4.2-2.2z"/></svg>
+                Acceso hasta el 12 de diciembre
+              </span>
+            </div>
+
+            <button class="card row-card" style="display:block;text-align:left;padding:12px 12px 6px;" aria-label="Hoy, 2 tareas. 08:30 Control pediátrico de Tomás, por verificar. 15:40 Retirar a Emma de la escuela, asiste. Abrir Actividades">
+              <span class="card-head" style="display:flex;align-items:baseline;gap:8px;padding:0 4px 6px;">
+                <span class="eyebrow">Hoy</span>
+                <span class="note" style="font-size:12px;color:var(--on-surface-variant);flex:1;">2 tareas</span>
+              </span>
+              <span class="row" style="cursor:inherit;">
+                <span class="time">08:30</span>
+                <span class="main">
+                  <span class="title">Control pediátrico de Tomás</span>
+                  <span class="meta"><span class="cat-dot" style="background:var(--salud-dot)" aria-hidden="true"></span>Salud</span>
+                </span>
+                <span class="tag verificar"><i aria-hidden="true"></i>Por verificar</span>
+              </span>
+              <span class="row" style="cursor:inherit;">
+                <span class="time">15:40</span>
+                <span class="main">
+                  <span class="title">Retirar a Emma de la escuela</span>
+                  <span class="meta"><span class="cat-dot" style="background:var(--educacion-dot)" aria-hidden="true"></span>Educación</span>
+                </span>
+                <span class="tag asiste"><i aria-hidden="true"></i>Asiste</span>
+              </span>
+            </button>
+
+            <div class="stats" role="group" aria-label="Tus números">
+              <button class="stat" aria-label="Asignadas a vos: 3">
+                <span class="label">Asignadas a vos</span>
+                <span class="value">3</span>
+              </button>
+              <button class="stat" aria-label="Vencidas: 1">
+                <span class="label">Vencidas</span>
+                <span class="value alert">1</span>
+              </button>
+            </div>
+
+            <section class="card section-card" aria-labelledby="perm-title">
+              <div class="card-head"><h3 id="perm-title">Qué podés hacer</h3></div>
+              <div class="perm-row yes"><span class="mark" aria-hidden="true">✓</span><span>Finalizar tu tarea y adjuntar archivos.</span></div>
+              <div class="perm-row no"><span class="mark" aria-hidden="true">✕</span><span>No podés crear, asignar, rechazar ni cancelar actividades.</span></div>
+              <div class="perm-row no"><span class="mark" aria-hidden="true">✕</span><span>No ves los datos de los progenitores ni del vínculo.</span></div>
+            </section>
+
+            <section class="card access-card" aria-labelledby="access-title">
+              <div class="access-head">
+                <span class="avatar" aria-hidden="true">A</span>
+                <span>
+                  <b id="access-title">Te autorizó Ángelo</b>
+                  <small>Progenitor · vínculo con Emma y Tomás</small>
+                </span>
+              </div>
+              <p class="access-line">Tu acceso vence el <b>12 de diciembre</b>. Después de esa fecha no vas a poder entrar. Si necesitás más tiempo, pedíselo a Ángelo.</p>
+            </section>
+          </main>
+
+          <nav class="navbar" aria-label="Navegación principal">
+            <button class="nav-item" aria-current="page"><span class="pill"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg></span>Inicio</button>
+            <button class="nav-item"><span class="pill"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M19 4h-1V2h-2v2H8V2H6v2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2zm0 16H5V10h14v10zM5 8V6h14v2H5z"/></svg></span>Actividades</button>
+          </nav>
+        </div>
+      </div>
+
+      <!-- ── 2. Actividades ── -->
+      <div>
+        <span class="phone-label">Actividades · sólo las tuyas</span>
+        <div class="phone">
+          <header class="topbar">
+            <h1>Actividades</h1>
+            <button class="icon-btn" aria-label="Notificaciones: 1 sin leer">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 22a2 2 0 0 0 2-2h-4a2 2 0 0 0 2 2zm6-6V11c0-3.07-1.63-5.64-4.5-6.32V4a1.5 1.5 0 0 0-3 0v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></svg>
+              <span class="badge" aria-hidden="true">1</span>
+            </button>
+          </header>
+
+          <main class="feed">
+            <p class="list-note">Ves sólo las actividades que <b>Ángelo</b> te asignó. Cuando te asigna una, ya queda como <b>Asiste</b>: no tenés que aceptarla.</p>
+
+            <section class="card section-card" aria-labelledby="overdue-title">
+              <div class="card-head"><h3 id="overdue-title">Vencidas</h3><span class="note">1</span></div>
+              <button class="row" aria-label="Vencida ayer: Buscar la receta del pediatra, Salud">
+                <span class="time">Ayer</span>
+                <span class="main">
+                  <span class="title">Buscar la receta del pediatra</span>
+                  <span class="meta"><span class="cat-dot" style="background:var(--salud-dot)" aria-hidden="true"></span>Salud</span>
+                </span>
+                <span class="tag vencida"><i aria-hidden="true"></i>Vencida</span>
+              </button>
+            </section>
+
+            <section class="card section-card" aria-labelledby="today-title">
+              <div class="card-head"><h3 id="today-title">Hoy</h3><span class="note">2</span></div>
+              <button class="row" aria-label="08:30 Control pediátrico de Tomás, Salud, por verificar">
+                <span class="time">08:30</span>
+                <span class="main">
+                  <span class="title">Control pediátrico de Tomás</span>
+                  <span class="meta"><span class="cat-dot" style="background:var(--salud-dot)" aria-hidden="true"></span>Salud</span>
+                </span>
+                <span class="tag verificar"><i aria-hidden="true"></i>Por verificar</span>
+              </button>
+              <button class="row" aria-label="15:40 Retirar a Emma de la escuela, Educación, asiste">
+                <span class="time">15:40</span>
+                <span class="main">
+                  <span class="title">Retirar a Emma de la escuela</span>
+                  <span class="meta"><span class="cat-dot" style="background:var(--educacion-dot)" aria-hidden="true"></span>Educación</span>
+                </span>
+                <span class="tag asiste"><i aria-hidden="true"></i>Asiste</span>
+              </button>
+            </section>
+
+            <section class="card section-card" aria-labelledby="week-title">
+              <div class="card-head"><h3 id="week-title">Jueves 5</h3><span class="note">1</span></div>
+              <button class="row" aria-label="18:00 Comprar leche y pañales, Familiar, en progreso">
+                <span class="time">18:00</span>
+                <span class="main">
+                  <span class="title">Comprar leche y pañales</span>
+                  <span class="meta"><span class="cat-dot" style="background:var(--familiar-dot)" aria-hidden="true"></span>Familiar</span>
+                </span>
+                <span class="tag progreso"><i aria-hidden="true"></i>En progreso</span>
+              </button>
+            </section>
+          </main>
+
+          <nav class="navbar" aria-label="Navegación principal">
+            <button class="nav-item"><span class="pill"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg></span>Inicio</button>
+            <button class="nav-item" aria-current="page"><span class="pill"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M19 4h-1V2h-2v2H8V2H6v2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2zm0 16H5V10h14v10zM5 8V6h14v2H5z"/></svg></span>Actividades</button>
+          </nav>
+        </div>
+      </div>
+
+      <!-- ── 3. Detalle ── -->
+      <div>
+        <span class="phone-label">Detalle · dos acciones, ninguna de rechazo</span>
+        <div class="phone">
+          <div class="sheet-head">
+            <span class="grab" aria-hidden="true"></span>
+            <h2>Retirar a Emma de la escuela</h2>
+            <p class="sub"><span class="tag progreso"><i aria-hidden="true"></i>En progreso</span><span>15:40 · Educación</span></p>
+          </div>
+
+          <main class="feed">
+            <section class="card section-card" aria-labelledby="info-title">
+              <div class="card-head"><h3 id="info-title">Qué tenés que hacer</h3></div>
+              <p style="font-size:14px;line-height:20px;">Pasar por la puerta de la calle Mitre 1240. La salida es a las 15:40 y la maestra espera hasta las 16:00. Avisar por el chat del vínculo si hay demora.</p>
+            </section>
+
+            <section class="card section-card" aria-labelledby="state-title">
+              <div class="card-head"><h3 id="state-title">Estado</h3><span class="note">Te lo asigna Ángelo</span></div>
+              <div class="rail">
+                <div class="step done">
+                  <div class="node"><span class="dot" aria-hidden="true"></span><span class="line" aria-hidden="true"></span></div>
+                  <div class="body"><p class="name">Asiste</p><p class="hint">Confirmada al asignarte · 2 nov, 19:04</p></div>
+                </div>
+                <div class="step current">
+                  <div class="node"><span class="dot" aria-hidden="true"></span><span class="line" aria-hidden="true"></span></div>
+                  <div class="body"><p class="name">En progreso</p><p class="hint">Desde hoy, 15:40</p></div>
+                </div>
+                <div class="step pending">
+                  <div class="node"><span class="dot" aria-hidden="true"></span><span class="line" aria-hidden="true"></span></div>
+                  <div class="body"><p class="name">Por verificar</p><p class="hint">Después de finalizar</p></div>
+                </div>
+                <div class="step pending">
+                  <div class="node"><span class="dot" aria-hidden="true"></span></div>
+                  <div class="body"><p class="name">Finalizada</p><p class="hint">La cierra el progenitor</p></div>
+                </div>
+              </div>
+            </section>
+
+            <section class="card section-card" aria-labelledby="files-title">
+              <div class="card-head"><h3 id="files-title">Archivos</h3><button class="text-btn">Adjuntar</button></div>
+              <p style="font-size:12px;color:var(--on-surface-variant);line-height:18px;">Una foto del retiro le sirve a Ángelo para cerrar la tarea.</p>
+            </section>
+          </main>
+
+          <div class="footer">
+            <button class="btn tonal">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16.5 6v11.5a4 4 0 0 1-8 0V5a2.5 2.5 0 0 1 5 0v10.5a1 1 0 0 1-2 0V6H10v9.5a2.5 2.5 0 0 0 5 0V5a4 4 0 0 0-8 0v12.5a5.5 5.5 0 0 0 11 0V6h-1.5z"/></svg>
+              Adjuntar
+            </button>
+            <button class="btn primary">Finalizar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <p class="frame-note">
+      <b>El tradeoff:</b> la pantalla no muestra nada que el terciario no pueda usar. Se cae el anillo de
+      cumplimiento (expone el porcentaje de los progenitores), la celda de saldo de gastos y la sección
+      Hijos; la franja queda con dos celdas y la navegación con dos ítems, no cuatro. El acceso temporal
+      es el primer chip del saludo, así que la persona lo ve antes de empezar a trabajar y no descubre
+      el vencimiento el día que la app la deja afuera. A cambio, es la dirección más sobria: el estado de
+      la tarea pesa menos que en 02 y la autoridad del progenitor se explica en texto, no en jerarquía.
+    </p>
+  </section>
+</div>
+
+<script>
+  (function () {
+    var root = document.documentElement;
+    var sw = document.querySelector('.theme-toggle .switch');
+    var media = window.matchMedia('(prefers-color-scheme: dark)');
+    var choice = 'system';
+    function isDark() { return choice === 'system' ? media.matches : choice === 'dark'; }
+    function apply() {
+      var dark = isDark();
+      root.setAttribute('data-theme', dark ? 'dark' : 'light');
+      sw.setAttribute('aria-checked', String(dark));
+    }
+    sw.addEventListener('click', function () { choice = isDark() ? 'light' : 'dark'; apply(); });
+    if (media.addEventListener) media.addEventListener('change', function () { if (choice === 'system') apply(); });
+    apply();
+  })();
+</script>
+</body>
+</html>
