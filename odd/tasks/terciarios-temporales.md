@@ -261,3 +261,18 @@ La verificación independiente dejó dos límites explícitos: el comportamiento
 `ThirdPartiesService.assertProgenitor` ya delega en el chokepoint, así que el módulo nuevo no tiene su propia copia de la regla. Verificación: `pnpm build` OK; `pnpm test` → **98 suites, 1157 tests, 0 fallas** (9 nuevos del chokepoint).
 
 Falta de T3 (unidad 2): migrar los call-sites — `activities.service.ts`, `expenses.service.ts`, `children.service.ts` y `bonds.service.ts` siguen usando `isActiveBondForMember`, así que **hoy la revocación todavía no quita el acceso** a esos endpoints (es exactamente lo que F4 de la verificación independiente señaló).
+
+**L13 (textos de los siete hallazgos y correcciones).** Los textos se extrajeron del registro nativo (`.git/gentle-ai/review-transactions/v2/<lineage>/review-state.json`, `admitted_role_results`). Hallazgos y disposición:
+
+| ID | Severidad | Hallazgo | Estado |
+|---|---|---|---|
+| `R1-001` / `R3-001` / `R4-001` | CRITICAL / CRITICAL / **BLOCKER** | Revocar (y vencer) sólo cambiaban el grant: la fila de `bond_member` quedaba abierta y el resto del back autoriza con `isActiveBondForMember`, así que el `DELETE` respondía 200 y el tercero conservaba el vínculo | **corregido**: revocar y vencer cierran la membresía (`left_at`); volver a otorgar la reabre |
+| `R4-004` | WARNING | `expireIfLapsed` hacía `save` de una fila leída antes: una revocación concurrente quedaba pisada por `expired`, perdiendo `revokedAt`/`revokedBy` | **corregido**: `UPDATE ... WHERE status='active'` |
+| `R3-003` | WARNING | `2026-02-30` pasa la regex del DTO y la comparación lexicográfica; Postgres la rechaza → 500 | **corregido**: validación de fecha de calendario real → 400 |
+| `R3-004` | WARNING | El chequeo de grant vigente y el INSERT no son atómicos: dos altas simultáneas del mismo par → violación del índice único → 500 | **corregido**: `23505` se traduce al 409 previsto |
+| `R2-001` | WARNING | `findLatestForUser` ordenaba sólo por `createdAt` entre vínculos: `/third-parties/me` podía devolver el grant de **otro** vínculo | **corregido**: prefiere el grant `active` |
+| `R2-002` | SUGGESTION | El KDoc nombraba un `assertOwner` inexistente | **corregido** |
+| `R2-003` | SUGGESTION | Normalización de email duplicada en vez de reutilizar la del DTO de auth | diferido (tocaría el DTO de auth; la regla hoy es igual en ambos lados) |
+| `R1-002` / `R1-003` (escalados) + `R4-002` / `R3-002` | CRITICAL | `src/auth/dto/auth.dto.ts` normaliza el email a minúsculas y recorta espacios de la contraseña **sin backfill ni búsqueda case-insensitive**: una cuenta existente con mayúsculas o con espacios en la contraseña deja de autenticarse | **no es de T1/T2** — viene de un commit anterior de la rama; queda para decisión del humano |
+
+Verificación tras las correcciones: `pnpm build` OK; `pnpm test` → **98 suites, 1162 tests, 0 fallas** (5 casos nuevos en la spec de regresión).
