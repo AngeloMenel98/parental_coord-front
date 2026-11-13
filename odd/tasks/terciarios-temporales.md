@@ -296,3 +296,18 @@ Falta de T4 (última rebanada): **auto-confirmación al asignar** (S8/D6) — al
 **L17 (T4 · auto-confirmación al asignar, S8/D6).** Asignar a un tercero escribe `confirmedAt` **en la misma transición** del alta: no hay paso de aceptación, así que no existe ventana para rechazar. Detalle de implementación: `assignedConfirmed` **no es una columna** — el servicio la deriva de `confirmedAt != null` —, así que alcanza con esa marca. No se agregó ninguna arista al mapa de transiciones ni se salteó ningún estado: sigue siendo `created → assigned → assisting`, y el paso a `assisting` lo sigue dando el reloj/worker como para cualquier asignado. Prueba nueva que fija el contrato: al asignar a un tercero el `applyTransition` lleva `confirmedAt`; a un miembro normal, no. Verificación: `pnpm build` OK; `pnpm test` → **99 suites, 1169 tests, 0 fallas**.
 
 **Verificación pendiente de T4 (punto 2 de `## Decisiones abiertas`, no resuelta por esta rebanada):** que el worker/timers efectivamente empujen `assigned → assisting → in_progress → verify` en una actividad asignada. La auto-confirmación cierra la ventana de rechazo, pero si el worker no empuja esos estados el camino a `done` queda cortado antes de llegar. Sigue siendo un dato a verificar, no una decisión de producto.
+
+**L18 (verificación del worker — el dato que faltaba, y el defecto que destapó).** El motor de timers (`activity-timers.processor.ts`) sólo hace cuatro cosas:
+
+| Timer | Origen exigido | Destino |
+|---|---|---|
+| `RESPONSE_TIMEOUT` | `created` \| `assigned` | **`overdue`** |
+| `START` | `assisting` | `in_progress` |
+| `END` | `in_progress` | `verify` |
+| `VERIFY_TIMEOUT` | `verify` | `overdue` |
+
+**Ningún timer empuja `assigned → assisting`**: esa arista la da `confirmAssignment`, guardada a “sólo el asignado”. Consecuencia directa sobre L17: la auto-confirmación escribe `confirmedAt` pero deja la fila en **`assigned`**, así que a las 36 h el `RESPONSE_TIMEOUT` la pasa a `overdue` y el tercero **no puede finalizarla** (`canComplete` exige `in_progress`/`verify`, y `canConfirm`/`canDecline` son `false` para su rol). Es exactamente el corte que el punto 2 de `## Decisiones abiertas` pedía verificar antes de dar la feature por completa: **el dato está, y dice que la rebanada de L17 quedó incompleta**.
+
+Corrección diseñada (unidad siguiente, no incluida): dar los **dos pasos legales** del mapa en el mismo request — `created → assigned` (con `assignedTo`) y enseguida `assigned → assisting` —, el segundo con **actor de sistema**, porque esa arista está guardada al asignado y acá la aceptación no la da una persona: la da la regla del rol (S8). El primer intento quedó rojo porque el doble de test del alta no modela estado/versión (el segundo paso veía `created`), y se revirtió para no dejar la rama en rojo.
+
+**L19 (auth, decisión del humano — literal).** “no hace falta hacer un backfill porque no hay usuarios con email usando mayusculas ni password con espacios”. Se mantiene la normalización de `75d5aef` tal cual: **sin migración de datos y sin fallback de login**. El riesgo queda aceptado por dato (no hay casos que rompan), no por diseño; si alguna vez aparece una cuenta con mayúsculas o con espacios en la contraseña, no va a poder entrar y el síntoma será un 401 sin explicación. Cierra el pendiente que la review nativa había escalado.
