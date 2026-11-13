@@ -1,12 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Casa: el glifo de "coordinación de la casa". Sin texto: un vector no renderiza tipografía
-     y las letras dependen de la fuente que traiga el dispositivo. -->
+<!-- "P" de Parental: mismo lenguaje que la "L" de Local, para distinguir de un vistazo la
+     app de producción de la de desarrollo en el cajón. Trazo, no tipografía: un vector no
+     renderiza fuentes y las letras dependen de la que traiga el dispositivo. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
     <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M54,26 L82,50 L82,82 L26,82 L26,50 Z" />
+        android:fillColor="@android:color/transparent"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="12"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M40,82 V30 H60 A14,14 0 0 1 60,58 H40" />
 </vector>

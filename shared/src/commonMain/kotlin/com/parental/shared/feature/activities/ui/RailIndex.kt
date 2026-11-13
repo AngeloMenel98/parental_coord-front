@@ -87,6 +87,77 @@ internal fun railItemIndexOf(sections: List<RailSection>, date: LocalDate): Int?
     return null
 }
 
+/** Por qué el riel se posó donde se posó — T10 (S15). */
+internal enum class RailAnchorKind {
+    /** Hay una actividad en curso AHORA: el riel abre en la línea de «ahora». */
+    InProgress,
+
+    /** Nada en curso: el riel abre en el primer bloque del primer día con contenido. */
+    FirstBlock,
+}
+
+/**
+ * Destino del anclaje inicial del riel — T10 (S15).
+ *
+ * Es la DECISIÓN, no la geometría: la pantalla la traduce a índice de lista con
+ * [railItemIndexOf] (la única fuente de la forma) y a píxeles con `railOffsetDp`. Así la regla se
+ * prueba en `commonTest`, sin Compose, sin reloj y sin layout.
+ *
+ * @param date día donde se posa el riel.
+ * @param minuteOfDay minuto de día de la línea de destino dentro del eje de [date]: la hora
+ *   actual si hay algo en curso, o el inicio del primer bloque.
+ */
+internal data class RailAnchor(
+    val date: LocalDate,
+    val minuteOfDay: Int,
+    val kind: RailAnchorKind,
+)
+
+/**
+ * Dónde abre el riel en su primera composición — S15: «anclar solo si hay algo en curso».
+ *
+ * REGLAS, en orden:
+ *  1. Si la sección de [today] tiene un bloque `start <= nowMinute < end` (intervalo
+ *     semiabierto: a la hora exacta de fin el bloque ya terminó), el anclaje es la línea de
+ *     «ahora» de HOY. El `now` sólo se compara contra los bloques de [today]: un bloque de ayer
+ *     a la misma hora no es «algo en curso».
+ *  2. Si no hay nada en curso, el anclaje es el bloque MÁS TEMPRANO de la primera sección CON
+ *     contenido. Un día sin bloques no es destino: posarse ahí deja al usuario mirando una
+ *     franja vacía, que es justo lo que S15 evita.
+ *  3. Si ninguna sección tiene bloques —o la única sección es la de «sin fecha de inicio», que
+ *     no tiene eje horario— no hay anclaje y la lista abre donde estaba (el tope).
+ *
+ * No lee el reloj: `nowMinute` y `today` entran por parámetro (el llamador los saca del
+ * `LaunchedEffect` de la pantalla) y un día plegado conserva sus bloques en la sección, así que
+ * el anclaje no depende de que la vista esté desplegada.
+ */
+internal fun railInitialAnchor(
+    sections: List<RailSection>,
+    today: LocalDate,
+    nowMinute: Int,
+): RailAnchor? {
+    val todayBlocks = sections.firstOrNull { section -> section.date == today }?.railDay?.blocks
+    val inProgress = todayBlocks?.firstOrNull { block ->
+        block.startMinute <= nowMinute && nowMinute < block.endMinute
+    }
+    if (inProgress != null) {
+        return RailAnchor(date = today, minuteOfDay = nowMinute, kind = RailAnchorKind.InProgress)
+    }
+    val firstWithContent = sections.firstOrNull { section ->
+        !section.railDay?.blocks.isNullOrEmpty()
+    }
+    val date = firstWithContent?.date ?: return null
+    // `buildRailDay` ya ordena por inicio; `minByOrNull` lo deja explícito y hace que la regla no
+    // dependa de ese orden (es el MÁS TEMPRANO, no "el primero de la lista").
+    val firstBlock = firstWithContent.railDay?.blocks?.minByOrNull { block -> block.startMinute }
+        ?: return null
+    return RailAnchor(
+        date = date,
+        minuteOfDay = firstBlock.startMinute,
+        kind = RailAnchorKind.FirstBlock,
+    )
+}
+
 /** Largo de la abreviatura de día de semana del riel — `"MIÉ"`, tres letras. */
 private const val RAIL_WEEKDAY_LENGTH = 3
 

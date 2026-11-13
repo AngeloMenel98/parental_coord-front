@@ -20,8 +20,10 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.EventBusy
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -40,9 +42,12 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
@@ -89,6 +94,24 @@ private const val RAIL_TODAY_CHIP = "hoy"
  *  Sin botón: el alta es el FAB único de S7, que no vive en la fila. */
 private const val RAIL_FREE_DAY_LABEL = "Día libre: sin actividades cargadas"
 
+/** Título del aviso de «hoy sin actividades» — `.hoynotice` del artboard (`:126`). */
+private const val RAIL_TODAY_EMPTY_TITLE = "Hoy no tiene actividades"
+
+/** Acción del aviso. La misma palabra que el `.hact` del artboard y el MISMO alta que el FAB. */
+private const val RAIL_TODAY_EMPTY_ACTION = "Agregar"
+
+/**
+ * Alpha del disco del aviso sobre `secondaryContainer` — el `rgba(0,105,109,.12)` del
+ * `.hoynotice .hnico` del artboard (`:131`).
+ *
+ * Vive aquí y no en `RailGeometry` porque el token pertenece a `Spacing.kt`, fuera de las
+ * superficies de esta tarea; el valor ES el del artboard, no un número elegido a ojo.
+ */
+private const val RAIL_TODAY_EMPTY_DISC_ALPHA = 0.12f
+
+/** Alpha del subtítulo del aviso — el `opacity:.72` del `.hsub` del artboard (`:133`). */
+private const val RAIL_TODAY_EMPTY_SUB_ALPHA = 0.72f
+
 /** Clave de lista de la sección sin fecha (el `date` es `null` y una clave nula no vale). */
 private const val RAIL_UNDATED_KEY = "sin-fecha"
 
@@ -116,6 +139,12 @@ private const val RAIL_UNDATED_KEY = "sin-fecha"
  * @param focusRequesters T7 (R4) · id → `FocusRequester` que registra cada bloque y cada fila sin
  *   fecha. Es el MISMO mapa que lee la pantalla al cerrar la hoja de detalle: sin este cable el
  *   retorno de foco cae siempre en el contenedor de la lista.
+ * @param todayEmptyNotice T10 (S12) · el día de hoy no tiene actividades y el usuario acaba de
+ *   pedir «Hoy»: en vez de saltar en silencio, el riel dice que hoy no hay nada y ofrece el alta.
+ *   La pantalla ya lo cruza con los bloques reales, así que aquí es un booleano puro.
+ * @param onCreateFromEmptyToday T10 (S12) · el MISMO alta que el FAB (S7): la acción del aviso no
+ *   abre un segundo camino de alta. **Sin valor por defecto**: una llamante nueva que lo omita no
+ *   compila, que es lo que impide dejar el aviso sin salida.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -132,6 +161,8 @@ internal fun RailTimeline(
     onToggleDay: (LocalDate) -> Unit,
     onSwipeAction: (String, SwipeAction) -> Unit,
     focusRequesters: MutableMap<String, FocusRequester>,
+    todayEmptyNotice: Boolean,
+    onCreateFromEmptyToday: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(
@@ -180,18 +211,27 @@ internal fun RailTimeline(
                 }
                 // Un día plegado no aporta ítem de contenido (`railContentCount` = 0).
                 section.isExpanded -> item(key = "rail-day-$date") {
-                    RailDayBody(
-                        section = section,
-                        categories = categories,
-                        memberNames = memberNames,
-                        children = children,
-                        zone = zone,
-                        today = today,
-                        nowMinute = nowMinute,
-                        onOpen = onOpen,
-                        onSwipeAction = onSwipeAction,
-                        focusRequesters = focusRequesters,
-                    )
+                    // T10 (S12) · El aviso REEMPLAZA la superficie del día libre: los dos dicen
+                    // lo mismo y el aviso ya trae la acción, igual que el artboard oculta su
+                    // `.emptyday` cuando aparece el `.hoynotice` (`:561`). No cambia la FORMA de
+                    // la lista —sigue siendo UN ítem de contenido—, así que el índice de
+                    // `railItemIndexOf` no se desalinea.
+                    if (date == today && todayEmptyNotice) {
+                        RailTodayEmptyNotice(today = today, onCreate = onCreateFromEmptyToday)
+                    } else {
+                        RailDayBody(
+                            section = section,
+                            categories = categories,
+                            memberNames = memberNames,
+                            children = children,
+                            zone = zone,
+                            today = today,
+                            nowMinute = nowMinute,
+                            onOpen = onOpen,
+                            onSwipeAction = onSwipeAction,
+                            focusRequesters = focusRequesters,
+                        )
+                    }
                 }
             }
         }
@@ -355,6 +395,14 @@ private fun RailTodayChip() {
  * `railOffsetDp(axis.endMinute, axis, RailGeometry.DpPerHour).dp` —, no un alto adivinado:
  * un contenedor más bajo recorta el final del eje y uno más alto deja un hueco muerto
  * antes del día siguiente.
+ *
+ * T10 · AIRE A LA IZQUIERDA Y CANALETA DEL SISTEMA. La canaleta mide
+ * [AgendaGeometry.timeColumn] (48dp) y su rótulo va alineado a la derecha con 8dp de aire
+ * antes de la grilla, pero la fila arrancaba en x=0: en un teléfono de 384dp los `07:00`
+ * quedaban pegados al borde. `Spacing.lg` de sangría alinea la canaleta con el rótulo del
+ * encabezado de día (que usa la misma sangría) y deja aire delante de la hora. El lienzo —y
+ * con él la línea de hora y el carril 0 de los bloques— sigue arrancando EXACTAMENTE donde
+ * termina la canaleta: es el mismo `Row`, sin márgenes intermedios.
  */
 @Composable
 private fun RailDayBody(
@@ -380,7 +428,7 @@ private fun RailDayBody(
         modifier = Modifier
             .fillMaxWidth()
             .height(canvasHeight)
-            .padding(end = Spacing.md),
+            .padding(start = Spacing.lg, end = Spacing.md),
         verticalAlignment = Alignment.Top,
     ) {
         RailHourGutter(axis = axis, dpPerHour = RailGeometry.DpPerHour)
@@ -442,6 +490,86 @@ private fun RailFreeDay() {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
         )
+    }
+}
+
+/**
+ * Aviso de «hoy no tiene actividades» — T10 (S12), el `.hoynotice` del artboard (`:126`).
+ *
+ * POR QUÉ EXISTE: con S15 el riel abre anclado, así que tocar «Hoy» muchas veces no cambia
+ * nada visible; si el día está vacío, el control parecía no hacer nada. Este aviso es la
+ * respuesta: dice que hoy no hay actividades y ofrece el alta en el mismo lugar donde el
+ * usuario miró.
+ *
+ * ANUNCIO (S11): el contenedor es una REGIÓN VIVA (`liveRegion = Polite`), así que TalkBack
+ * lee el aviso cuando aparece sin robarle el foco a nada. NO se usa `mergeDescendants`: el
+ * botón de alta tiene que seguir siendo un nodo con acción propia — fusionarlo escondería la
+ * única salida que el aviso ofrece.
+ *
+ * La pantalla lo monta sólo cuando hoy no tiene bloques y lo retira en cuanto el usuario elige
+ * otro día o la agenda de hoy deja de estar vacía, así que no hay estado "pegado".
+ */
+@Composable
+private fun RailTodayEmptyNotice(today: LocalDate, onCreate: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = Spacing.lg, end = Spacing.lg, top = Spacing.sm, bottom = Spacing.sm)
+            .clip(ParentalShapes.medium)
+            .background(MaterialTheme.colorScheme.secondaryContainer)
+            .padding(horizontal = Spacing.md, vertical = Spacing.sm)
+            .semantics { liveRegion = LiveRegionMode.Polite },
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(Spacing.xl)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.primary.copy(alpha = RAIL_TODAY_EMPTY_DISC_ALPHA))
+                // Decorativo: el título de al lado ya dice el mensaje.
+                .clearAndSetSemantics { },
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = Icons.Filled.EventBusy,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(Spacing.lg),
+            )
+        }
+        Spacer(modifier = Modifier.width(Spacing.sm))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = RAIL_TODAY_EMPTY_TITLE,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                text = formatDayTitle(today).uppercase(),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSecondaryContainer.copy(
+                    alpha = RAIL_TODAY_EMPTY_SUB_ALPHA,
+                ),
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        Spacer(modifier = Modifier.width(Spacing.sm))
+        Button(
+            onClick = onCreate,
+            shape = CircleShape,
+            contentPadding = PaddingValues(horizontal = Spacing.md, vertical = Spacing.xs),
+            modifier = Modifier.heightIn(min = AgendaGeometry.touchTargetLegacy),
+        ) {
+            Text(
+                text = RAIL_TODAY_EMPTY_ACTION,
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+            )
+        }
     }
 }
 

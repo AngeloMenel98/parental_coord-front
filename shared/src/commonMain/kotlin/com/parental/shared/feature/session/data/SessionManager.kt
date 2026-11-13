@@ -16,6 +16,20 @@ class SessionManager {
         private set
     var userId: String? by mutableStateOf(null)
         private set
+    /**
+     * Rol DENTRO del vínculo (`progenitor|coordinador|third_party`), separado de [role]
+     * (`systemRole`: `user|admin`).
+     *
+     * Son dos ejes distintos y por eso son dos campos: `system_role` enruta a grumos
+     * (Admin vs app) y este rol decide la vista y, del lado del servidor, la autorización.
+     * Se deriva en el cliente desde `GET /bonds` (`VinculoMember.role` del miembro cuyo
+     * `user.id` es el usuario actual), sin esperar a que el JWT lleve el vínculo.
+     *
+     * Un valor desconocido cae en el mismo `else` que `user`: la degradación segura es el
+     * Home de siempre, nunca una vista restringida por accidente.
+     */
+    var bondRole: String? by mutableStateOf(null)
+        private set
     /** True while login is in progress (bonds fetch pending). Keeps UI on Login screen. */
     var loginPending: Boolean by mutableStateOf(false)
         internal set
@@ -61,12 +75,27 @@ class SessionManager {
         Platform.saveString(KEY_USER_ID, userId)
     }
 
+    /**
+     * Fija el rol en el vínculo. Se llama al loguear y también al restaurar la sesión,
+     * porque las sesiones guardadas antes de esta feature no lo tienen y sin él la app
+     * volvería al Home de los progenitores con los datos de todos (S5).
+     */
+    fun updateBondRole(bondRole: String?) {
+        this.bondRole = bondRole
+        if (bondRole != null) {
+            Platform.saveString(KEY_BOND_ROLE, bondRole)
+        } else {
+            Platform.remove(KEY_BOND_ROLE)
+        }
+    }
+
     fun clear() {
         token = null
         userName = null
         role = null
         bondId = null
         userId = null
+        bondRole = null
         loginPending = false
         // Clear from storage
         Platform.remove(KEY_TOKEN)
@@ -74,6 +103,7 @@ class SessionManager {
         Platform.remove(KEY_ROLE)
         Platform.remove(KEY_BOND_ID)
         Platform.remove(KEY_USER_ID)
+        Platform.remove(KEY_BOND_ROLE)
     }
 
     /**
@@ -86,11 +116,13 @@ class SessionManager {
         val savedRole = Platform.loadString(KEY_ROLE)
         val savedBondId = Platform.loadString(KEY_BOND_ID)
         val savedUserId = Platform.loadString(KEY_USER_ID)
+        val savedBondRole = Platform.loadString(KEY_BOND_ROLE)
         token = savedToken
         userName = savedUserName
         role = savedRole
         bondId = savedBondId
         userId = savedUserId
+        bondRole = savedBondRole
         return true
     }
 
@@ -100,5 +132,6 @@ class SessionManager {
         private const val KEY_ROLE = "session_role"
         private const val KEY_BOND_ID = "session_bond_id"
         private const val KEY_USER_ID = "session_user_id"
+        private const val KEY_BOND_ROLE = "session_bond_role"
     }
 }

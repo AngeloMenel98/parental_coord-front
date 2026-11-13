@@ -1,0 +1,28 @@
+{
+  "title": "Terciario temporal — vista restringida",
+  "brief": "Tres direcciones para la vista del usuario terciario temporal: acceso con vencimiento, asignado por un progenitor, sin crear ni rechazar actividades, viendo sólo su Home y sus tareas asignadas, pudiendo únicamente finalizar y adjuntar archivos.",
+  "feature": "odd/tasks/terciarios-temporales.md",
+  "artboards": [
+    {
+      "file": "01-solo-lo-tuyo.html",
+      "title": "Sólo lo tuyo",
+      "tradeoff": "La pantalla no muestra nada que el terciario no pueda usar: sin anillo de cumplimiento, sin saldo, sin hijos, nav de dos ítems. Muy sobria; el estado de la tarea pesa menos que en 02.",
+      "width": 1440,
+      "height": 1120
+    },
+    {
+      "file": "02-agenda-prestada.html",
+      "title": "Agenda prestada",
+      "tradeoff": "Pone el cuándo adelante: riel por hora, bloque Próxima y el acceso como cinta de ancho completo. Rápida de escanear; no explica los permisos.",
+      "width": 1440,
+      "height": 1120
+    },
+    {
+      "file": "03-permiso-explicito.html",
+      "title": "Permiso explícito",
+      "tradeoff": "La autoridad del progenitor y la vigencia son lo primero, con la acción pegada a cada tarea. Máxima legibilidad de la restricción; la más cargada y la que más crece con cada permiso nuevo.",
+      "width": 1440,
+      "height": 1120
+    }
+  ]
+}
