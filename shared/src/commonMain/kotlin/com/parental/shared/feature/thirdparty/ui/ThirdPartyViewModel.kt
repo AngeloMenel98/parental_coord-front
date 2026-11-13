@@ -83,6 +83,12 @@ data class ThirdPartyUiState(
     val isCompleting: Boolean = false,
     val message: String? = null,
     val showPermitDialog: Boolean = false,
+    /**
+     * T10 · el servidor contestó 403: el grant está revocado o suspendido. La pantalla
+     * deja de existir y sólo se ofrece cerrar sesión — no tiene sentido mostrar una
+     * vista restringida a alguien que ya no tiene acceso.
+     */
+    val accessEnded: Boolean = false,
     val userName: String = "",
 ) {
     val counts: Map<ThirdPartyFilter, Int> get() = thirdPartyFilterCounts(activities)
@@ -169,6 +175,7 @@ class ThirdPartyViewModel(
                         categories = categories,
                         permit = permit,
                         showPermitDialog = permit != null && !hasSeenPermit(),
+                        accessEnded = grantResult is ApiResult.Error && grantResult.code == 403,
                     )
                 }
                 is ApiResult.Error -> {
@@ -177,6 +184,7 @@ class ThirdPartyViewModel(
                         error = activitiesResult.message,
                         categories = categories,
                         permit = resolvePermit(grantResult),
+                        accessEnded = grantResult is ApiResult.Error && grantResult.code == 403,
                     )
                 }
             }

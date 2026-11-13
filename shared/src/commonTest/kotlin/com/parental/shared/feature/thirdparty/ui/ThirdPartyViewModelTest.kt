@@ -133,6 +133,10 @@ class ThirdPartyViewModelTest {
             viewModel.state.value.permit,
             "🔴 T10: con el acceso revocado no hay tarjeta de permiso que mostrar.",
         )
+        assertTrue(
+            viewModel.state.value.accessEnded,
+            "🔴 T10: un 403 del grant termina la sesión del terciario, no la deja a medias.",
+        )
         assertFalse(
             viewModel.state.value.showPermitDialog,
             "🔴 L7: y tampoco se abre el popup de bienvenida.",
