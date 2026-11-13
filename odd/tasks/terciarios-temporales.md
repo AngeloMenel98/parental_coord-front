@@ -187,7 +187,7 @@ Todas pendientes. Cada una se aprueba antes de arrancar (D1).
 | T2 | S2, S3, S7 | Módulo `third-parties`: entidades vivas, repo, service, controller, DTOs, audit `third_party_grant`/`revoke` | back | inline | hecho (L9) |
 | T3 | S9 | `resolveBondAccess` + `assertBondAccess` + `assertCanAssignTo`, memoizado por request; migrar los servicios de Bond al chokepoint | back | inline | hecho (L12–L14) |
 | T4 | S8, S11, S13 | Política: `canComplete` sólo asignado **para todos** + rol del viewer en el resto de los flags + auto-confirmación al asignar + `complete()` pasando por la política (F1–F3). Sin transiciones nuevas | back | inline | hecho (L15–L17) |
-| T5 | S5, S6 | Lista filtrada por assignee en query, `/bonds` redactado, 403 en compliance y gastos | back | inline | parcial (L20: filtro en query hecho; falta `/bonds` redactado y los 403) |
+| T5 | S5, S6 | Lista filtrada por assignee en query, `/bonds` redactado, 403 en compliance y gastos | back | inline | hecho (L20–L21) |
 | T6 | S12 | Realtime: excluir terciarios del broadcast y entregar sólo sus actividades. Notificaciones: sólo `assigned` | back | inline | pendiente |
 | T7 | S1, S5 | `bondRole` en sesión derivado de `Vinculo.members`, enrutado por rol, árbol de navegación del terciario | front | inline | hecho (L8) |
 | T8 | S5 | `ThirdPartyHomeScreen`: composición propia, sin anillo de cumplimiento, sin saldo, sin hijos | front | inline | hecho (L8) |
@@ -315,3 +315,7 @@ Corrección diseñada (unidad siguiente, no incluida): dar los **dos pasos legal
 **L20 (T5, primera pieza: la lista filtrada en la query — S6).** `findByBondIdOrdered(bondId, assigneeId?)` agrega `a.assigned_to = :assigneeId` cuando hay assignee, y `listByBond` pasa el id del viewer **sólo si el chokepoint dice que es tercero**. Hasta acá la restricción de S6 era un filtro del cliente sobre una respuesta bond-wide: el vínculo entero viajaba al dispositivo. Ahora el límite se aplica donde se leen las filas. Dos pruebas fijan las dos direcciones (tercero → filtrada; progenitor → sin filtro). Verificación: `pnpm build` OK; `pnpm test` → **99 suites, 1171 tests, 0 fallas**.
 
 Falta de T5: (a) `GET /bonds` redactado para el tercero (sin lista de miembros ni hijos); (b) 403 en compliance y en gastos, que hoy se resuelven sólo por membresía — el chokepoint ya sabe el rol, falta aplicarlo en esas dos superficies.
+
+**L21 (T5, piezas 2 y 3 — S5).** `GET /bonds` redacta el vínculo para el tercero: se **vacían `members` y `children`** en vez de esconder el Bond (necesita saber a qué vínculo pertenece, no quiénes son los otros). Compliance y **todas** las superficies de gastos responden **403** y no 404: el vínculo existe y él pertenece, lo que no puede es mirar. La decisión sale del chokepoint (`BondsService.isThirdPartyIn`), no de lo que pida la app. Pruebas: la redacción en las dos direcciones (tercero vacío / progenitor completo) y el 403 de compliance. Verificación: `pnpm build` OK; `pnpm test` → **99 suites, 1173 tests, 0 fallas**.
+
+Con esto T5 queda cerrada. Sigue: T6 (realtime y notificaciones acotadas), T10 (sesión ante 401/403), T11 (matriz de capacidades cruzada + e2e de terciario), T12 (identidad del terciario en el DTO del vínculo) y el front del artboard ya está hecho (L7–L8).
