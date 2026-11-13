@@ -5,7 +5,7 @@ asignadas por un progenitor concreto dentro de un Bond, con acceso con fecha de 
 revocación anticipada, y una vista reducida: Home propio y sólo sus actividades asignadas, sin
 capacidad de crear, rechazar ni cancelar, pudiendo únicamente finalizar.
 
-**Estado:** propuesta técnica revisada con L4. Front del artboard `03-permiso-explicito` implementado y verificado (T7, T8, T9, T13). Back sin empezar: T1–T6 y T10–T12.
+**Estado:** L4. Front del artboard `03-permiso-explicito` implementado y verificado (T7, T8, T9, T13). Back: grant (T1) y módulo `third-parties` (T2) implementados y verificados; siguen T3–T6 y T10–T12.
 **Ramas:** back `parental_coordination_back` · front `parental_coord-front` (hoy en `ft/activity-stage-rail`, con cambios sin commitear en `Bitacora*`).
 **Entrega:** por definir (ver `## Tasks`); unidades de ~400 líneas, tests junto al comportamiento, Conventional Commits, sin push ni PR.
 **Runners:** front `./gradlew :shared:testDebugUnitTest` + `./gradlew :androidApp:assembleDebug` · back `pnpm test` + `pnpm build`.
@@ -183,8 +183,8 @@ Todas pendientes. Cada una se aprueba antes de arrancar (D1).
 
 | ID | Spec | Tarea | Repo | Ruta | Estado |
 |---|---|---|---|---|---|
-| T1 | S2, S7 | Migraciones: `third_party` en `bond_member_role`, `end_date NOT NULL`, `authorized_by` FK, `relationship`, `revoked_*`, índice único parcial, `expired` | back | inline | pendiente |
-| T2 | S2, S3, S7 | Módulo `third-parties`: entidades vivas, repo, service, controller, DTOs, audit `third_party_grant`/`revoke` | back | delegado | pendiente |
+| T1 | S2, S7 | Migraciones: `third_party` en `bond_member_role`, `end_date NOT NULL`, `relationship`, `revoked_*`, índice único parcial, `expired` | back | inline | hecho (L9) |
+| T2 | S2, S3, S7 | Módulo `third-parties`: entidades vivas, repo, service, controller, DTOs, audit `third_party_grant`/`revoke` | back | inline | hecho (L9) |
 | T3 | S9 | `resolveBondAccess` + `assertBondAccess` + `assertCanAssignTo`, memoizado por request; migrar los servicios de Bond al chokepoint | back | delegado | pendiente |
 | T4 | S8, S11, S13 | Política: `canComplete` sólo asignado **para todos** + rol del viewer en el resto de los flags + auto-confirmación al asignar + `complete()` pasando por la política (F1–F3). Sin transiciones nuevas | back | delegado | pendiente |
 | T5 | S5, S6 | Lista filtrada por assignee en query, `/bonds` redactado, 403 en compliance y gastos | back | delegado | pendiente |
@@ -228,3 +228,15 @@ Decisiones de implementación: (a) `bondRole` se deriva en el cliente desde `Vin
 Pendiente de back para que la vista funcione con datos reales: T2 (grant), T5 (filtro por assignee en query y `/bonds` redactado), T6 (realtime acotado), T10 (401/403 por grant vencido o revocado) y T12 (identidad del terciario en el DTO del vínculo).
 
 **Cortes de entrega (L8).** `0cff20e` contrato + policy · `882a236` ViewModel + diálogos · `603c537` Inicio + Root · `65f9579` Actividades + detalle · `03b0582` sesión/enrutado · `891529c` pruebas · `0986fe4` diseño + este log. Sin push ni PR.
+
+**L9 (back: T1 + T2).** Back en `ft/third-party-access`: `068dd5c` migración + su spec · `82ba4fb` entidad del grant, repositorios y DTOs · `6acf570` servicio, controller, módulo y registro en `AppModule` · `94d70be` specs del servicio. Verificación: `pnpm build` OK; `pnpm test` → **96 suites, 1138 tests, 0 fallas** (25 nuevos: 17 del servicio, 8 de la migración). La migración se corrió además contra un **Postgres 16 real** (contenedor descartable en el puerto 55432, sin volumen): cadena completa desde cero, esquema inspeccionado (`end_date` y `relationship` NOT NULL, índice único parcial `WHERE status='active'`, los tres índices, `bond_member_role=progenitor,coordinador,third_party`, `auth_third_status=active,suspended,revoked,expired`, `third_party_relationship=family,caregiver,medical,educational`), `migration:revert` OK y **re-ejecución OK** (las guardas y los `ADD VALUE IF NOT EXISTS` son idempotentes).
+
+Migración `1793664000000-AddThirdPartyAccessGrant`: `third_party` en `bond_member_role` y `expired` en `auth_third_status` con `ADD VALUE IF NOT EXISTS`; tipo `third_party_relationship`; `end_date` NOT NULL y `relationship` NOT NULL precedidos por guardas que **fallan ruidosamente** (D3: si hay filas sin fecha o filas sin relación, la migración se detiene en vez de inventar); `revoked_at`/`revoked_by` (FK `ON DELETE RESTRICT`)/`revoked_reason`; índice único **parcial** `(bond_id, user_id) WHERE status='active'` para que revocar y volver a otorgar siga siendo posible; índices por `bond_id`, `user_id` y `authorized_by` (la consola del dueño filtra por el último). `down()` revierte todo lo que Postgres permite revertir y deja las dos etiquetas de enum (no se pueden quitar) con el motivo escrito.
+
+Rutas: `GET /bonds/:bondId/third-parties`, `POST /bonds/:bondId/third-parties`, `PATCH /third-parties/:id`, `DELETE /third-parties/:id` y `GET /third-parties/me`; todas con `JwtAuthGuard`.
+
+Decisiones de implementación: (a) **tenencia por dueño, no por vínculo**: sólo el progenitor que otorgó el grant lo lista, lo edita y lo revoca (S7), y un grant ajeno responde **404 y no 403** para no confirmar que el id existe; (b) el alta **no crea credenciales** (D4): busca la cuenta por email y responde **422** si no existe — inventar una contraseña convertiría un pendiente de producto en una decisión de seguridad; (c) un progenitor o coordinador **no se degrada** a `third_party` (409); (d) membresía + grant + audit en **una transacción**; (e) `GET /third-parties/me` hace **vencimiento perezoso** (marca `expired` y audita) y devuelve el grant con su estado para que la persona lea que venció, pero responde **403** si fue revocado o suspendido; (f) la entidad sigue viviendo en `expenses/entities` (F6) porque la entidad de participaciones declara la relación inversa y su metadata tiene que resolverse: deuda anotada, no movida a ciegas.
+
+Corrección en el front que habilitó el back (commit aparte): `ThirdPartyViewModel` ya no cae al progenitor derivado cuando el grant responde **403** — ese fallback existe sólo para cuando el endpoint todavía no existía. Test nuevo: “un 403 del grant no cae en el progenitor derivado”.
+
+Sigue pendiente para que la vista funcione con datos reales: T3 (chokepoint `assertBondAccess`/`assertCanAssignTo`), T4 (política + auto-confirmación al asignar), T5 (filtro por assignee en query y `/bonds` redactado), T6 (realtime y notificaciones acotadas), T10 (sesión ante 401/403), T11 (matriz de capacidades) y T12 (identidad del terciario en el DTO del vínculo).
