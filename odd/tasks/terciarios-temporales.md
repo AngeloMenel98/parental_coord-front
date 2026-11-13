@@ -188,7 +188,7 @@ Todas pendientes. Cada una se aprueba antes de arrancar (D1).
 | T3 | S9 | `resolveBondAccess` + `assertBondAccess` + `assertCanAssignTo`, memoizado por request; migrar los servicios de Bond al chokepoint | back | inline | hecho (L12–L14) |
 | T4 | S8, S11, S13 | Política: `canComplete` sólo asignado **para todos** + rol del viewer en el resto de los flags + auto-confirmación al asignar + `complete()` pasando por la política (F1–F3). Sin transiciones nuevas | back | inline | hecho (L15–L17) |
 | T5 | S5, S6 | Lista filtrada por assignee en query, `/bonds` redactado, 403 en compliance y gastos | back | inline | hecho (L20–L21) |
-| T6 | S12 | Realtime: excluir terciarios del broadcast y entregar sólo sus actividades. Notificaciones: sólo `assigned` | back | inline | pendiente |
+| T6 | S12 | Realtime: excluir terciarios del broadcast y entregar sólo sus actividades. Notificaciones: sólo `assigned` | back | inline | realtime hecho; notificaciones pendientes (L24) |
 | T7 | S1, S5 | `bondRole` en sesión derivado de `Vinculo.members`, enrutado por rol, árbol de navegación del terciario | front | inline | hecho (L8) |
 | T8 | S5 | `ThirdPartyHomeScreen`: composición propia, sin anillo de cumplimiento, sin saldo, sin hijos | front | inline | hecho (L8) |
 | T9 | S4, S6, S10, S11 | Restricciones en Actividades: sin FAB, sin swipe, chips por estado, footer con "Finalizar" y adjuntos para el asignado | front | inline | hecho (L8) |
@@ -331,3 +331,7 @@ Con esto T5 queda cerrada. Sigue: T6 (realtime y notificaciones acotadas), T10 (
 3. **Que el publicador** (outbox/fan-out) emita frames dirigidos al tercero en vez de un broadcast filtrado: el más correcto a largo plazo, y el más caro.
 
 Recomendación: (1). Queda pendiente de decisión antes de escribir. **T11** (matriz de capacidades cruzada + e2e del terciario) depende de T6 para la parte de realtime y, para el e2e, de la infraestructura de Postgres que el repo no tiene en tests (la convención son specs estructurales).
+
+**L24 (T6, realtime hecho — opción 1).** El frame `activity.changed` ahora lleva **`assignedTo`** (viaja desde el outbox como extra; el cliente lo ignora, el servidor lo usa para filtrar). `BondMembersRepository.findActiveThirdPartyIds` resuelve en una consulta quiénes son terceros con grant vivo (`status='active'` y `end_date >= CURRENT_DATE`), y el gateway los saca del broadcast general: a un tercero sólo le llega el frame cuya `assignedTo` es su id. Un frame sin `assignedTo` **no** se le entrega — ante la duda, no filtrar de menos — y los `expense.changed` nunca le llegan (S5). Prueba nueva con un socket de tercero: actividad ajena → nada, gasto → nada, actividad propia → sí. Verificación: `pnpm build` OK; `pnpm test` → **99 suites, 1174 tests, 0 fallas**.
+
+Falta de T6: **notificaciones**. `activity-notification.map.ts` decide destinatarios por relación (`assignee`, `creator`, `member`), sin saber el rol del vínculo: para acotar al tercero a `assigned` hay que resolver su rol en el fan-out (una consulta por lote, no por notificación). No se tocó: cambiar el fan-out sin verificar cómo resuelve hoy los nombres/roles es justo el tipo de parche a ciegas que ya salió mal dos veces en esta sesión.
