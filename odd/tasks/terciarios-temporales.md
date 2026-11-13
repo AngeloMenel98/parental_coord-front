@@ -194,7 +194,7 @@ Todas pendientes. Cada una se aprueba antes de arrancar (D1).
 | T9 | S4, S6, S10, S11 | Restricciones en Actividades: sin FAB, sin swipe, chips por estado, footer con "Finalizar" y adjuntos para el asignado | front | inline | hecho (L8) |
 | T10 | S9 | 401/403 por grant revocado/vencido: limpiar sesión y mensaje "Tu acceso temporal terminó" | front | inline | hecho (L22) |
 | T11 | S9, S13 | Pruebas cruzadas: matriz de capacidades por rol en back (incluye el cambio de `canComplete` para progenitores), e2e de terciario, tests de sesión/enrutado en front | ambos | inline | parcial (L25: matriz por rol hecha; e2e sin infraestructura) |
-| T12 | S12 | Identidad del terciario: el otro progenitor ve "Autorizado por <progenitor>", sin nombre ni perfil, en DTO de Bond, de actividad y en notificaciones | back | delegado | pendiente |
+| T12 | S12 | Identidad del terciario: el otro progenitor ve "Autorizado por <progenitor>", sin nombre ni perfil, en DTO de Bond, de actividad y en notificaciones | back | inline | pendiente (plan en L27) |
 | T13 | S1, S2, S9 | Diálogos de permiso del artboard 03: onboarding "Tu permiso, en concreto" en el primer ingreso + "Lo que no podés hacer acá" en el detalle, abiertos desde iconos de información; sin notas explicativas dentro del producto | front | inline | hecho (L8) |
 
 ## Decisiones abiertas
@@ -343,3 +343,11 @@ T11 queda **parcial** por dos piezas que no se pueden correr acá: el **e2e del 
 **T12 sigue pendiente** (identidad del terciario en el DTO del vínculo: que el otro progenitor vea “Autorizado por <progenitor>”, sin nombre ni perfil).
 
 **L26 (T6, notificaciones — cerrada).** El fan-out resolvía destinatarios por relación (`assignee`/`creator`/`member`) **sin saber el rol del vínculo**, así que al tercero le llegaba todo: actividades creadas en el vínculo y cada cambio de estado, incluidas las que no puede ver. Ahora los destinatarios se filtran **una vez por lote** contra los terceros con acceso vivo del vínculo (`findActiveThirdPartyIds`, la misma consulta del gateway): para ellos se descarta todo salvo `activity.assigned` (S12). Prueba: el filtro saca al tercero de un evento que no es la asignación y lo deja en ella. Verificación: `pnpm build` OK; `pnpm test` → **99 suites, 1178 tests, 0 fallas**. Con esto **T6 queda completa** (realtime + notificaciones).
+
+**L27 (T12, no iniciada — plan y por qué no se hizo a ciegas).** Para mostrar “Autorizado por <progenitor>” en el DTO del vínculo hace falta, por cada tercero del Bond, **quién lo autorizó**, y eso no está en el DTO ni se puede deducir de los miembros (con dos progenitores el nombre sería una adivinanza). El plan concreto:
+
+1. `BondMembersRepository.findThirdPartyAuthorizers(bondId)` → `Map<terceroUserId, authorizerUserId>`, con el mismo join a `auth_third_party` que ya usan el gateway y el fan-out;
+2. `BondsService` recibe `BondMembersRepository` (hoy no lo tiene) y, para un viewer que **no** es tercero, reemplaza el nombre del miembro `third_party` por `"Autorizado por <nombre del autorizador>"` (nombre que sale de `findMemberNames`, que ya existe);
+3. prueba en las dos direcciones: el progenitor del vínculo ve la frase, el tercero sigue viendo su propio vínculo redactado.
+
+No lo hice porque estoy al final del presupuesto de contexto y una T12 a medias deja justo la vista que más importa —la del **otro progenitor**— mostrando un nombre que puede ser el equivocado. Prefiero dejarla pendiente y honesta antes que publicar una atribución falsa de quién autorizó a quién.
