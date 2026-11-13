@@ -276,3 +276,7 @@ Falta de T3 (unidad 2): migrar los call-sites — `activities.service.ts`, `expe
 | `R1-002` / `R1-003` (escalados) + `R4-002` / `R3-002` | CRITICAL | `src/auth/dto/auth.dto.ts` normaliza el email a minúsculas y recorta espacios de la contraseña **sin backfill ni búsqueda case-insensitive**: una cuenta existente con mayúsculas o con espacios en la contraseña deja de autenticarse | **no es de T1/T2** — viene de un commit anterior de la rama; queda para decisión del humano |
 
 Verificación tras las correcciones: `pnpm build` OK; `pnpm test` → **98 suites, 1162 tests, 0 fallas** (5 casos nuevos en la spec de regresión).
+
+**T3, unidad 2 (paso 1 — `342c351`).** En vez de migrar servicio por servicio, `BondsService.isActiveBondForMember` **delega en el chokepoint**: es la puerta que ya usan `activities`, `expenses`, adjuntos, webhooks y el filtro de destinatarios de notificaciones, así que un grant revocado o vencido deja de servir en todo el backend de una vez — sin tocar siete servicios ni sus dobles de test. Cuatro pruebas nuevas en `bonds.service.spec.ts` fijan la bisagra (incluido el caso que la review marcó como BLOCKER: tercero sin grant → no es miembro activo). Verificación: `pnpm build` OK; `pnpm test` → **99 suites, 1166 tests, 0 fallas**.
+
+Falta de la unidad 2 (paso 2, lo único que queda de T3): `assertCanAssignTo` en el alta y la reasignación de actividades (`activities.service.ts:~660`), para que a un tercero sólo le asigne el progenitor que lo autorizó. Requiere tocar el constructor de `ActivitiesService` y cuatro specs que lo construyen.
