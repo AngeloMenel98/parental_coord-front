@@ -161,7 +161,7 @@ class ThirdPartyViewModel(
                     val mine = thirdPartySorted(
                         thirdPartyVisibleActivities(activitiesResult.data, currentUserId),
                     )
-                    val permit = grantResult.toPermit() ?: ownerFallbackPermit()
+                    val permit = resolvePermit(grantResult)
                     _state.value = _state.value.copy(
                         isLoading = false,
                         error = null,
@@ -176,7 +176,7 @@ class ThirdPartyViewModel(
                         isLoading = false,
                         error = activitiesResult.message,
                         categories = categories,
-                        permit = grantResult.toPermit() ?: ownerFallbackPermit(),
+                        permit = resolvePermit(grantResult),
                     )
                 }
             }
@@ -329,6 +329,22 @@ class ThirdPartyViewModel(
             )
             is ApiResult.Error -> _state.value = _state.value.copy(message = res.message)
         }
+    }
+
+    /**
+     * El permiso que la pantalla puede mostrar, o `null` si no hay ninguno honesto.
+     *
+     * El fallback del progenitor derivado existe SÓLO para cuando el endpoint todavía no
+     * está (404/red): es la forma de no dejar la vista sin jerarquía mientras T2 no
+     * exista. Un **403** significa lo contrario — el grant existe y fue revocado o
+     * suspendido (T10) — y ahí mostrar la tarjeta sería decirle a la persona que todavía
+     * tiene un acceso que ya no tiene.
+     */
+    private suspend fun resolvePermit(
+        grantResult: ApiResult<ThirdPartyGrant>,
+    ): ThirdPartyPermitUi? = when (grantResult) {
+        is ApiResult.Success -> grantResult.toPermit()
+        is ApiResult.Error -> if (grantResult.code == 403) null else ownerFallbackPermit()
     }
 
     private fun hasSeenPermit(): Boolean = loadFlag(permitSeenKey(currentUserId)) == "true"

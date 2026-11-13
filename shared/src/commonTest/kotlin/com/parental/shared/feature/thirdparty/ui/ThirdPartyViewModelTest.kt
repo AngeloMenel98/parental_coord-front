@@ -10,6 +10,8 @@ import com.parental.shared.feature.activities.domain.model.CompleteActivityRespo
 import com.parental.shared.feature.activities.domain.model.attachments.ActivityAttachmentDto
 import com.parental.shared.feature.bonds.data.remote.BondsApi
 import com.parental.shared.feature.bonds.domain.model.Vinculo
+import com.parental.shared.feature.bonds.domain.model.VinculoMember
+import com.parental.shared.feature.bonds.domain.model.VinculoMemberUser
 import com.parental.shared.feature.thirdparty.data.remote.ThirdPartiesApi
 import com.parental.shared.feature.thirdparty.domain.model.ThirdPartyGrant
 import io.ktor.client.HttpClient
@@ -98,6 +100,42 @@ class ThirdPartyViewModelTest {
         assertFalse(
             viewModel.state.value.showPermitDialog,
             "🔴 L7: sin permiso no hay popup que anunciar.",
+        )
+    }
+
+    @Test
+    fun `un 403 del grant no cae en el progenitor derivado`() {
+        val viewModel = viewModel(
+            grantApi = FakeGrantApi().apply {
+                result = ApiResult.Error(403, "Tu acceso temporal terminó")
+            },
+            bondsApi = FakeBondsApi().apply {
+                result = ApiResult.Success(
+                    listOf(
+                        Vinculo(
+                            id = bondId,
+                            members = listOf(
+                                VinculoMember(
+                                    id = "m-1",
+                                    role = "progenitor",
+                                    user = VinculoMemberUser(id = "p-1", firstName = "Ángelo"),
+                                ),
+                            ),
+                        ),
+                    ),
+                )
+            },
+        )
+
+        viewModel.load()
+
+        assertNull(
+            viewModel.state.value.permit,
+            "🔴 T10: con el acceso revocado no hay tarjeta de permiso que mostrar.",
+        )
+        assertFalse(
+            viewModel.state.value.showPermitDialog,
+            "🔴 L7: y tampoco se abre el popup de bienvenida.",
         )
     }
 
