@@ -58,11 +58,16 @@ internal const val CHANGE_PASSWORD_CURRENT_INVALID = "La contraseña actual no e
 /**
  * El cambio de contraseña obligatorio del primer ingreso (S2).
  *
- * 🔴 El dueño de la sesión es este VM, no la pantalla: cuando el servidor acepta el cambio
- * hay DOS cosas que actualizar —el token, porque el back emite uno nuevo, y el flag, porque
- * es lo que el routing mira para dejar de bloquear— y ninguna de las dos puede depender de
- * que una composición siga viva. Por eso recibe el [SessionManager] y no callbacks: el
- * estado que se afirma en un test es el mismo objeto que lee `App`.
+ * 🔴 El token lo escribe este VM, no la pantalla: cuando el servidor acepta el cambio el back
+ * emite uno nuevo y ninguna actualización de la sesión puede depender de que una composición
+ * siga viva. Por eso recibe el [SessionManager] y no callbacks: el estado que se afirma en un
+ * test es el mismo objeto que lee `App`.
+ *
+ * 🔴 Pero el FLAG de bloqueo NO lo apaga este VM, aunque sea el dueño del token. Apagarlo es
+ * lo que hace recomponer el routing, y si se apagara acá la app podría montar el destino real
+ * —el Home de los progenitores— con el rol del vínculo todavía en `null`, porque esa
+ * derivación (`GET /bonds`) ocurre después. Quien apaga el flag es `App`, y sólo cuando la
+ * derivación ya terminó (o se rindió): se avisa con [success] y se deja el flag como está.
  *
  * La validación de cliente repite la política del back a propósito. No es desconfianza: es
  * evitar que un typo cueste un viaje de red y, sobre todo, que el bloqueo se sienta como un
@@ -114,9 +119,11 @@ class ChangePasswordViewModel(
             authRepository.changePassword(state.currentPassword, state.newPassword)
                 .onSuccess { response ->
                     // El repositorio ya cambió su token cacheado; la sesión de la app es
-                    // otra cosa y se actualiza acá, con el flag que mandó el servidor.
+                    // otra cosa y recibe SÓLO el token nuevo. El flag queda como está a
+                    // propósito: lo apaga `App` después de derivar el vínculo, porque
+                    // apagarlo acá dejaría el routing recomponer hacia Home con `bondRole`
+                    // en null y un tercero vería el Home de los progenitores (R3-001).
                     sessionManager.updateToken(response.access_token)
-                    sessionManager.updateMustChangePassword(response.user.mustChangePassword)
                     _uiState.value = ChangePasswordUiState()
                     _success.value = true
                 }

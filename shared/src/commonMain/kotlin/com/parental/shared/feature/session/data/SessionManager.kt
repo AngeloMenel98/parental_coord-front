@@ -47,6 +47,16 @@ class SessionManager {
 
     val isLoggedIn: Boolean get() = token != null
 
+    /**
+     * Abre una sesión NUEVA.
+     *
+     * 🔴 El vínculo no se hereda: [bondId] y [bondRole] se escriben con lo que recibe la
+     * llamada —o `null`—, nunca con lo que dejó la sesión anterior. Si no se resetearan, un
+     * logout seguido del login de otra persona podría enrutar al nuevo usuario con el rol
+     * del vínculo del anterior ([bondRole] es lo que decide si la app monta la vista de
+     * terceros). El rol del vínculo se deriva DESPUÉS del login —o al salir del cambio
+     * obligatorio de contraseña—, así que acá siempre arranca vacío.
+     */
     fun setSession(
         token: String,
         userName: String,
@@ -59,15 +69,27 @@ class SessionManager {
         this.userName = userName
         this.role = role
         this.bondId = bondId
+        this.bondRole = null
         this.userId = userId
         this.mustChangePassword = mustChangePassword
         // Persist to storage
         Platform.saveString(KEY_TOKEN, token)
         Platform.saveString(KEY_USER_NAME, userName)
         role?.let { Platform.saveString(KEY_ROLE, it) }
-        bondId?.let { Platform.saveString(KEY_BOND_ID, it) }
+        saveOrClear(KEY_BOND_ID, bondId)
+        // Una sesión nueva no puede dejar el rol del vínculo de la anterior en disco.
+        Platform.remove(KEY_BOND_ROLE)
         userId?.let { Platform.saveString(KEY_USER_ID, it) }
         Platform.saveString(KEY_MUST_CHANGE_PASSWORD, mustChangePassword.toString())
+    }
+
+    /** Escribe el valor en el almacenamiento o borra la clave: un `null` no deja residuo. */
+    private fun saveOrClear(key: String, value: String?) {
+        if (value != null) {
+            Platform.saveString(key, value)
+        } else {
+            Platform.remove(key)
+        }
     }
 
     /**
@@ -99,11 +121,7 @@ class SessionManager {
 
     fun updateBondId(bondId: String?) {
         this.bondId = bondId
-        if (bondId != null) {
-            Platform.saveString(KEY_BOND_ID, bondId)
-        } else {
-            Platform.remove(KEY_BOND_ID)
-        }
+        saveOrClear(KEY_BOND_ID, bondId)
     }
 
     /** Backfill userId for legacy sessions restored without one (via GET /auth/me). */
@@ -119,13 +137,10 @@ class SessionManager {
      */
     fun updateBondRole(bondRole: String?) {
         this.bondRole = bondRole
-        if (bondRole != null) {
-            Platform.saveString(KEY_BOND_ROLE, bondRole)
-        } else {
-            Platform.remove(KEY_BOND_ROLE)
-        }
+        saveOrClear(KEY_BOND_ROLE, bondRole)
     }
 
+    /** Cierra la sesión: no sobrevive NADA del usuario anterior, ni en memoria ni en disco. */
     fun clear() {
         token = null
         userName = null

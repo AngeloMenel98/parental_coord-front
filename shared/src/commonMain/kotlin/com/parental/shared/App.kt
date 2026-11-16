@@ -45,6 +45,9 @@ import com.parental.shared.feature.thirdparty.ui.ThirdPartiesViewModel
 import com.parental.shared.feature.thirdparty.ui.ThirdPartyRoot
 import com.parental.shared.core.network.realtime.RealtimeConnectionManager
 import com.parental.shared.platform.Platform
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 private sealed class Screen(val route: String) {
@@ -142,6 +145,15 @@ private fun AppContent(
      */
     val sessionScope = rememberCoroutineScope()
 
+    /**
+     * Dueño único de la derivación del vínculo al salir del cambio obligatorio (S2/R3-001).
+     * Se recuerda a nivel de sesión —y no en la hoja— justamente porque la hoja se desmonta
+     * cuando el flag se apaga, que es el último paso de la derivación.
+     */
+    val bondDerivation = remember(sessionManager, sessionScope) {
+        BondDerivationCoordinator(sessionManager, sessionScope)
+    }
+
     val currentScreen = if (sessionManager.loginPending) {
         Screen.Login
     } else if (sessionManager.isLoggedIn) {
@@ -187,11 +199,15 @@ private fun AppContent(
                     )
 
                     // D2/F7: el rol vive en el miembro del vínculo, no en el JWT ni en
-                    // `system_role`. Un solo dueño de esta derivación: la comparte la
-                    // salida del cambio obligatorio de contraseña, donde el 403 del guard
-                    // impidió hacerla al entrar (S2).
+                    // `system_role`. 🔴 Con una contraseña provisoria NO se deriva: el
+                    // guard del back responde `403 PASSWORD_CHANGE_REQUIRED` en `GET
+                    // /bonds` mientras el flag esté encendido, así que sería trabajo
+                    // perdido a sabiendas (R2-001). Esa derivación la hace
+                    // [BondDerivationCoordinator] al salir del cambio.
                     try {
-                        sessionManager.deriveBondFromServer()
+                        if (!sessionManager.mustChangePassword) {
+                            sessionManager.deriveBondWithRetry()
+                        }
                     } finally {
                         // Complete login — now safe to navigate to Home/Admin
                         sessionManager.completeLogin()
@@ -201,9 +217,10 @@ private fun AppContent(
         }
 
         Screen.ChangePassword -> {
-            // El VM es dueño de la sesión: al aceptar el cambio escribe el token nuevo y
-            // apaga el flag. El `currentScreen` de arriba se recalcula solo, así que la
-            // hoja no navega a ningún lado.
+            // El VM escribe el token nuevo y avisa que el cambio salió; el FLAG lo apaga
+            // esta capa, y sólo después de derivar el vínculo (R3-001). Al revés, este
+            // mismo `when` recompondría hacia el destino real con `bondRole` todavía en
+            // null: un tercero montaría el Home de los progenitores.
             val changePasswordViewModel = remember {
                 ChangePasswordViewModel(
                     authRepository = authRepository,
@@ -214,20 +231,18 @@ private fun AppContent(
                 onDispose {
                     changePasswordViewModel.destroy()
                     // S2: mientras el flag estaba encendido `GET /bonds` respondía 403, así
-                    // que el login no pudo derivar el vínculo y un tercero caería en el
-                    // Home de los progenitores. Se deriva al desmontarse la hoja además de
-                    // en `onSuccess` porque el efecto de éxito puede quedar cancelado por
-                    // la MISMA recomposición que apaga el flag; el guard deja una sola
-                    // request efectiva entre los dos caminos.
-                    sessionScope.launch { sessionManager.deriveBondIfUnblocked() }
+                    // que el login no pudo derivar el vínculo. Además del camino de éxito
+                    // se pide al desmontarse la hoja —una red de seguridad para el caso en
+                    // que el efecto de éxito no llegue a correr—; el coordinador comparte
+                    // el guard entre los dos, así que una sola request queda en vuelo
+                    // (R3-003) y ninguna se repite sobre un resultado ya concluyente.
+                    bondDerivation.deriveOnDispose()
                 }
             }
             ChangePasswordScreen(
                 viewModel = changePasswordViewModel,
                 onLogout = logout,
-                onSuccess = {
-                    sessionScope.launch { sessionManager.deriveBondIfUnblocked() }
-                },
+                onSuccess = { bondDerivation.deriveThenRelease() },
             )
         }
 
@@ -495,49 +510,192 @@ private fun AppContent(
     }
 }
 
+/** Cuántas veces se intenta la derivación antes de rendirse con el rol en null (R4). */
+private const val BOND_DERIVATION_ATTEMPTS = 2
+
+/** Aire entre intentos: un fallo transitorio no se reintenta en el mismo instante. */
+private const val BOND_DERIVATION_RETRY_DELAY_MS = 250L
+
+/**
+ * Lo que dejó UN intento de derivación.
+ *
+ * La distinción es lo que evita el bucle: «no hay vínculo» o «no hay un miembro que sea
+ * este usuario» son respuestas CONCLUYENTES —reintentar devuelve lo mismo—, mientras que un
+ * error de red o del servidor sí puede cambiar en el intento siguiente (R4, R3-003).
+ */
+private enum class BondDerivationOutcome { Settled, Unresolved }
+
 /**
  * Deriva el vínculo de quien está logueado — `bondId` y el rol DENTRO del vínculo — desde
- * `GET /bonds`.
+ * `GET /bonds`, en UN intento.
  *
- * La llaman dos caminos y por eso vive acá: el login y la salida del cambio obligatorio de
- * contraseña (S2). Mientras el flag está encendido el back responde
- * `403 PASSWORD_CHANGE_REQUIRED` en esa ruta, así que después del login lo único que se
- * sabe es el `systemRole`; el rol del vínculo —el que decide si la persona es un tercero—
- * sólo se puede derivar una vez que la contraseña ya cambió.
+ * Vive acá porque la llaman dos caminos con la misma necesidad: el login (cuando la
+ * contraseña no es provisoria) y la salida del cambio obligatorio (S2). Con el flag de
+ * contraseña encendido el back responde `403 PASSWORD_CHANGE_REQUIRED` en esa ruta, así que
+ * el rol del vínculo —el que decide si la persona es un tercero— sólo se puede derivar una
+ * vez que la contraseña ya cambió.
  *
- * Degrada en SILENCIO a propósito: sin vínculo no hay rol, y sin rol el routing cae en el
- * Home de siempre, que es la degradación segura — nunca una vista restringida por
- * accidente.
+ * 🔴 La respuesta tardía se DESCARTA si la sesión ya no es la que la pidió (R1-002): entre
+ * el request y la respuesta pudo correr un logout —o el login de otra persona—, y escribir
+ * acá repoblaría `bondId`/`bondRole` sobre una sesión que ya no existe.
  */
-private suspend fun SessionManager.deriveBondFromServer() {
-    val token = token ?: return
-    val userId = userId
-    try {
-        when (val bonds = ApiClient.bondsApi().getMyBonds(token)) {
-            is ApiResult.Success -> {
-                val bond = bonds.data.firstOrNull() ?: return
-                updateBondId(bond.id)
-                updateBondRole(bond.members.firstOrNull { it.user?.id == userId }?.role)
-            }
-            is ApiResult.Error -> Unit
-        }
+private suspend fun SessionManager.deriveBondFromServer(): BondDerivationOutcome {
+    val sessionToken = token ?: return BondDerivationOutcome.Unresolved
+    val sessionUserId = userId
+    val result = try {
+        ApiClient.bondsApi().getMyBonds(sessionToken)
     } catch (e: Exception) {
-        // Sin red no hay nada que derivar: el `else` del routing ya es el Home de siempre.
+        // Sin red no hay nada que derivar todavía: es un fallo, no una respuesta.
+        ApiResult.Error(0, e.message ?: "Network error")
+    }
+
+    if (token != sessionToken) return BondDerivationOutcome.Unresolved
+
+    return when (result) {
+        is ApiResult.Success -> {
+            val bond = result.data.firstOrNull { it.id == bondId } ?: result.data.firstOrNull()
+            updateBondId(bond?.id)
+            updateBondRole(bond?.members?.firstOrNull { it.user?.id == sessionUserId }?.role)
+            // Sin vínculo, o sin un miembro que sea este usuario, el rol queda en `null`: el
+            // routing cae en el Home de siempre, que es la degradación segura — nunca una
+            // vista restringida por accidente. Y es un resultado concluyente.
+            BondDerivationOutcome.Settled
+        }
+        is ApiResult.Error -> BondDerivationOutcome.Unresolved
     }
 }
 
 /**
- * La derivación de [deriveBondFromServer], sólo cuando tiene sentido: sesión abierta, sin
- * bloqueo de contraseña provisoria y sin rol de vínculo todavía.
+ * [deriveBondFromServer] con hasta [attempts] intentos, para un fallo transitorio (R4).
  *
- * El guard es lo que hace idempotentes a los dos caminos que la llaman al salir del cambio
- * obligatorio (el callback de éxito y el desmontaje de la hoja): el primero que corre deja
- * el rol puesto y el otro no gasta una request. Tras un logout no queda token y tampoco se
- * pide nada.
+ * Devuelve `true` cuando la derivación quedó resuelta (con o sin rol) y `false` cuando se
+ * agotaron los intentos sin respuesta concluyente.
  */
-private suspend fun SessionManager.deriveBondIfUnblocked() {
-    if (!isLoggedIn || mustChangePassword || bondRole != null) return
-    deriveBondFromServer()
+private suspend fun SessionManager.deriveBondWithRetry(
+    attempts: Int = BOND_DERIVATION_ATTEMPTS,
+): Boolean {
+    repeat(attempts) { attempt ->
+        if (deriveBondFromServer() == BondDerivationOutcome.Settled) return true
+        if (attempt < attempts - 1) delay(BOND_DERIVATION_RETRY_DELAY_MS)
+    }
+    return false
+}
+
+/**
+ * Coordina la derivación del vínculo al salir del cambio obligatorio de contraseña (S2).
+ *
+ * Dos caminos la piden —el éxito del cambio y el desmontaje de la hoja— y este objeto es lo
+ * que los vuelve un solo trabajo:
+ *
+ * - **Un intento en vuelo**: si ya hay una derivación corriendo, el segundo camino no
+ *   arranca otra (R3-003).
+ * - **Un presupuesto por token**: [BOND_DERIVATION_ATTEMPTS] intentos en total, compartidos
+ *   entre los dos caminos. Agotado el presupuesto no se reintenta: el flag se apaga igual
+ *   porque la contraseña YA cambió, y el routing cae en el Home de siempre.
+ * - **Nada se repite sobre un resultado concluyente**: si la respuesta fue «hay rol» o «no
+ *   hay vínculo/rol», [settledFor] lo recuerda y se deja de pedir. Ese es el caso que antes
+ *   no terminaba nunca, porque `bondRole == null` no distingue «todavía no sé» de «no hay».
+ * - **El flag lo apaga sólo el camino de éxito**, y recién cuando la derivación terminó
+ *   (R3-001): [deriveOnDispose] deriva pero nunca libera el bloqueo.
+ */
+private class BondDerivationCoordinator(
+    private val sessionManager: SessionManager,
+    private val scope: CoroutineScope,
+) {
+    /** Token cuya derivación ya quedó concluida: reintentar no cambiaría nada. */
+    private var settledFor: String? = null
+
+    /** Token al que pertenece el presupuesto de intentos ([attemptsUsed]). */
+    private var budgetFor: String? = null
+    private var attemptsUsed: Int = 0
+
+    /** El único trabajo de derivación que puede estar corriendo. */
+    private var inFlight: Job? = null
+
+    /** Token cuyo éxito espera que se apague el flag cuando la derivación termine. */
+    private var releaseRequestedFor: String? = null
+
+    /**
+     * Salida exitosa del cambio: deriva con el token NUEVO y DESPUÉS apaga el flag, que es
+     * lo que hace recomponer el routing hacia la vista real.
+     */
+    fun deriveThenRelease() {
+        val token = sessionManager.token ?: return
+        releaseRequestedFor = token
+        start()
+    }
+
+    /** Red de seguridad del desmontaje de la hoja: deriva, pero no apaga el flag. */
+    fun deriveOnDispose() = start()
+
+    private fun start() {
+        val sessionToken = sessionManager.token
+        if (sessionToken == null) {
+            // Sin sesión no hay nada que derivar ni a quién liberar.
+            releaseRequestedFor = null
+            return
+        }
+        if (inFlight?.isActive == true) return
+        if (settledFor == sessionToken) {
+            releaseNow(sessionToken)
+            return
+        }
+
+        val remaining = BOND_DERIVATION_ATTEMPTS - attemptsFor(sessionToken)
+        val job = scope.launch {
+            val settled = remaining > 0 && sessionManager.deriveBondWithRetry(remaining)
+            attemptsUsed += remaining.coerceAtLeast(0)
+            if (sessionManager.token == sessionToken) {
+                if (settled) {
+                    settledFor = sessionToken
+                } else {
+                    // No se esconde: el rol queda en null y conviene poder verlo en el log. El
+                    // flag se apaga igual — la contraseña cambió, y dejarlo encendido sería
+                    // encerrar a la persona en la hoja por un fallo de red.
+                    println(
+                        "No se pudo derivar el vínculo tras el cambio de contraseña " +
+                            "($BOND_DERIVATION_ATTEMPTS intentos); el bloqueo se apaga igual.",
+                    )
+                }
+                releaseNow(sessionToken)
+            } else {
+                // La sesión cambió mientras corría: este trabajo es de OTRO usuario. No se
+                // toca el flag de la sesión actual (R1/R3/R4-001) y no se reintenta contra
+                // el token nuevo.
+                if (releaseRequestedFor == sessionToken) releaseRequestedFor = null
+            }
+        }
+        inFlight = job
+        job.invokeOnCompletion {
+            if (inFlight === job) inFlight = null
+            // Una sesión nueva pudo pedir su liberación mientras el job viejo corría.
+            if (releaseRequestedFor != null && releaseRequestedFor == sessionManager.token) {
+                start()
+            }
+        }
+    }
+
+    /**
+     * Apaga el bloqueo si el éxito de [sessionToken] lo pidió y esa sesión sigue viva.
+     *
+     * Keyeado por token a propósito: un pedido viejo de la sesión A no puede apagar el flag
+     * de la sesión B que entró después (R1/R3/R4-001).
+     */
+    private fun releaseNow(sessionToken: String) {
+        if (releaseRequestedFor != sessionToken) return
+        releaseRequestedFor = null
+        if (sessionManager.token != sessionToken) return
+        sessionManager.updateMustChangePassword(false)
+    }
+
+    /** Intentos ya gastados para [sessionToken]; un token nuevo arranca el presupuesto. */
+    private fun attemptsFor(sessionToken: String): Int {
+        if (budgetFor != sessionToken) {
+            budgetFor = sessionToken
+            attemptsUsed = 0
+        }
+        return attemptsUsed
+    }
 }
 
 /** Estado liviano sin VM (A14): sin vínculo activo no se puede listar actividades. */

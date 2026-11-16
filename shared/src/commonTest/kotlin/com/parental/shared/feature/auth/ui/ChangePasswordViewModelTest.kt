@@ -22,7 +22,9 @@ import kotlin.test.assertTrue
  * sustituido (nunca hay red) y `destroy()` al final de cada test.
  *
  * 🔴 La sesión se afirma sobre el [SessionManager] REAL, no sobre un espía: el contrato es
- * que el token nuevo y el flag apagado quedan en el objeto que lee el routing. La
+ * que el token nuevo queda en el objeto que lee el routing, y que el FLAG de bloqueo NO se
+ * apaga acá — porque apagarlo antes de derivar el vínculo haría montar el Home de los
+ * progenitores a un tercero (R3-001); lo apaga `App`, después de derivar. La
  * persistencia (`Platform.saveString`) es un no-op acá — sin `init()` no hay prefs — y por
  * eso este test no prueba la escritura en disco, sólo el estado en memoria.
  */
@@ -54,7 +56,7 @@ class ChangePasswordViewModelTest {
     }
 
     @Test
-    fun `el cambio exitoso reemplaza el token y apaga el flag`() {
+    fun `el cambio exitoso reemplaza el token y no toca el flag`() {
         val repository = FakeAuthRepository()
         val session = session()
         val viewModel = viewModel(repository = repository, session = session)
@@ -72,17 +74,35 @@ class ChangePasswordViewModelTest {
             session.token,
             "🔴 S2: el token que sigue contando es el que devolvió el cambio, no el viejo.",
         )
-        assertFalse(
+        assertTrue(
             session.mustChangePassword,
-            "🔴 S2: con la contraseña ya elegida el bloqueo tiene que apagarse.",
+            "🔴 R3-001: el VM ya NO apaga el bloqueo; lo apaga `App` recién cuando el vínculo " +
+                "está derivado. Si el flag cayera acá, el routing recompondría hacia el Home " +
+                "de los progenitores con `bondRole` todavía en null.",
         )
         assertTrue(
             viewModel.success.value,
-            "🔴 S2: la pantalla se entera de que puede cerrarse.",
+            "🔴 S2: la pantalla se entera de que el cambio salió y `App` deriva el vínculo.",
         )
         assertNull(
             viewModel.uiState.value.error,
             "🔴 S2: un éxito no deja cartel de error.",
+        )
+    }
+
+    @Test
+    fun `un cambio exitoso no inventa el rol del vínculo`() {
+        val repository = FakeAuthRepository()
+        val session = session()
+        val viewModel = viewModel(repository = repository, session = session)
+
+        fill(viewModel)
+        viewModel.submit()
+
+        assertNull(
+            session.bondRole,
+            "🔴 R3-001: el rol lo deriva `App` con `GET /bonds`; el VM no puede fabricarlo " +
+                "ni dejarlo como estaba.",
         )
     }
 
