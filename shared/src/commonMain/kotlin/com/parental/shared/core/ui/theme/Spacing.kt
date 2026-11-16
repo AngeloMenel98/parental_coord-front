@@ -216,15 +216,20 @@ object RailGeometry {
     val MinBlockHeight: Dp = 48.dp
 
     /**
-     * Alpha del tinte de fondo de un bloque sobre `surface` — 0.14f.
+     * Alpha del tinte de fondo de un bloque sobre `surface` — 0.28f.
      *
      * El fondo NO sale de `CategoryInfo.colorHex` ni del `container` del triple: cuando el
      * servidor manda un hex, `container == content == dot` (`TagColors.kt`) y el título
-     * quedaba del mismo color que su propio fondo. Un tinte del `dot` al 14% siempre compone
-     * un fondo claro sobre `surface`, así que el título va en `onSurface` y el bloque se lee
-     * con cualquier hex, sin depender de qué rama del resolver ganó.
+     * quedaba del mismo color que su propio fondo. Un tinte del `dot` siempre compone un fondo
+     * claro sobre `surface`, así que el título va en `onSurface` y el bloque se lee con
+     * cualquier hex, sin depender de qué rama del resolver ganó.
+     *
+     * 0.28 y no 0.14: en el dispositivo el bloque se leía lavado sobre un día con muchas filas,
+     * y el tinte apenas se distinguía del fondo. A 0.28 el bloque se lee como tarjeta sólida y
+     * `onSurface` conserva ≥ 10:1 sobre las seis categorías (el peor caso es el índigo de
+     * Educación, que a 0.28 da ≈ 9.9:1).
      */
-    val BlockTintAlpha: Float = 0.14f
+    val BlockTintAlpha: Float = 0.28f
 
     /**
      * Alpha de la línea de media hora sobre `outlineVariant` — 0.5f.
@@ -259,14 +264,6 @@ object RailGeometry {
      * 12dp: a 1dp el contorno se pierde entre el antialiasing de la esquina.
      */
     val OverdueBorderWidth: Dp = 1.5.dp
-
-    /**
-     * Alpha de un bloque `Done` — 0.62f, el `.pill.done` del artboard (`:115`).
-     *
-     * ⚠ No es la ÚNICA señal de “cumplida”: el título va tachado y `StatusTag` dice el
-     * estado en palabras (S11 — el estado nunca se codifica sólo con color u opacidad).
-     */
-    val DoneAlpha: Float = 0.62f
 
     /**
      * Umbral de bloque CORTO — 64dp, `shortPill` del artboard (`:375`).

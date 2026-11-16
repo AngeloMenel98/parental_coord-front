@@ -44,6 +44,49 @@ class ActivityRailScreenContractTest {
 
     private val screen: String by lazy { stripComments(source("ActivitiesScreen.kt")) }
 
+    /** La pantalla SIN recortar: el KDoc de `densityExpanded` también es contrato (S14). */
+    private val rawScreen: String by lazy { source("ActivitiesScreen.kt") }
+
+    /**
+     * Cuerpo de la llamada `callee(…)` con los paréntesis balanceados.
+     *
+     * Necesario para probar «los filtros están ADENTRO del panel» sin componer: buscar
+     * `ActivityFiltersRow(` en todo el archivo no dice si sigue debajo del mapa o pasó a ser su
+     * ranura, que es justo la diferencia de S14.
+     */
+    private fun callBody(source: String, callee: String): String {
+        val start = source.indexOf("$callee(")
+        assertTrue(start >= 0, "🔴 No existe la llamada `$callee(`.")
+        var depth = 0
+        var i = start + callee.length
+        while (i < source.length) {
+            when (source[i]) {
+                '(' -> depth++
+                ')' -> {
+                    depth--
+                    if (depth == 0) return source.substring(start, i + 1)
+                }
+            }
+            i++
+        }
+        fail("🔴 La llamada `$callee(` no cierra sus paréntesis.")
+    }
+
+    /**
+     * Cuerpo de una función privada, desde su firma hasta el `}` que cierra en la columna 0.
+     *
+     * El corte por `\n}\n` es seguro con el formato del repo (llave de cierre sin sangría) y
+     * acota el texto SIN comentarios que estas guardas leen.
+     */
+    private fun functionBody(source: String, signature: String): String {
+        val body = source.substringAfter(signature).substringBefore("\n}\n")
+        assertTrue(
+            signature in source && body.isNotBlank(),
+            "🔴 No existe `$signature` o su cuerpo quedó vacío.",
+        )
+        return body
+    }
+
     private fun uiDir(): File {
         var candidate: File? = File("").absoluteFile
         while (candidate != null) {
@@ -372,6 +415,282 @@ class ActivityRailScreenContractTest {
         assertTrue(
             "SnackbarHost(snackbarHostState)" in screen,
             "🔴 Se perdió el `SnackbarHost` único de la pantalla (snackbar + Deshacer).",
+        )
+    }
+
+    // ── 9 · T10 (S13, S14) · el mapa: chevron solo y filtros adentro ──────────────────
+
+    @Test
+    fun `mostrar y ocultar el mapa es un chevron sin texto con nombre y estado`() {
+        val map = stripComments(source("MonthDensityMap.kt"))
+        val toggle = functionBody(map, "private fun DensityToggle(")
+
+        assertFalse(
+            "Text(" in toggle,
+            "🔴 El control del mapa volvió a tener texto visible. S13: «con solo los chevron es " +
+                "suficiente» — el nombre accesible no se pinta.",
+        )
+        assertFalse(
+            "\"Ocultar\"" in toggle || "\"Ver el mes\"" in toggle,
+            "🔴 Los rótulos visibles del pill volvieron: el control es SÓLO el chevron (S13).",
+        )
+        assertTrue(
+            "contentDescription = " in toggle,
+            "🔴 El chevron perdió su nombre accesible: queda un botón anónimo (S11).",
+        )
+        assertTrue(
+            "stateDescription = " in toggle,
+            "🔴 El chevron no anuncia si el mapa está expandido o plegado (S11/S13).",
+        )
+        assertTrue(
+            "Icons.Filled.ExpandLess" in toggle && "Icons.Filled.ExpandMore" in toggle,
+            "🔴 El chevron dejó de decir el sentido: arriba = plegar, abajo = desplegar (S13).",
+        )
+        assertTrue(
+            "toggleable(" in toggle,
+            "🔴 El control dejó de ser `toggleable`: sin valor de estado, TalkBack no sabe qué " +
+                "está mostrando.",
+        )
+        assertTrue(
+            "AgendaGeometry.touchTargetLegacy" in toggle,
+            "🔴 El chevron bajó del mínimo de 44dp (S11): `touchTargetLegacy` (48dp) es su piso.",
+        )
+        assertEquals(
+            1,
+            Regex("toggleable\\s*\\(").findAll(map).count(),
+            "🔴 Hay más de un control de mostrar/ocultar en el mapa: S13 deja UN chevron.",
+        )
+        assertEquals(
+            1,
+            Regex("onToggleExpanded").findAll(screen).count(),
+            "🔴 La pantalla cablea el plegado del mapa en más de un sitio: el chevron del panel " +
+                "es el ÚNICO control.",
+        )
+    }
+
+    @Test
+    fun `los dos filtros se montan dentro del panel y no se pliegan con el mapa`() {
+        val panel = callBody(screen, "MonthDensityMap")
+
+        assertTrue(
+            "ActivityFiltersRow(" in panel,
+            "🔴 La fila de tipos (Eventos / Obligaciones) no está DENTRO de la llamada al panel " +
+                "(S14): sigue en una fila aparte debajo del calendario.",
+        )
+        assertTrue(
+            "ChildrenFiltersRow(" in panel,
+            "🔴 La fila de hijos no está DENTRO de la llamada al panel (S14).",
+        )
+        listOf("ActivityFiltersRow", "ChildrenFiltersRow").forEach { row ->
+            assertEquals(
+                1,
+                Regex("$row\\s*\\(").findAll(screen).count(),
+                "🔴 `$row` se monta más de una vez: la fila vieja debajo del panel no se retiró.",
+            )
+        }
+
+        val map = stripComments(source("MonthDensityMap.kt"))
+        val panelSource = functionBody(map, "internal fun MonthDensityMap(")
+        assertEquals(
+            1,
+            Regex("if \\(expanded\\) \\{").findAll(panelSource).count(),
+            "🔴 El plegado del panel dejó de tener UN bloque: si la grilla y los filtros cuelgan " +
+                "de condiciones distintas, se pliegan por separado.",
+        )
+        val collapse = panelSource.substringAfter("if (expanded) {")
+        listOf("DensityWeekdayCaps()", "DensityGrid(", "DensityLegend()").forEach { part ->
+            assertTrue(
+                part in collapse,
+                "🔴 `$part` quedó FUERA de la zona plegable: el chevron dejaría de plegar el mes.",
+            )
+        }
+        assertFalse(
+            "filters()" in collapse,
+            "🔴 Los filtros volvieron DENTRO del plegado: al cerrar el mapa desaparecen, y son " +
+                "permanentes (S14 + decisión de producto de T10).",
+        )
+        val beforeCollapse = panelSource.substringBefore("if (expanded) {")
+        assertTrue(
+            "filters()" in beforeCollapse,
+            "🔴 Los filtros dejaron de montarse SIEMPRE dentro del panel: plegar el mapa los " +
+                "escondería.",
+        )
+        assertTrue(
+            beforeCollapse.indexOf("filters()") > beforeCollapse.indexOf("DensityHeader("),
+            "🔴 Los filtros quedaron ENCIMA del encabezado del calendario.",
+        )
+    }
+
+    @Test
+    fun `el mapa de densidad abre plegado por defecto`() {
+        assertTrue(
+            Regex("var densityExpanded by rememberSaveable \\{ mutableStateOf\\(false\\) \\}")
+                .containsMatchIn(screen),
+            "🔴 El mapa volvió a abrir desplegado: a 384dp el panel mide ~513dp y el riel queda " +
+                "en ~130dp, que no es usable. El mapa es una lente ocasional, no el estado de " +
+                "reposo.",
+        )
+        assertTrue(
+            "PLEGADO por defecto" in rawScreen,
+            "🔴 El KDoc no dice que el mapa abre plegado: el default responde a una medida y tiene " +
+                "que quedar escrito donde se lee.",
+        )
+    }
+
+    // ── 10 · T10 (S12) · «Hoy» sin nada hoy avisa, no salta en silencio ───────────────
+
+    @Test
+    fun `hoy sin actividades deja un aviso en el riel en vez de saltar en silencio`() {
+        val rail = stripComments(source("RailTimeline.kt"))
+        assertTrue(
+            "RailTodayEmptyNotice(" in rail,
+            "🔴 El riel no monta el aviso de «hoy sin actividades» (S12).",
+        )
+        val notice = functionBody(rail, "private fun RailTodayEmptyNotice(")
+        assertTrue(
+            "liveRegion = LiveRegionMode.Polite" in notice,
+            "🔴 El aviso no se anuncia a tecnología asistiva: aparece y TalkBack no dice nada.",
+        )
+        assertTrue(
+            "RAIL_TODAY_EMPTY_TITLE" in notice && "\"Hoy no tiene actividades\"" in rail,
+            "🔴 El aviso perdió su copy: S12 pide decir que hoy no hay actividades.",
+        )
+        assertTrue(
+            "onCreate" in notice,
+            "🔴 El aviso no ofrece el alta: informa y deja al usuario sin salida (S12 + S7).",
+        )
+
+        val jump = screen.substringAfter("val goToToday").substringBefore("val shiftMonth")
+        assertTrue(
+            "todayEmptyNotice = " in jump,
+            "🔴 El toque de `Hoy` sigue saltando en silencio: el control no decide nada cuando el " +
+                "día de hoy no tiene actividades (S12).",
+        )
+        assertTrue(
+            "pendingJumpDate = today" in jump,
+            "🔴 El toque de `Hoy` perdió el salto: cuando hoy SÍ tiene actividades tiene que " +
+                "desplegar y llevar el riel a su encabezado.",
+        )
+        assertTrue(
+            "todayEmptyNotice = false" in screen.substringAfter("onSelectDay = {").substringBefore("onPrevMonth"),
+            "🔴 El aviso no se reemplaza al elegir otro día en el mapa: quedaría pegado al riel.",
+        )
+        assertTrue(
+            "todayEmptyNotice = showTodayEmptyNotice" in screen,
+            "🔴 El riel no recibe el aviso: la pantalla lo decidiría y nadie lo pintaría (S12).",
+        )
+        assertTrue(
+            "onCreateFromEmptyToday = onOpenCreate" in screen,
+            "🔴 La acción del aviso no es el MISMO alta que el FAB (S7: un solo camino de alta).",
+        )
+    }
+
+    // ── 11 · T10 (S15) · el anclaje inicial es una regla pura ─────────────────────────
+
+    @Test
+    fun `el anclaje inicial del riel sale de una funcion pura`() {
+        assertTrue(
+            "railInitialAnchor(" in screen,
+            "🔴 La pantalla no usa `railInitialAnchor`: el anclaje volvió a ser una condición " +
+                "inline en composición, que no se puede probar (S15).",
+        )
+        assertFalse(
+            "startMinute <= nowMinute" in screen,
+            "🔴 La pantalla decide «en curso» por su cuenta: la regla vive en `railInitialAnchor`.",
+        )
+        // El anclaje tiene que ser la posición de CREACIÓN del `LazyListState`: un `scrollToItem`
+        // desde un efecto llega un frame tarde y se ve el salto (el defecto que encontró el
+        // humano en el dispositivo).
+        assertTrue(
+            "rememberLazyListState(" in screen && "initialFirstVisibleItemIndex" in screen &&
+                "initialFirstVisibleItemScrollOffset" in screen,
+            "🔴 El riel no se crea anclado: si el estado arranca en el tope y se corrige después, " +
+                "el usuario ve la lista arriba y un salto.",
+        )
+        assertEquals(
+            1,
+            Regex("initialFirstVisibleItemIndex").findAll(screen).count(),
+            "🔴 Hay más de un estado de lista anclado: el riel tiene UNO solo.",
+        )
+        val index = stripComments(source("RailIndex.kt"))
+        val anchor = functionBody(index, "internal fun railInitialAnchor(")
+        assertTrue(
+            "RailAnchorKind.InProgress" in anchor,
+            "🔴 La regla perdió la rama «hay algo en curso»: S15 ancla en la línea de ahora sólo " +
+                "si hay una actividad en curso.",
+        )
+        assertTrue(
+            "RailAnchorKind.FirstBlock" in anchor,
+            "🔴 La regla perdió la rama de respaldo «primer bloque del día».",
+        )
+    }
+
+    // ── 12 · Hallazgos del dispositivo (384dp) que entraron en T10 ────────────────────
+
+    @Test
+    fun `el pill de hoy va abajo a la izquierda y no dentro del slot del FAB`() {
+        val fabSlot = screen.substringAfter("floatingActionButton =").substringBefore("snackbarHost =")
+        assertFalse(
+            "RailTodayButton(" in fabSlot,
+            "🔴 El pill «Hoy» volvió al slot `floatingActionButton`: ese slot alinea a la derecha y " +
+                "el pill queda pegado al FAB. En el artboard va abajo a la IZQUIERDA.",
+        )
+        assertTrue(
+            "FloatingActionButton(" in fabSlot,
+            "🔴 El FAB dejó de montarse en su slot.",
+        )
+        val pill = callBody(screen, "RailTodayButton")
+        assertTrue(
+            ".align(Alignment.BottomStart)" in pill,
+            "🔴 El pill «Hoy» no está anclado a `BottomStart`: volvería a quedar alineado a la " +
+                "derecha por la `Column` centrada.",
+        )
+        assertTrue(
+            "RAIL_FLOATING_CLEARANCE" in screen,
+            "🔴 El pill y el FAB dejaron de tener su franja reservada: taparían el último bloque.",
+        )
+    }
+
+    @Test
+    fun `la canaleta horaria usa el ancho del sistema con aire a la izquierda`() {
+        val rail = stripComments(source("RailTimeline.kt"))
+        val body = functionBody(rail, "private fun RailDayBody(")
+        assertTrue(
+            "padding(start = Spacing.lg, end = Spacing.md)" in body,
+            "🔴 La canaleta volvió a arrancar en x=0: en 384dp los `07:00` quedan pegados al " +
+                "borde izquierdo, sin aire.",
+        )
+        assertTrue(
+            "RailHourGutter(" in body && "RailDayCanvas(" in body,
+            "🔴 El cuerpo del día dejó de ser [canaleta | lienzo]: la línea tiene que arrancar " +
+                "donde arranca el carril 0 de los bloques.",
+        )
+        val canvas = stripComments(source("RailCanvas.kt"))
+        val gutter = functionBody(canvas, "internal fun RailHourGutter(")
+        assertTrue(
+            "width(AgendaGeometry.timeColumn)" in gutter,
+            "🔴 La canaleta dejó de usar el ancho del sistema (`AgendaGeometry.timeColumn`).",
+        )
+        assertTrue(
+            "textAlign = TextAlign.End" in gutter,
+            "🔴 El rótulo de hora dejó de estar alineado a la derecha contra la grilla.",
+        )
+    }
+
+    @Test
+    fun `el encabezado del panel pone densidad al lado del mes y no debajo`() {
+        val map = stripComments(source("MonthDensityMap.kt"))
+        val header = functionBody(map, "private fun DensityHeader(")
+        assertFalse(
+            "Column(modifier = Modifier.weight(1f))" in header,
+            "🔴 Volvió la columna que apila «Densidad» debajo del mes: el artboard los pone en " +
+                "la misma línea.",
+        )
+        assertTrue(
+            header.indexOf("DENSITY_CAPTION") > 0 &&
+                header.indexOf("DENSITY_CAPTION") < header.indexOf("Icons.AutoMirrored.Filled.KeyboardArrowRight"),
+            "🔴 «Densidad» dejó de ser el caption de la misma fila que el mes (antes de la flecha " +
+                "siguiente).",
         )
     }
 

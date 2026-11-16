@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -67,11 +66,16 @@ import kotlinx.datetime.LocalDate
 /** Rótulo del panel. En minúscula como el resto del copy del riel ("densidad"). */
 private const val DENSITY_CAPTION = "Densidad"
 
-/** Copy del pill cuando el mapa está ABIERTO — el `toggleLabel` del artboard (`:196`). */
-private const val DENSITY_COLLAPSE_LABEL = "Ocultar"
+/**
+ * Nombres accesibles del chevron — T10 (S13): el control NO tiene texto visible, así que el
+ * nombre vive sólo aquí y lo lee el lector de pantalla.
+ */
+private const val DENSITY_COLLAPSE_CONTENT_DESCRIPTION = "Ocultar el mapa de densidad"
+private const val DENSITY_EXPAND_CONTENT_DESCRIPTION = "Ver el mes en el mapa de densidad"
 
-/** Copy del pill cuando el mapa está CERRADO — el `setDensity(false)` del artboard (`:535`). */
-private const val DENSITY_EXPAND_LABEL = "Ver el mes"
+/** Estado del chevron en palabras (S11: el estado nunca se codifica sólo con la forma). */
+private const val DENSITY_EXPANDED_STATE = "Visible"
+private const val DENSITY_COLLAPSED_STATE = "Oculto"
 
 /** Extremos de la leyenda: "Menos → Más" (`.legend`, `:203`). */
 private const val DENSITY_LEGEND_LOW = "Menos"
@@ -94,16 +98,28 @@ private val DENSITY_LEGEND_LEVELS = listOf(
  * Dos estados, y el plegado **compone condicionalmente**: cerrado, la fila de días de la
  * semana, la grilla y la leyenda NO existen en el árbol (`if (expanded)`), no están a alpha 0.
  * Un `alpha(0f)` dejaría los botones de la grilla en el recorrido de TalkBack, que es
- * exactamente el defecto que el `[hidden]` del artboard evita. El estado del pill lo anuncia
+ * exactamente el defecto que el `[hidden]` del artboard evita. El estado del chevron lo anuncia
  * `stateDescription`.
+ *
+ * T10 (S14) · LOS FILTROS VIVEN ADENTRO Y NO SE PLIEGAN. `filters` es una ranura que la pantalla
+ * llena con las DOS filas que ya existen (`ActivityFiltersRow` y `ChildrenFiltersRow`): se montan
+ * SIEMPRE, debajo del encabezado y arriba de la zona plegable, así que siguen siendo parte del
+ * calendario (no vuelven a una fila suelta debajo) pero no desaparecen al cerrar el mapa.
+ *
+ * T10 · POR QUÉ ABRE PLEGADO. Con el mapa desplegado el panel mide ~513dp a 384dp de ancho
+ * (encabezado + días + hasta seis semanas de celdas de 44dp + leyenda) y el riel —el contenido
+ * de la pantalla— queda en ~130dp, que no es usable. El mapa es una LENTE OCASIONAL, no el
+ * estado de reposo; los filtros, en cambio, son permanentes, y por eso quedan fuera del plegado.
  *
  * @param density salida de `buildMonthDensity` para ESTE mes y la zona del usuario. Un día
  *   ausente es un día sin actividades, y su celda sigue siendo un botón: elegirla es válido
  *   (el riel salta al día con actividades más cercano).
  * @param selected día seleccionado; puede caer fuera del mes (no se marca nada).
  * @param today día de hoy en la zona del usuario; puede caer fuera del mes mostrado.
- * @param expanded estado del pill. Lo posee la pantalla (T6), igual que el `rememberSaveable`
- *   del resto de la vista.
+ * @param expanded estado del chevron. Lo posee la pantalla (T6), igual que el `rememberSaveable`
+ *   del resto de la vista; desde T10 arranca PLEGADO (ver arriba).
+ * @param filters ranura de filtros: se compone SIEMPRE, debajo del encabezado y encima de la
+ *   zona que se pliega. La pantalla pasa las filas existentes sin re-estilizarlas.
  */
 @Composable
 internal fun MonthDensityMap(
@@ -117,23 +133,27 @@ internal fun MonthDensityMap(
     onSelectDay: (LocalDate) -> Unit,
     onPrevMonth: () -> Unit,
     onNextMonth: () -> Unit,
+    filters: @Composable () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
-        // Todo el contenido va con el mismo margen lateral del arteboard (`.density{padding:0
-        // 12px}`), para que rótulos de día, celdas y leyenda compartan columnas. El separador
-        // queda FUERA de ese margen: en el arteboard el `border-bottom` cruza la sección
-        // entera.
-        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.md)) {
-            DensityHeader(
-                year = year,
-                monthNumber = monthNumber,
-                expanded = expanded,
-                onToggleExpanded = onToggleExpanded,
-                onPrevMonth = onPrevMonth,
-                onNextMonth = onNextMonth,
-            )
-            if (expanded) {
+        // Todo el contenido con el margen lateral del arteboard (`.density{padding:0 12px}`),
+        // para que rótulos de día, celdas y leyenda compartan columnas. El separador queda FUERA
+        // de ese margen: en el arteboard el `border-bottom` cruza la sección entera.
+        DensityHeader(
+            year = year,
+            monthNumber = monthNumber,
+            expanded = expanded,
+            onToggleExpanded = onToggleExpanded,
+            onPrevMonth = onPrevMonth,
+            onNextMonth = onNextMonth,
+            modifier = Modifier.padding(horizontal = Spacing.md),
+        )
+        // S14 · Los filtros, DENTRO del panel y FUERA del plegable: son permanentes. Van a ancho
+        // completo porque las filas traen su propio relleno (no se re-estilizan).
+        filters()
+        if (expanded) {
+            Column(modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.md)) {
                 DensityWeekdayCaps()
                 DensityGrid(
                     year = year,
@@ -147,7 +167,7 @@ internal fun MonthDensityMap(
             }
         }
         // Separador del artboard (`border-bottom:1px solid var(--outline-variant)`): cierra el
-        // panel en LOS DOS estados, porque el encabezado sigue estando.
+        // panel en LOS DOS estados, porque el encabezado y los filtros siguen estando.
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -158,13 +178,14 @@ internal fun MonthDensityMap(
 }
 
 /**
- * Encabezado del panel: flechas del mes, rótulo, "Densidad" y el pill de plegado.
+ * Encabezado del panel: flechas del mes, rótulo con la leyenda "Densidad" AL LADO, y el chevron.
  *
- * ⚠ ADAPTACIÓN AL ANCHO (desviación del artboard, que pone el rótulo y el `sub` en la MISMA
- * línea): aquí el rótulo del mes y la leyenda "Densidad" van apilados dentro de la columna con
- * peso. En un móvil de 320dp, dos flechas de 48dp + el pill dejan ~115dp para el mes, y
- * "Mayo De 2026" con el `sub` al lado no cabe sin cortar el mes — que es el dato, no el
- * adorno. El orden de lectura y la jerarquía no cambian.
+ * T10 · UNA SOLA LÍNEA. El arteboard pone el rótulo del mes y el caption en la misma línea
+ * (`.dhead h2` + `.sub`, `:193`), y es lo que se hace aquí: en 384dp el panel deja 360dp de
+ * ancho útil, los tres controles de 48dp se llevan 144dp y el mes más el caption necesitan
+ * ~190dp a escala de fuente 1,0 — entran. El mes cede ancho (`weight(1f, fill = false)`) antes
+ * que empujar el caption fuera de la fila, así que con fuente muy grande se recorta el mes
+ * —que es el dato— y no desaparece "Densidad".
  *
  * ⚠ TIPOGRAFÍA: el artboard usa serif de 16px para el mes. La escala del proyecto no tiene
  * ningún rol serif por debajo de `headlineSmall` (24sp, el que usa la hoja de calendario), y
@@ -179,10 +200,10 @@ private fun DensityHeader(
     onToggleExpanded: () -> Unit,
     onPrevMonth: () -> Unit,
     onNextMonth: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         IconButton(
@@ -195,7 +216,10 @@ private fun DensityHeader(
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        Column(modifier = Modifier.weight(1f)) {
+        Row(
+            modifier = Modifier.weight(1f),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             Text(
                 // El formateador que ya usa la hoja de calendario: una sola forma de escribir
                 // el mes en el producto.
@@ -203,8 +227,11 @@ private fun DensityHeader(
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
+                softWrap = false,
                 overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false),
             )
+            Spacer(modifier = Modifier.width(Spacing.xs))
             Text(
                 text = DENSITY_CAPTION,
                 style = MaterialTheme.typography.labelSmall,
@@ -228,51 +255,45 @@ private fun DensityHeader(
 }
 
 /**
- * Pill "Ocultar" / "Ver el mes" — el ÚNICO control de mostrar/ocultar (S4).
+ * Chevron de mostrar/ocultar el mapa — el ÚNICO control (S4) y, desde T10, SÓLO un chevron.
  *
- * `toggleable` (no `clickable`) porque el control TIENE estado: TalkBack anuncia el valor y
- * `stateDescription` lo dice en palabras ("Visible"/"Oculto"), igual que el chevron de día de
- * `RailTimeline.kt`. El ícono cambia de sentido por estado en vez de girar: no se arrastra una
- * dependencia de animación por un giro.
+ * S13: "El btono de ver Mes/ocultar con solo los chevron es suficiente." Por eso no hay
+ * `Text`: el nombre accesible viaja en `contentDescription` y el estado en `stateDescription`
+ * (equivalente al `aria-expanded` del artboard), así que TalkBack anuncia qué hace y en qué
+ * estado está aunque en pantalla sólo se vea la flecha. `toggleable` (no `clickable`) conserva
+ * el valor de estado y el rol de botón.
  *
- * `heightIn(min = touchTargetLegacy)` para que el pill de 28dp del artboard siga siendo un
- * objetivo táctil de S11 — el piso manda sobre la medida del dibujo.
+ * El ícono CAMBIA DE SENTIDO por estado (arriba = plegar, abajo = desplegar) en vez de girar:
+ * no se arrastra una dependencia de animación por un giro.
+ *
+ * Objetivo táctil [AgendaGeometry.touchTargetLegacy] (48dp): el mínimo de S11 es 44dp y el
+ * artboard mide 44px; el token del sistema ya cumple y no se inventa un dp nuevo.
  */
 @Composable
 private fun DensityToggle(expanded: Boolean, onToggleExpanded: () -> Unit) {
     val tint = MaterialTheme.colorScheme.primary
-    Row(
+    Box(
         modifier = Modifier
-            .heightIn(min = AgendaGeometry.touchTargetLegacy)
+            .size(AgendaGeometry.touchTargetLegacy)
             .clip(CircleShape)
             .border(Spacing.hairline, MaterialTheme.colorScheme.outlineVariant, CircleShape)
             .toggleable(value = expanded, role = Role.Button, onValueChange = { onToggleExpanded() })
             .semantics {
                 contentDescription = if (expanded) {
-                    "Ocultar el mapa de densidad"
+                    DENSITY_COLLAPSE_CONTENT_DESCRIPTION
                 } else {
-                    "Ver el mes en el mapa de densidad"
+                    DENSITY_EXPAND_CONTENT_DESCRIPTION
                 }
-                stateDescription = if (expanded) "Visible" else "Oculto"
-            }
-            .padding(horizontal = Spacing.sm),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+                stateDescription = if (expanded) DENSITY_EXPANDED_STATE else DENSITY_COLLAPSED_STATE
+            },
+        contentAlignment = Alignment.Center,
     ) {
-        Text(
-            text = if (expanded) DENSITY_COLLAPSE_LABEL else DENSITY_EXPAND_LABEL,
-            style = MaterialTheme.typography.labelMedium,
-            color = tint,
-            fontWeight = FontWeight.SemiBold,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
         Icon(
             imageVector = if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
             // El texto alternativo lo lleva el contenedor: dos nodos dirían lo mismo dos veces.
             contentDescription = null,
             tint = tint,
-            modifier = Modifier.size(Spacing.lg),
+            modifier = Modifier.size(Spacing.xl),
         )
     }
 }

@@ -27,7 +27,15 @@
 
 **S10.** No existen subtareas en el modelo (`Actividad` en `ActivitiesModels.kt` no tiene `subtasks`). El contador `2/5` del artboard se omite; no se inventa el dato.
 
-**S11.** Accesibilidad: etiqueta semántica por bloque (título, rango, duración, estado), contraste AA, foco visible, objetivos ≥ 44dp, estado nunca solo por color.
+**S11.** Accesibilidad: etiqueta semántica por bloque (título, rango, duración, estado), contraste AA, foco visible, objetivos ≥ 44dp, estado nunca solo por color. **Excepción decidida por el humano:** los chips de filtro dentro del calendario van a 34dp, como el mockup; siguen por encima del mínimo de 24dp de WCAG 2.2 y el resto de los objetivos táctiles conserva 44dp.
+
+**S12.** "Fijate que el boton de 'Hoy' si no hay nada en la fecha, tiene que devolver que no hay actividad." Si el día de hoy no tiene actividades, el control de "Hoy" no salta en silencio: informa que hoy no hay actividades.
+
+**S13.** "El btono de ver Mes/ocultar con solo los chevron es suficiente." El control de mostrar/ocultar el mapa de densidad queda solo con el chevron: sin texto.
+
+**S14.** "dentro del calendario deberia estar el filtro por Hijos y por Evento/Obligacion." Los filtros por hijo y por tipo (Eventos / Obligaciones) viven dentro del panel del calendario, no en una fila aparte debajo.
+
+**S15.** El riel abre anclado en la línea de "ahora" **solo si hay una actividad en curso**; si no hay nada en curso, abre en el primer bloque del día. Decisión del humano: "anclar solo si hay algo en curso".
 
 ## Tasks
 
@@ -41,6 +49,7 @@
 | T6 | S6, S7, S8 | delegado | hecho | c817fd0 |
 | T7 | S11 | delegado | hecho | 9351d42 |
 | T9 | S3, S11 | delegado | hecho | f54f0a6, 34c6174 |
+| T10 | S12, S13, S14, S15 | delegado | en curso | — |
 | T8 | S1, S3 | delegado | pendiente | — |
 
 - **T1** — Derivación pura del riel: eje del día, escala minutos→dp, carriles de solapamiento, ticks horarios. `UI/RailDerivation.kt` + `commonTest/.../RailDerivationTest.kt`.
@@ -105,3 +114,9 @@ La siguiente unidad arranca desde `d35ca32`.
 **L15.** El primer APK se instaló sobre el paquete equivocado: el teléfono tiene `com.parental.android.local` (desarrollo, el del icono con la L) y `com.parental.android` (producción). El humano confirmó que la app de trabajo es `.local`. Para que los dos ids convivan sin editar el archivo a mano, `androidApp/build.gradle.kts` toma el `applicationId` de `-PappId` y cae en `com.parental.android`; `aapt2` confirma que sin la propiedad el paquete sigue siendo el de producción. Instalado sobre `.local` conservando la sesión.
 
 **L16.** El humano pidió mergear la rama a `develop` y reinstalar `.local` desde ahí. El merge se hace con T8 pendiente: `AgendaList`, `WeekAgenda`, `WeekOverview`, `DayAgenda*`, `AgendaTimelineRow` y `CalendarJumpSheet` siguen en disco, ya sin montarse. Es deuda de código muerto, no de comportamiento: la pantalla usa solo el riel.
+
+**L17.** Corrección de base: la app de desarrollo se compila desde `ft/admin-reports-ui` (34 commits que `develop` no tenía), así que instalar un build de `develop` retrocedió Home, Gastos y Admin en el teléfono. La rama correcta es `ft/rail-on-admin` (base de trabajo + riel) y el build de desarrollo usa la convención del repo: `-PlocalBuild=true -PapiBaseUrl=http://192.168.0.17:3000/api -PwsUrl=ws://192.168.0.17:3000/realtime`. El `-PappId` que agregué queda sin efecto: es un segundo mecanismo para lo mismo.
+
+**L18.** Pedido del humano, textual: "dejame en develop mergeado y pusheado los 34 commits" → merge de `ft/rail-on-admin` en `develop` (`010aa92`) y push a `origin/develop`. Nuevos requisitos: S12, S13, S14 (T10).
+
+**L19.** Artboard 03 actualizado y aprobado (S12, S13, S14). Decisiones del humano para la implementación: "utiliza los chips del mockup" (34dp, excepción registrada en S11) y "anclar solo si hay algo en curso" (S15). El mapa de densidad abre **expandido** por defecto, porque los filtros viven dentro y plegarlo los dejaría inalcanzables.

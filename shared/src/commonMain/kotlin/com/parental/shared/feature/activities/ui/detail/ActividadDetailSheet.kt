@@ -3,6 +3,7 @@ package com.parental.shared.feature.activities.ui.detail
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
@@ -11,12 +12,14 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.PersonOff
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -38,6 +41,7 @@ import com.parental.shared.feature.activities.ui.attachments.AttachmentsSection
 import com.parental.shared.core.ui.theme.ProgressStroke
 import com.parental.shared.core.ui.theme.SheetGeometry
 import com.parental.shared.core.ui.theme.Spacing
+import com.parental.shared.core.ui.theme.StatusTokens
 import com.parental.shared.feature.activities.domain.model.ActividadDetalle
 import com.parental.shared.feature.activities.domain.model.resolveChildNames
 import com.parental.shared.feature.activities.domain.model.visibleDeclinedReason
@@ -676,10 +680,19 @@ internal fun DetailCard(title: String? = null, body: String? = null, content: @C
  */
 @Composable
 private fun DetailStatusCard(actividad: ActividadDetalle, attachmentCount: Int) {
-    val stages = activityStages(actividad)
+    val rail = stageRail(actividad)
     val steps = detailChecklist(actividad, attachmentCount)
     DetailCard(title = "Estado") {
-        StageRail(stages)
+        StageRail(rail)
+        // PRD §2 y AC 7.3: Verificar no es un paso; la card lo dice sin mover el riel.
+        if (rail.verificationPending) {
+            Spacer(Modifier.height(Spacing.sm))
+            Text(
+                text = "Pendiente de verificar",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
         Spacer(Modifier.height(Spacing.md))
         CheckMeter(steps)
         Spacer(Modifier.height(Spacing.md))
@@ -690,25 +703,45 @@ private fun DetailStatusCard(actividad: ActividadDetalle, attachmentCount: Int) 
     }
 }
 
-/** Riel de 5 etapas. UN nodo de semántica: los rótulos se anuncian como una frase, no cinco. */
+/** Alfa de un paso INHABILITADO (posterior a un terminal). */
+private const val DISABLED_ALPHA = 0.38f
+
+/**
+ * Riel de los 5 pasos. UN nodo de semántica: los rótulos se anuncian como una frase, no cinco.
+ *
+ * El foco del anuncio es la etapa actual o, si la línea se cortó, el punto de corte: en un
+ * terminal no hay etapa actual y leer "Etapa 2 de 5: Asignada" ocultaría que venció o que no
+ * asiste.
+ */
 @Composable
-private fun StageRail(stages: List<StageNode>) {
-    val current = stages.first { it.current }
+private fun StageRail(rail: StageRail) {
+    val nodes = rail.nodes
     val scheme = MaterialTheme.colorScheme
+    val terminalIndex = rail.terminalIndex
+    val focus = nodes.firstOrNull { it.current }
+        ?: nodes.getOrNull(terminalIndex)
+        ?: nodes.last()
     Row(
         modifier = Modifier.fillMaxWidth().clearAndSetSemantics {
-            contentDescription = "Etapa ${current.stage.ordinal + 1} de ${stages.size}: ${current.stage.label}"
+            contentDescription = buildString {
+                append("Etapa ${focus.stage.ordinal + 1} de ${nodes.size}: ")
+                append(rail.terminal?.label ?: focus.stage.label)
+                if (rail.verificationPending) append(". Pendiente de verificar")
+            }
         },
     ) {
-        stages.forEachIndexed { index, node ->
-            val next = stages.getOrNull(index + 1)
-            val previous = stages.getOrNull(index - 1)
+        nodes.forEachIndexed { index, node ->
+            val next = nodes.getOrNull(index + 1)
+            val previous = nodes.getOrNull(index - 1)
+            // Un paso posterior al terminal queda INHABILITADO: ni alcanzado ni pendiente.
+            val disabled = terminalIndex >= 0 && index > terminalIndex
             Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                 Box(Modifier.fillMaxWidth().height(DetailGeometry.stageDisc), contentAlignment = Alignment.Center) {
                     // La línea vive DENTRO de la celda y va del borde al centro: las celdas
                     // contiguas la empalman sin medir nada a mano. Un tramo sólo se pinta si
                     // AMBOS extremos se alcanzaron: una actividad cerrada sin confirmar deja
-                    // el hueco visible en vez de rellenarlo por los dos lados.
+                    // el hueco visible en vez de rellenarlo por los dos lados. Con un terminal
+                    // el prefijo ya viene alcanzado, así que el trazo llega hasta el corte.
                     if (previous != null && previous.reached && node.reached) {
                         Box(
                             Modifier.align(Alignment.CenterStart).fillMaxWidth(0.5f)
@@ -723,15 +756,24 @@ private fun StageRail(stages: List<StageNode>) {
                                 .background(scheme.primary),
                         )
                     }
-                    StageDisc(node)
+                    StageDisc(node = node, disabled = disabled)
                 }
                 Spacer(Modifier.height(Spacing.xs))
                 Text(
-                    text = node.stage.label,
+                    // El punto de corte se rotula con el ESTADO, no con el nombre del paso.
+                    text = node.terminal?.label ?: node.stage.label,
                     style = MaterialTheme.typography.labelSmall,
                     textAlign = TextAlign.Center,
-                    color = if (node.reached) scheme.onSurface else scheme.onSurfaceVariant,
-                    fontWeight = if (node.current) FontWeight.SemiBold else FontWeight.Normal,
+                    color = when {
+                        disabled -> scheme.onSurfaceVariant.copy(alpha = DISABLED_ALPHA)
+                        node.reached -> scheme.onSurface
+                        else -> scheme.onSurfaceVariant
+                    },
+                    fontWeight = if (node.current || node.terminal != null) {
+                        FontWeight.SemiBold
+                    } else {
+                        FontWeight.Normal
+                    },
                 )
             }
         }
@@ -739,9 +781,23 @@ private fun StageRail(stages: List<StageNode>) {
 }
 
 @Composable
-private fun StageDisc(node: StageNode) {
+private fun StageDisc(node: StageNode, disabled: Boolean) {
     val scheme = MaterialTheme.colorScheme
     val base = Modifier.size(DetailGeometry.stageDisc)
+    val terminal = node.terminal
+    if (terminal != null) {
+        // PRD AC 7.9: el desenlace negativo NO se distingue sólo por color — disco, ícono y
+        // el rótulo de arriba dicen lo mismo.
+        Box(base.background(terminalColor(terminal), CircleShape), Alignment.Center) {
+            Icon(
+                imageVector = terminalIcon(terminal),
+                contentDescription = null,
+                tint = scheme.surface,
+                modifier = Modifier.size(DetailGeometry.iconSize),
+            )
+        }
+        return
+    }
     when {
         // Actual: anillo + punto, NO un check — "alcanzada" y "ocurriendo" no son lo mismo.
         node.current -> Box(base.border(ProgressStroke.thin, scheme.primary, CircleShape), Alignment.Center) {
@@ -755,8 +811,27 @@ private fun StageDisc(node: StageNode) {
                 modifier = Modifier.size(DetailGeometry.iconSize),
             )
         }
+        disabled -> Box(
+            base.border(ProgressStroke.thin, scheme.outlineVariant.copy(alpha = DISABLED_ALPHA), CircleShape),
+        )
         else -> Box(base.border(ProgressStroke.thin, scheme.outlineVariant, CircleShape))
     }
+}
+
+/** El rojo del sistema de estados: el mismo `overdue`/`rejected` del `StatusTag`, no uno nuevo. */
+@Composable
+private fun terminalColor(outcome: TerminalOutcome): Color {
+    val status = when (outcome) {
+        TerminalOutcome.Expired -> StatusTokens.Status.Overdue
+        TerminalOutcome.Declined, TerminalOutcome.Cancelled -> StatusTokens.Status.Rejected
+    }
+    return StatusTokens.triple(status, isSystemInDarkTheme()).content
+}
+
+private fun terminalIcon(outcome: TerminalOutcome) = when (outcome) {
+    TerminalOutcome.Expired -> Icons.Filled.Schedule
+    TerminalOutcome.Declined -> Icons.Filled.PersonOff
+    TerminalOutcome.Cancelled -> Icons.Filled.Close
 }
 
 /** Medidor de pasos: una barra por paso visible. "0 de 2" es información, no decoración. */

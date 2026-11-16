@@ -17,6 +17,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -25,6 +26,7 @@ import com.parental.shared.core.ui.components.BottomNavBar
 import com.parental.shared.core.ui.components.CategoryInfo
 import com.parental.shared.core.ui.theme.AgendaGeometry
 import com.parental.shared.core.ui.theme.MotionTokens
+import com.parental.shared.core.ui.theme.RailGeometry
 import com.parental.shared.core.ui.theme.Spacing
 import com.parental.shared.feature.activities.ui.detail.ActividadDetailSheet
 import com.parental.shared.feature.activities.ui.create.CreateActivitySheet
@@ -32,6 +34,7 @@ import com.parental.shared.feature.activities.ui.openedId
 import com.parental.shared.feature.activities.ui.swipe.SwipeAction
 import com.parental.shared.feature.activities.ui.swipe.SwipeReasonDialog
 import com.parental.shared.feature.activities.ui.swipe.SWIPE_UNDO_LABEL
+import com.parental.shared.feature.bonds.domain.model.VinculoChild
 import kotlinx.coroutines.delay
 import kotlinx.datetime.Clock
 import kotlinx.datetime.DateTimeUnit
@@ -52,6 +55,15 @@ import kotlinx.datetime.toLocalDateTime
  */
 private const val MINUTES_PER_HOUR = 60
 private const val NOW_TICK_MILLIS = 60_000L
+
+/**
+ * Fracción del alto del riel donde se posa la línea del anclaje inicial — 0.45, el
+ * `Math.round(host.clientHeight*0.45)` del `landOnNow()` del artboard (`03-riel-del-tiempo.html`).
+ *
+ * Deja contexto ARRIBA de la línea: cuando hay algo en curso, lo que importa es la actividad y
+ * sus vecinas, no el borde superior del eje.
+ */
+private const val RAIL_INITIAL_ANCHOR_VIEWPORT_FRACTION = 0.45f
 
 /**
  * Hueco reservado bajo el riel para los dos controles flotantes — el `.fabgap` del artboard
@@ -315,13 +327,21 @@ private fun ActividadesListScreen(
     val today = remember(zone) { currentDateIn(zone) }
     val selectedDate = parseIsoDate(selectedDateIso) ?: today
 
-    // T6 (S4) · El mapa de densidad se pliega desde el pill de SU encabezado —el único
-    // control (S4)— y el mes visible se recuerda como FECHA ISO, no como `LocalDate`: el
+    // T6 (S4) · El mapa de densidad se pliega desde el chevron de SU encabezado —el único
+    // control (S4/S13)— y el mes visible se recuerda como FECHA ISO, no como `LocalDate`: el
     // `LocalDate` no es `Saveable` y el mapa debe reabrirse en el mismo mes tras rotar.
-    // Plegado por defecto: en un móvil el mapa abierto ocupa ~280dp de alto y el riel es el
-    // contenido; S4 sólo pide que se muestre u oculte desde su pill, no que arranque abierto.
+    //
+    // T10 · PLEGADO por defecto, y la razón es una medida: a 384dp de ancho el panel desplegado
+    // mide ~513dp (encabezado + días + hasta seis semanas de celdas de 44dp + leyenda) y el riel
+    // —el contenido de la pantalla— se queda en ~130dp. El mapa es una LENTE OCASIONAL, no el
+    // estado de reposo. Los DOS filtros, que sí son permanentes, se montan dentro del panel pero
+    // FUERA del plegado (`MonthDensityMap.filters`), así que plegar no los esconde.
     var densityExpanded by rememberSaveable { mutableStateOf(false) }
     var visibleMonthIso by rememberSaveable { mutableStateOf(today.toString()) }
+    // T10 (S12) · El usuario tocó "Hoy" con el día vacío: el riel tiene que DECIRLO, no saltar en
+    // silencio. Se guarda la INTENCIÓN y se cruza con los bloques de hoy al pintar, así que el
+    // aviso desaparece solo si hoy pasa a tener actividades y no queda pegado al riel.
+    var todayEmptyNotice by rememberSaveable { mutableStateOf(false) }
     // T6 (S5) · Días PLEGADOS, como lista de cadenas ISO. Es la forma más simple que un
     // `Saver` escribe en el bundle y la que no depende de que `LocalDate` sea serializable.
     // Se guarda la lista de días PLEGADOS (y no la de desplegados) para que el estado por
@@ -331,9 +351,9 @@ private fun ActividadesListScreen(
     ) { mutableStateOf(emptyList()) }
     val collapsedDays = remember(collapsedDaysIso) { collapsedDaysIso.toSet() }
 
-    val listState = rememberLazyListState()
-    // El destino del salto se guarda un instante y lo consume un `LaunchedEffect`: el índice
-    // del encabezado depende de las secciones, que cambian con los datos y con el plegado.
+    // El destino del salto se guarda un instante y lo consume un `LaunchedEffect` DENTRO del
+    // riel (allí vive el `LazyListState`, ver `RailAnchoredTimeline`): el índice del encabezado
+    // depende de las secciones, que cambian con los datos y con el plegado.
     var pendingJumpDate by remember { mutableStateOf<LocalDate?>(null) }
 
     // T6 (S3) · El reloj del riel se lee FUERA de composición, una vez por minuto. Arranca en
@@ -403,6 +423,20 @@ private fun ActividadesListScreen(
     // sería una hora sin eje que la pinte.
     val railNowMinute = if (sections.any { it.date == today }) nowMinute else null
 
+    // T10 (S12) · Si hoy tiene siquiera un bloque. Una sección de hoy EXISTE aunque esté vacía,
+    // así que "hay sección" no sirve: lo que decide es que tenga bloques.
+    val todayHasBlocks = sections.any { section ->
+        section.date == today && !section.railDay?.blocks.isNullOrEmpty()
+    }
+    // El aviso se pinta sólo si se pidió Y hoy sigue vacío: si una recarga o un filtro le trae
+    // actividades a hoy, el aviso se reemplaza solo.
+    val showTodayEmptyNotice = todayEmptyNotice && !todayHasBlocks
+    // T10 (S15) · La DECISIÓN de anclaje es pura (`railInitialAnchor`); aquí sólo se toma cuando
+    // el reloj ya dio su primera lectura. Se calcula en composición pero NO se consume hasta
+    // montar el riel: `RailAnchoredTimeline` la usa como posición INICIAL del `LazyListState`, así
+    // que el primer frame con contenido ya está anclado y no hay scroll visible después.
+    val initialRailAnchor = nowMinute?.let { minute -> railInitialAnchor(sections, today, minute) }
+
     // S5 · Un día se pliega desde el chevron de SU encabezado y desde ningún otro sitio.
     val toggleDay: (LocalDate) -> Unit = { date ->
         val iso = date.toString()
@@ -416,9 +450,13 @@ private fun ActividadesListScreen(
     // S6 · "Hoy": despliega el día de hoy si estaba plegado y lleva el riel a su encabezado.
     // Las dos cosas ocurren en el MISMO toque: el desplegado cambia las secciones y el índice
     // se calcula después, en el efecto, sobre las secciones ya desplegadas.
+    //
+    // T10 (S12) · Si hoy no tiene ni un bloque, el toque además deja el aviso: con el anclaje de
+    // S15 el riel muchas veces ya está en hoy, así que un salto mudo parecía un botón roto.
     val goToToday: () -> Unit = {
         val iso = today.toString()
         if (iso in collapsedDays) collapsedDaysIso = collapsedDaysIso - iso
+        todayEmptyNotice = !todayHasBlocks
         pendingJumpDate = today
     }
 
@@ -485,29 +523,23 @@ private fun ActividadesListScreen(
                 onNavigate = onNavigateBottom,
             )
         },
-        // S7 + S6 · Dos controles flotantes en el mismo sitio: el pill "Hoy" a la izquierda y el
-        // FAB de alta a la derecha, que es donde el artboard los pone. El FAB es CIRCULAR y
-        // `primary` —"Poneme el boton de agregar en un circulo abajo"— y es el ÚNICO camino de
-        // alta de la pantalla. El pill NO es un FAB (S7 pide uno solo) sino un botón elevado con
-        // su palabra. Si hoy no tiene sección, el toque de "Hoy" no hace nada: ver `goToToday`,
+        // S7 + S6 · El FAB de alta vive en el slot del `Scaffold`: es CIRCULAR y `primary`
+        // —"Poneme el boton de agregar en un circulo abajo"— y es el ÚNICO camino de alta de la
+        // pantalla. El pill "Hoy" NO va aquí: en el artboard aprobado está abajo a la IZQUIERDA,
+        // espejado respecto del FAB, y el slot `floatingActionButton` alinea a la derecha — con
+        // los dos dentro de un `Row` el pill quedaba pegado al FAB. Ahora el pill se monta en el
+        // contenido, anclado a `BottomStart` (ver el `Box` de abajo).
         floatingActionButton = {
-            Row(
-                modifier = Modifier.padding(end = Spacing.lg),
-                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-                verticalAlignment = Alignment.CenterVertically,
+            FloatingActionButton(
+                onClick = onOpenCreate,
+                shape = CircleShape,
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
             ) {
-                RailTodayButton(today = today, onClick = goToToday)
-                FloatingActionButton(
-                    onClick = onOpenCreate,
-                    shape = CircleShape,
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary,
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Add,
-                        contentDescription = "Nueva actividad",
-                    )
-                }
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = "Nueva actividad",
+                )
             }
         },
         // R-8 / G-1 · Un ÚNICO `SnackbarHost` en toda la pantalla. La lista lo hospeda sólo
@@ -515,11 +547,16 @@ private fun ActividadesListScreen(
         // serían doble pintada y doble anuncio.
         snackbarHost = { if (uiState.detail is DetailUiState.Closed) SnackbarHost(snackbarHostState) },
     ) { padding ->
+        // T10 (S6) · El pill "Hoy" va abajo a la IZQUIERDA, espejado respecto del FAB, como en
+        // el artboard aprobado. NO va en el slot `floatingActionButton`: ese slot alinea a la
+        // derecha y con los dos dentro de un `Row` el pill quedaba pegado al FAB. Vive en la
+        // ÚLTIMA franja del contenido —el mismo hueco de `RAIL_FLOATING_CLEARANCE` que ya reserva
+        // el sitio de los flotantes—, así que no tapa ni un renglón del riel.
         Column(
             modifier = Modifier.fillMaxSize().padding(padding),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            // T6 (S4) · El mapa de densidad va ARRIBA de los filtros y se pliega desde el pill
+            // T6 (S4) · El mapa de densidad va ARRIBA del riel y se pliega desde el chevron
             // de su PROPIO encabezado: no hay un segundo control en ninguna otra parte ("que se
             // muestra u oculta desde el pill del encabezado del calendario").
             MonthDensityMap(
@@ -535,30 +572,38 @@ private fun ActividadesListScreen(
                     // ese día no tiene actividades, se va al día con actividades más cercano
                     // —el mismo criterio que usaba la hoja modal de calendario—.
                     onSelectedDateChange(date.toString())
+                    // T10 (S12) · Elegir día REEMPLAZA el aviso de "hoy vacío": el usuario ya
+                    // está mirando otra fecha y el aviso de hoy sólo estorbaría.
+                    todayEmptyNotice = false
                     pendingJumpDate = jumpTargetDate(date, dayGroups)
                 },
                 onPrevMonth = { shiftMonth(-1) },
                 onNextMonth = { shiftMonth(1) },
+                // T10 (S14) · Los DOS filtros viven DENTRO del panel del calendario —debajo del
+                // encabezado y arriba de la zona plegable—, así que NO desaparecen al plegar el
+                // mapa: son permanentes, el mapa es la lente ocasional. Se reutilizan las filas
+                // existentes TAL CUAL: misma selección, mismos contadores y mismos callbacks; lo
+                // único que cambia es el sitio donde se montan.
+                filters = {
+                    ActivityFiltersRow(
+                        selectedTab = uiState.selectedTab,
+                        onSelectTab = onSelectTab,
+                        counts = tabCounts(uiState.actividades),
+                    )
+                    if (uiState.children.size > 1) {
+                        val childCounts = remember(uiState.actividades, uiState.selectedTab) {
+                            childFilterCounts(uiState.actividades, uiState.selectedTab)
+                        }
+                        ChildrenFiltersRow(
+                            children = uiState.children,
+                            selectedChildren = uiState.selectedChildren,
+                            counts = childCounts,
+                            onSelectAll = onClearChildren,
+                            onToggleChild = onToggleChild,
+                        )
+                    }
+                },
             )
-            // T3 (S5) · Los filtros son UNA línea de chips con contador. Los rótulos
-            // "Vista" y "Filtrar" y el control segmentado se fueron con el nuevo cromo.
-            ActivityFiltersRow(
-                selectedTab = uiState.selectedTab,
-                onSelectTab = onSelectTab,
-                counts = tabCounts(uiState.actividades),
-            )
-            if (uiState.children.size > 1) {
-                val childCounts = remember(uiState.actividades, uiState.selectedTab) {
-                    childFilterCounts(uiState.actividades, uiState.selectedTab)
-                }
-                ChildrenFiltersRow(
-                    children = uiState.children,
-                    selectedChildren = uiState.selectedChildren,
-                    counts = childCounts,
-                    onSelectAll = onClearChildren,
-                    onToggleChild = onToggleChild,
-                )
-            }
             // T6 · El contenido ocupa el alto que queda y deja libre el hueco de los dos
             // controles flotantes (el `.fabgap` del artboard): así ni el FAB ni el pill "Hoy"
             // tapan el final del riel. La `Column` no scrollea —lo que scrollea es el riel—, así
@@ -607,49 +652,176 @@ private fun ActividadesListScreen(
                                 actionLabel = "Crear actividad",
                                 onAction = onOpenCreate,
                             )
-                        } else RailTimeline(
-                            // T6 (S3) · El riel es la ÚNICA vista de Actividades (L6). Las
-                            // secciones ya vienen derivadas y en orden: el riel no agrupa ni
-                            // ordena, sólo pinta encabezados pegajosos y cuerpos de día.
-                            sections = sections,
-                            categories = uiState.categories,
-                            memberNames = uiState.memberNames,
-                            children = uiState.children,
-                            zone = zone,
-                            today = today,
-                            nowMinute = railNowMinute,
-                            // El estado de la lista lo posee la pantalla: es lo que mueve el
-                            // salto a un día con el índice de `railItemIndexOf`.
-                            listState = listState,
-                            onOpen = { row -> onSelectActividad(row.actividad.id) },
-                            onToggleDay = toggleDay,
-                            // T7 (R2-T2-7, L11) · El gesto vuelve a tener superficie: la
-                            // agenda lo llevaba en sus filas y el riel lo monta en sus bloques,
-                            // con el motivo obligatorio y la oferta de deshacer que la pantalla
-                            // ya tenía cableadas.
-                            onSwipeAction = onSwipeAction,
-                            // T7 (R4) · El mapa de foco, para que el retorno desde la hoja
-                            // vuelva al bloque que la abrió.
-                            focusRequesters = focusRequesters,
-                        )
+                        } else {
+                            // T10 (S15) · SIN RELOJ TODAVÍA NO HAY ANCLAJE, y montar el riel sin
+                            // anclarlo para corregirlo después sería exactamente el salto visible
+                            // que S15 prohíbe. El reloj llega en el primer tick del
+                            // `LaunchedEffect` de arriba, así que esta rama dura un frame como
+                            // mucho y no pinta nada (el esqueleto del estado de carga ya cumplió).
+                            val minute = nowMinute
+                            if (minute == null) {
+                                Spacer(modifier = Modifier.fillMaxSize())
+                            } else {
+                                // T6 (S3) · El riel es la ÚNICA vista de Actividades (L6). Las
+                                // secciones ya vienen derivadas y en orden: el riel no agrupa ni
+                                // ordena, sólo pinta encabezados pegajosos y cuerpos de día.
+                                RailAnchoredTimeline(
+                                    sections = sections,
+                                    initialAnchor = initialRailAnchor,
+                                    pendingJumpDate = pendingJumpDate,
+                                    onJumpApplied = { pendingJumpDate = null },
+                                    categories = uiState.categories,
+                                    memberNames = uiState.memberNames,
+                                    children = uiState.children,
+                                    zone = zone,
+                                    today = today,
+                                    nowMinute = railNowMinute,
+                                    // T10 (S12) · El aviso de "hoy sin actividades" y su acción,
+                                    // que es el MISMO alta que el FAB (S7).
+                                    todayEmptyNotice = showTodayEmptyNotice,
+                                    onCreateFromEmptyToday = onOpenCreate,
+                                    onOpen = { row -> onSelectActividad(row.actividad.id) },
+                                    onToggleDay = toggleDay,
+                                    // T7 (R2-T2-7, L11) · El gesto vuelve a tener superficie: la
+                                    // agenda lo llevaba en sus filas y el riel lo monta en sus
+                                    // bloques, con el motivo obligatorio y la oferta de deshacer
+                                    // que la pantalla ya tenía cableadas.
+                                    onSwipeAction = onSwipeAction,
+                                    // T7 (R4) · El mapa de foco, para que el retorno desde la
+                                    // hoja vuelva al bloque que la abrió.
+                                    focusRequesters = focusRequesters,
+                                )
+                            }
+                        }
                     }
                 }
             }
-            Spacer(modifier = Modifier.height(RAIL_FLOATING_CLEARANCE))
+            // T10 (S6) · El pill "Hoy" cierra la columna, abajo a la IZQUIERDA y espejado respecto
+            // del FAB (que el `Scaffold` ancla a la derecha). Vive en la franja que ya reservaba
+            // `RAIL_FLOATING_CLEARANCE` —72dp de alto y sin contenido—, así que no tapa texto del
+            // último bloque: el riel termina POR ENCIMA de esa franja.
+            Box(
+                modifier = Modifier.fillMaxWidth().height(RAIL_FLOATING_CLEARANCE),
+            ) {
+                RailTodayButton(
+                    today = today,
+                    onClick = goToToday,
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(start = Spacing.lg, bottom = Spacing.lg),
+                )
+            }
         }
         }
+    }
+}
 
-        // T6 (S6) · El salto se APLICA cuando ya se sabe el índice del encabezado: las
-        // secciones dependen de los datos y del plegado, que pueden cambiar después del toque.
+/**
+ * El riel montado con su `LazyListState` ANCLADO — T10 (S15).
+ *
+ * POR QUÉ UN COMPOSABLE APARTE Y NO UN `LaunchedEffect` EN LA PANTALLA: la posición inicial se
+ * pasa a `rememberLazyListState` como posición de CREACIÓN, así que el primer layout del riel ya
+ * está en la línea de "ahora" (o en el primer bloque) y no hay un scroll visible después. Un
+ * `scrollToItem` desde un efecto llegaría un frame tarde: el usuario vería el tope de la lista y
+ * un salto. Esto exige que el anclaje ya esté decidido al montar, y por eso la pantalla no monta
+ * el riel hasta que el reloj dio su primera lectura.
+ *
+ * El estado vive aquí, no en la pantalla, por la misma razón: `rememberLazyListState` sólo lee sus
+ * inicializadores al crearse. Se re-crea si el riel deja la composición (lista vacía o error), que
+ * es justo cuando un contenido nuevo merece volver a abrir anclado.
+ *
+ * @param initialAnchor decisión PURA de `railInitialAnchor`; `null` deja la lista en el tope.
+ * @param pendingJumpDate salto pedido desde el mapa o desde "Hoy"; lo consume el efecto y lo
+ *   limpia con [onJumpApplied].
+ */
+@Composable
+private fun RailAnchoredTimeline(
+    sections: List<RailSection>,
+    initialAnchor: RailAnchor?,
+    pendingJumpDate: LocalDate?,
+    onJumpApplied: () -> Unit,
+    categories: Map<String, CategoryInfo>,
+    memberNames: Map<String, String>,
+    children: List<VinculoChild>,
+    zone: TimeZone,
+    today: LocalDate,
+    nowMinute: Int?,
+    todayEmptyNotice: Boolean,
+    onCreateFromEmptyToday: () -> Unit,
+    onOpen: (TimelineRow) -> Unit,
+    onToggleDay: (LocalDate) -> Unit,
+    onSwipeAction: (String, SwipeAction) -> Unit,
+    focusRequesters: MutableMap<String, FocusRequester>,
+) {
+    // `maxHeight` es el alto REAL del riel en esta pantalla (el `weight(1f)` de arriba): es el
+    // único sitio donde el anclaje puede saber cuánto mide su viewport antes del primer layout.
+    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+        val density = LocalDensity.current
+        val viewportHeightPx = with(density) { maxHeight.toPx() }
+        val initialIndex = initialAnchor?.let { anchor -> railItemIndexOf(sections, anchor.date) } ?: 0
+        val initialOffsetPx = railAnchorOffsetPx(
+            anchor = initialAnchor,
+            sections = sections,
+            viewportHeightPx = viewportHeightPx,
+            pxPerDp = density.density,
+        )
+        val listState = rememberLazyListState(
+            initialFirstVisibleItemIndex = initialIndex,
+            initialFirstVisibleItemScrollOffset = initialOffsetPx,
+        )
+        RailTimeline(
+            sections = sections,
+            categories = categories,
+            memberNames = memberNames,
+            children = children,
+            zone = zone,
+            today = today,
+            nowMinute = nowMinute,
+            // Este estado es lo que mueve el salto a un día con el índice de `railItemIndexOf`.
+            listState = listState,
+            onOpen = onOpen,
+            onToggleDay = onToggleDay,
+            onSwipeAction = onSwipeAction,
+            focusRequesters = focusRequesters,
+            todayEmptyNotice = todayEmptyNotice,
+            onCreateFromEmptyToday = onCreateFromEmptyToday,
+        )
+
+        // T6 (S6) · El salto se APLICA cuando ya se sabe el índice del encabezado: las secciones
+        // dependen de los datos y del plegado, que pueden cambiar después del toque.
         // `railItemIndexOf` es la MISMA cuenta que monta el riel (`RailIndex.kt`), así que el
         // destino no puede desalinearse de la lista.
         LaunchedEffect(pendingJumpDate, sections) {
             val target = pendingJumpDate ?: return@LaunchedEffect
             val index = railItemIndexOf(sections, target)
             if (index != null) listState.scrollToItem(index)
-            pendingJumpDate = null
+            onJumpApplied()
         }
     }
+}
+
+/**
+ * Desplazamiento en píxeles para que la línea del anclaje caiga a
+ * [RAIL_INITIAL_ANCHOR_VIEWPORT_FRACTION] del alto del riel — el `landOnNow()` del artboard.
+ *
+ * Devuelve 0 cuando no hay anclaje, cuando el día está PLEGADO (su contenido no existe, así que
+ * desplazar en píxeles pondría el encabezado de otro día bajo el borde) o cuando el minuto cae
+ * antes de la franja que deja aire arriba. Nada de píxeles no enteros: `scrollOffset` es `Int`.
+ */
+private fun railAnchorOffsetPx(
+    anchor: RailAnchor?,
+    sections: List<RailSection>,
+    viewportHeightPx: Float,
+    pxPerDp: Float,
+): Int {
+    if (anchor == null) return 0
+    val section = sections.firstOrNull { candidate -> candidate.date == anchor.date } ?: return 0
+    if (!section.isExpanded) return 0
+    val axis = section.railDay?.axis ?: return 0
+    val linePx = railOffsetDp(anchor.minuteOfDay, axis, RailGeometry.DpPerHour) * pxPerDp
+    return (linePx - viewportHeightPx * RAIL_INITIAL_ANCHOR_VIEWPORT_FRACTION)
+        .coerceAtLeast(0f)
+        .toInt()
 }
 
 /**
@@ -664,14 +836,17 @@ private fun ActividadesListScreen(
  * ⚠ `ElevatedButton` y no una `Surface` con `clickable`: trae el rol de botón, el estado de
  * pulsado y la elevación del tema sin que este archivo declare un dp de sombra. El
  * `heightIn` con el objetivo táctil mantiene el piso de S11 aunque un tema encoja el botón.
+ *
+ * T10 · El `modifier` existe para que la pantalla lo ancle abajo a la IZQUIERDA: el artboard lo
+ * espeja respecto del FAB, y el slot `floatingActionButton` sólo alinea a la derecha.
  */
 @Composable
-private fun RailTodayButton(today: LocalDate, onClick: () -> Unit) {
+private fun RailTodayButton(today: LocalDate, onClick: () -> Unit, modifier: Modifier = Modifier) {
     ElevatedButton(
         onClick = onClick,
         shape = CircleShape,
         contentPadding = PaddingValues(horizontal = Spacing.lg, vertical = Spacing.sm),
-        modifier = Modifier
+        modifier = modifier
             .heightIn(min = AgendaGeometry.touchTargetLegacy)
             .semantics { contentDescription = "Ir a hoy, ${formatDayTitle(today)}" },
     ) {

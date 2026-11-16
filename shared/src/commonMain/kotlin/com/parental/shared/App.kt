@@ -38,6 +38,7 @@ import com.parental.shared.feature.notifications.ui.NotificationsViewModel
 import com.parental.shared.feature.notifications.ui.UnreadBadge
 import com.parental.shared.feature.notifications.ui.UnreadCountPoller
 import com.parental.shared.feature.session.data.SessionManager
+import com.parental.shared.feature.thirdparty.ui.ThirdPartyRoot
 import com.parental.shared.core.network.realtime.RealtimeConnectionManager
 import com.parental.shared.platform.Platform
 
@@ -45,6 +46,7 @@ private sealed class Screen(val route: String) {
     data object Login : Screen("login")
     data object Home : Screen("home")
     data object Admin : Screen("admin")
+    data object ThirdParty : Screen("third_party")
 }
 
 @Composable
@@ -61,6 +63,25 @@ fun App() {
             when (val me = ApiClient.authApi().me(token)) {
                 is ApiResult.Success -> sessionManager.updateUserId(me.data.id)
                 is ApiResult.Error -> Unit // degrade safely: no confirm affordance until re-login
+            }
+        }
+        // El rol en el vínculo se deriva al loguear, pero una sesión restaurada de una
+        // versión anterior no lo tiene; sin él la app caería en el Home de los
+        // progenitores con los datos de todo el vínculo (S5). Se deriva del vínculo
+        // guardado y, si no hay ninguno, queda `null`: el `else` ya es el Home de siempre,
+        // que es la degradación segura.
+        val restoredToken = sessionManager.token
+        if (restoredToken != null && sessionManager.bondRole == null && sessionManager.userId != null) {
+            when (val bonds = ApiClient.bondsApi().getMyBonds(restoredToken)) {
+                is ApiResult.Success -> {
+                    val bond = bonds.data.firstOrNull { it.id == sessionManager.bondId }
+                        ?: bonds.data.firstOrNull()
+                    val role = bond?.members
+                        ?.firstOrNull { it.user?.id == sessionManager.userId }
+                        ?.role
+                    if (role != null) sessionManager.updateBondRole(role)
+                }
+                is ApiResult.Error -> Unit
             }
         }
     }
@@ -105,8 +126,11 @@ private fun AppContent(
     val currentScreen = if (sessionManager.loginPending) {
         Screen.Login
     } else if (sessionManager.isLoggedIn) {
-        when (sessionManager.role) {
-            "admin" -> Screen.Admin
+        when {
+            sessionManager.role == "admin" -> Screen.Admin
+            // S1/S5: el tercero temporal tiene su propio árbol. El `systemRole` sigue
+            // siendo `user`; lo que decide acá es el rol DENTRO del vínculo.
+            sessionManager.bondRole == "third_party" -> Screen.ThirdParty
             else -> Screen.Home
         }
     } else {
@@ -141,6 +165,13 @@ private fun AppContent(
                                 if (result.data.isNotEmpty()) {
                                     val firstBond = result.data.first()
                                     sessionManager.updateBondId(firstBond.id)
+                                    // D2/F7: el rol vive en el miembro del vínculo, no en
+                                    // el JWT ni en `system_role`.
+                                    sessionManager.updateBondRole(
+                                        firstBond.members
+                                            .firstOrNull { it.user?.id == response.user.id }
+                                            ?.role,
+                                    )
                                 } else {
                                     // No bonds found for this user
                                 }
@@ -177,6 +208,21 @@ private fun AppContent(
             }
             AdminScreen(
                 viewModel = viewModel,
+                onLogout = logout,
+            )
+        }
+
+        Screen.ThirdParty -> {
+            val thirdPartyToken = sessionManager.token
+            if (thirdPartyToken == null) {
+                sessionManager.clear()
+                return
+            }
+            ThirdPartyRoot(
+                token = thirdPartyToken,
+                userName = sessionManager.userName.orEmpty(),
+                bondId = sessionManager.bondId,
+                currentUserId = sessionManager.userId,
                 onLogout = logout,
             )
         }

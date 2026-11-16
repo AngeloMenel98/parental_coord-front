@@ -26,74 +26,155 @@ import kotlinx.datetime.toLocalDateTime
  * eso el evento "se asignó a X" NO existe: no hay fecha con la que ubicarlo en la bitácora.
  */
 
-/** Las cinco etapas del ciclo de vida, en el orden en que se pintan. */
+/**
+ * Los cinco pasos del camino feliz (PRD §2), en el orden en que se pintan.
+ *
+ * `Asiste` es un paso PROPIO: el PRD lo separa de "Confirmada" porque es la acción con la que
+ * el asignado acepta. `En progreso` llega por tiempo y `Verificar` no es un paso: el PRD lo
+ * deja en el 4 con una indicación aparte.
+ */
 internal enum class ActivityStage(val label: String) {
     Created("Creada"),
     Assigned("Asignada"),
-    Confirmed("Confirmada"),
+    Confirmed("Asiste"),
     InProgress("En progreso"),
     Finished("Finalizada"),
 }
 
-/** Un nodo del riel: si se alcanzó y si es el actual. `current` es único. */
+/**
+ * El desenlace negativo del riel (PRD §3).
+ *
+ * `Expired` lo DECLARA el servidor con `overdue`; `Declined` y `Cancelled` son decisiones de
+ * usuario. Ninguno inventa una fecha: el riel sólo dice DÓNDE se cortó la línea, y la fecha
+ * (cuando existe) va al registro de trazabilidad, no al stepper.
+ */
+internal enum class TerminalOutcome(val label: String) {
+    Expired("Vencida"),
+    Declined("No asiste"),
+    Cancelled("Cancelada"),
+}
+
+/**
+ * Un paso del riel.
+ *
+ * `current` es único y NO coexiste con un terminal: cuando la línea se corta, el punto de
+ * corte reemplaza al actual. `reached` sigue siendo "la línea llegó hasta acá".
+ */
 internal data class StageNode(
     val stage: ActivityStage,
     val reached: Boolean,
     val current: Boolean,
+    val terminal: TerminalOutcome? = null,
 )
+
+/** El riel completo: los cinco nodos más los dos hechos que no son un nodo. */
+internal data class StageRail(
+    val nodes: List<StageNode>,
+    val verificationPending: Boolean = false,
+) {
+    /** El desenlace negativo, o `null` si la actividad sigue en el camino feliz. */
+    val terminal: TerminalOutcome? get() = nodes.firstNotNullOfOrNull { it.terminal }
+
+    /** Índice del nodo que cierra la línea, o -1. */
+    val terminalIndex: Int get() = nodes.indexOfFirst { it.terminal != null }
+}
 
 /** Estados en los que la actividad ya está cerrada. Los mismos alias que usa
  *  [statusSemanticLabel] (`DONE`/`COMPLETED`), repetidos como constante para no importar
  *  una tabla de textos sólo para comparar estados. */
 private val FINISHED_STATUSES = setOf("DONE", "COMPLETED")
 
+/** `verify` y su alias viejo: la ventana de verificación, que NO es un paso del riel. */
+private val VERIFY_STATUSES = setOf("VERIFY", "PENDING_VERIFICATION")
+
+/** Estados que prueban que el horario ya llegó: "En progreso" es un paso POR TIEMPO. */
+private val STARTED_STATUSES =
+    setOf("IN_PROGRESS", "VERIFY", "PENDING_VERIFICATION", "DONE", "COMPLETED")
+
 /**
  * Índice de la etapa que el ESTADO declara, sin mirar marcas.
  *
- * `OVERDUE` se queda en "En progreso": venció el plazo, no se cerró. `VERIFY` y
- * `PENDING_VERIFICATION` también: la ventana de verificación es el momento de finalizar (lo
- * dice el copy de `VerifyWindowCard`), no un paso posterior.
+ * `ASSISTING` es el paso 3: el servidor sólo transiciona a `assisting` cuando el asignado
+ * confirma, así que el estado ES la prueba de "Asiste". `IN_PROGRESS` en adelante declaran el
+ * paso 4; `VERIFY` también, porque la verificación no es un paso del PRD.
  *
- * 🔴 `ASSISTING` faltaba y caía en el `else` ("Creada"): es un estado real del DTO
- * (`ActivitiesModels.kt`) y el proyecto ya lo rotula (`statusSemanticLabel`). Se atiende una
- * actividad = está en curso.
+ * 🔴 Los terminales (`overdue`, `not_assisting`, `cancelled`) y cualquier estado desconocido
+ * NO ascienden el riel: su posición se calcula con las MARCAS (`confirmedAt`, `isPast`,
+ * `completedAt`), porque un terminal dice cómo termina, no cuánto avanzó.
  */
 private fun stageIndexOf(status: String): Int = when (status.uppercase()) {
     "CREATED" -> ActivityStage.Created.ordinal
-    "ASSIGNED", "NOT_ASSISTING", "CANCELLED" -> ActivityStage.Assigned.ordinal
-    "ASSISTING", "IN_PROGRESS", "VERIFY", "PENDING_VERIFICATION", "OVERDUE" -> ActivityStage.InProgress.ordinal
-    "DONE", "COMPLETED" -> ActivityStage.Finished.ordinal
-    // Estado desconocido: no se afirma nada más que "creada" en vez de mentir hacia arriba.
+    "ASSIGNED" -> ActivityStage.Assigned.ordinal
+    "ASSISTING" -> ActivityStage.Confirmed.ordinal
+    "IN_PROGRESS", "VERIFY", "PENDING_VERIFICATION", "DONE", "COMPLETED" -> ActivityStage.InProgress.ordinal
     else -> ActivityStage.Created.ordinal
 }
 
+/** El desenlace negativo que declara el estado, o `null` si sigue en el camino feliz. */
+private fun terminalOutcomeOf(status: String): TerminalOutcome? = when (status.uppercase()) {
+    "OVERDUE" -> TerminalOutcome.Expired
+    "NOT_ASSISTING" -> TerminalOutcome.Declined
+    "CANCELLED" -> TerminalOutcome.Cancelled
+    else -> null
+}
+
 /**
- * El riel de 5 etapas de una actividad.
+ * El riel de 5 pasos de una actividad (PRD §5).
  *
  * 🔴 NO se calcula con un índice único: se acumula lo que CADA marca prueba. Un índice
- * obligaba a elegir entre mentir arriba (pintar "Confirmada" en una actividad cerrada sin
+ * obligaba a elegir entre mentir arriba (pintar "Asiste" en una actividad cerrada sin
  * `confirmedAt`) o mentir abajo (retroceder una `in_progress` a "Asignada"). Con el conjunto
  * alcanzado, una actividad puede estar terminada y aun así dejar el hueco visible en
- * "Confirmada" — que es exactamente lo que pasó.
+ * "Asiste" — que es exactamente lo que pasó.
  *
- * `current` es la etapa alcanzada más alta; el riel marca el hueco, no lo rellena.
+ * Con un TERMINAL (`overdue`, `not_assisting`, `cancelled`) la regla cambia una sola cosa: el
+ * riel es un PREFIJO hasta el paso donde la línea se cortó, porque el PRD pide que el trazo
+ * "avance hasta el paso donde ocurrió y termine ahí". Ese corte es el `current` de la card:
+ * no hay etapa actual cuando la actividad ya terminó mal.
  */
-internal fun activityStages(actividad: ActividadDetalle): List<StageNode> {
-    val confirmed = actividad.assignedConfirmed || parseInstant(actividad.confirmedAt) != null
-    val finished = parseInstant(actividad.completedAt) != null ||
-        actividad.status.uppercase() in FINISHED_STATUSES
-    val declared = stageIndexOf(actividad.status)
+internal fun stageRail(actividad: ActividadDetalle): StageRail {
+    val status = actividad.status.uppercase()
+    val confirmed = actividad.assignedConfirmed ||
+        parseInstant(actividad.confirmedAt) != null ||
+        status == "ASSISTING"
+    val started = status in STARTED_STATUSES ||
+        parseInstant(actividad.completedAt) != null ||
+        (confirmed && actividad.isPast)
+    val finished = parseInstant(actividad.completedAt) != null || status in FINISHED_STATUSES
+    val declared = stageIndexOf(status)
     val reached = buildSet {
         add(ActivityStage.Created)
-        if (declared >= ActivityStage.Assigned.ordinal) add(ActivityStage.Assigned)
+        if (declared >= ActivityStage.Assigned.ordinal || actividad.assignedTo != null) {
+            add(ActivityStage.Assigned)
+        }
         if (confirmed) add(ActivityStage.Confirmed)
-        if (declared >= ActivityStage.InProgress.ordinal) add(ActivityStage.InProgress)
+        if (started) add(ActivityStage.InProgress)
         if (finished) add(ActivityStage.Finished)
     }
-    val current = reached.maxByOrNull { it.ordinal } ?: ActivityStage.Created
-    return ActivityStage.values().map { stage ->
-        StageNode(stage = stage, reached = stage in reached, current = stage == current)
+
+    val terminal = terminalOutcomeOf(status)
+    if (terminal != null) {
+        val index = reached.maxOf { it.ordinal }
+        return StageRail(
+            nodes = ActivityStage.values().map { stage ->
+                StageNode(
+                    stage = stage,
+                    reached = stage.ordinal <= index,
+                    current = false,
+                    terminal = terminal.takeIf { stage.ordinal == index },
+                )
+            },
+            verificationPending = false,
+        )
     }
+
+    val current = reached.maxByOrNull { it.ordinal } ?: ActivityStage.Created
+    return StageRail(
+        nodes = ActivityStage.values().map { stage ->
+            StageNode(stage = stage, reached = stage in reached, current = stage == current)
+        },
+        verificationPending = status in VERIFY_STATUSES,
+    )
 }
 
 /** Un paso del bloque "Qué falta". */
