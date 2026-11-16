@@ -40,6 +40,8 @@ import com.parental.shared.feature.notifications.ui.NotificationsViewModel
 import com.parental.shared.feature.notifications.ui.UnreadBadge
 import com.parental.shared.feature.notifications.ui.UnreadCountPoller
 import com.parental.shared.feature.session.data.SessionManager
+import com.parental.shared.feature.session.domain.ViewerRole
+import com.parental.shared.feature.session.domain.resolveViewerRole
 import com.parental.shared.feature.thirdparty.ui.ThirdPartiesScreen
 import com.parental.shared.feature.thirdparty.ui.ThirdPartiesViewModel
 import com.parental.shared.feature.thirdparty.ui.ThirdPartyRoot
@@ -91,10 +93,35 @@ fun App() {
                 is ApiResult.Success -> {
                     val bond = bonds.data.firstOrNull { it.id == sessionManager.bondId }
                         ?: bonds.data.firstOrNull()
-                    val role = bond?.members
-                        ?.firstOrNull { it.user?.id == sessionManager.userId }
-                        ?.role
-                    if (role != null) sessionManager.updateBondRole(role)
+                    sessionManager.updateBondId(bond?.id)
+                    if (bond != null) {
+                        val memberRole = bond.members
+                            .firstOrNull { it.user?.id == sessionManager.userId }
+                            ?.role
+                        if (memberRole != null) {
+                            sessionManager.updateBondRole(memberRole)
+                        } else {
+                            // S5: al tercero le redactan `members`, así que su fila no viaja;
+                            // el grant propio es lo único que lo identifica al restaurar.
+                            val grant = try {
+                                ApiClient.thirdPartiesApi().getMyGrant(restoredToken)
+                            } catch (e: Exception) {
+                                null
+                            }
+                            if (sessionManager.token == restoredToken) {
+                                when (
+                                    val resolved = resolveViewerRole(
+                                        bond.members,
+                                        sessionManager.userId,
+                                        grant,
+                                    )
+                                ) {
+                                    is ViewerRole.Known -> resolved.role?.let(sessionManager::updateBondRole)
+                                    ViewerRole.Unknown -> Unit
+                                }
+                            }
+                        }
+                    }
                 }
                 is ApiResult.Error -> Unit
             }
@@ -555,11 +582,36 @@ private suspend fun SessionManager.deriveBondFromServer(): BondDerivationOutcome
         is ApiResult.Success -> {
             val bond = result.data.firstOrNull { it.id == bondId } ?: result.data.firstOrNull()
             updateBondId(bond?.id)
-            updateBondRole(bond?.members?.firstOrNull { it.user?.id == sessionUserId }?.role)
-            // Sin vínculo, o sin un miembro que sea este usuario, el rol queda en `null`: el
-            // routing cae en el Home de siempre, que es la degradación segura — nunca una
-            // vista restringida por accidente. Y es un resultado concluyente.
-            BondDerivationOutcome.Settled
+            if (bond == null) {
+                updateBondRole(null)
+                return BondDerivationOutcome.Settled
+            }
+
+            val memberRole = bond.members.firstOrNull { it.user?.id == sessionUserId }?.role
+            if (memberRole != null) {
+                updateBondRole(memberRole)
+                return BondDerivationOutcome.Settled
+            }
+
+            // S5 le redacta `members` al tercero temporal: su propia fila NO viaja en
+            // `GET /bonds`, así que el rol no se puede leer de ahí (el bug que lo dejaba
+            // en el Home del progenitor). `GET /third-parties/me` sí lo identifica:
+            // 200/403 = tercero (403 es el grant revocado, y su vista muestra el corte),
+            // 404 = no tiene grant → no es tercero.
+            val ownGrant = try {
+                ApiClient.thirdPartiesApi().getMyGrant(sessionToken)
+            } catch (e: Exception) {
+                null
+            }
+            if (token != sessionToken) return BondDerivationOutcome.Unresolved
+
+            when (val resolved = resolveViewerRole(bond.members, sessionUserId, ownGrant)) {
+                is ViewerRole.Known -> {
+                    updateBondRole(resolved.role)
+                    BondDerivationOutcome.Settled
+                }
+                ViewerRole.Unknown -> BondDerivationOutcome.Unresolved
+            }
         }
         is ApiResult.Error -> BondDerivationOutcome.Unresolved
     }
