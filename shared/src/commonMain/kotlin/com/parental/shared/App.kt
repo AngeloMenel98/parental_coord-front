@@ -38,6 +38,8 @@ import com.parental.shared.feature.notifications.ui.NotificationsViewModel
 import com.parental.shared.feature.notifications.ui.UnreadBadge
 import com.parental.shared.feature.notifications.ui.UnreadCountPoller
 import com.parental.shared.feature.session.data.SessionManager
+import com.parental.shared.feature.thirdparty.ui.ThirdPartiesScreen
+import com.parental.shared.feature.thirdparty.ui.ThirdPartiesViewModel
 import com.parental.shared.feature.thirdparty.ui.ThirdPartyRoot
 import com.parental.shared.core.network.realtime.RealtimeConnectionManager
 import com.parental.shared.platform.Platform
@@ -239,10 +241,11 @@ private fun AppContent(
                 return
             }
 
-            // Terceros sigue siendo placeholder; Gastos ya navega (T29/T19).
+            // Terceros ya navega (T15): lista, alta, edición y revocación de los accesos
+            // que este progenitor otorgó.
             val onNavigateBottom: (String) -> Unit = { route ->
                 when (route) {
-                    "home", "activities", "expenses" -> bottomRoute = route
+                    "home", "activities", "expenses", "thirdparty" -> bottomRoute = route
                     else -> Unit
                 }
             }
@@ -397,6 +400,35 @@ private fun AppContent(
                         )
                     }
                 }
+            } else if (bottomRoute == "thirdparty") {
+                when {
+                    bondId == null -> SinVinculoScreen(
+                        onGoHome = { bottomRoute = "home" },
+                        selectedRoute = "thirdparty",
+                    )
+                    else -> {
+                        val thirdPartiesViewModel = remember(currentUserId, bondId) {
+                            ThirdPartiesViewModel(
+                                api = ApiClient.thirdPartiesApi(),
+                                token = token,
+                                bondId = bondId,
+                            )
+                        }
+                        DisposableEffect(thirdPartiesViewModel) {
+                            onDispose { thirdPartiesViewModel.destroy() }
+                        }
+                        LaunchedEffect(thirdPartiesViewModel) {
+                            thirdPartiesViewModel.load()
+                        }
+                        ThirdPartiesScreen(
+                            viewModel = thirdPartiesViewModel,
+                            onLogout = logout,
+                            onNavigateBottom = onNavigateBottom,
+                            unreadCount = unreadCount,
+                            onOpenNotifications = { showNotifications = true },
+                        )
+                    }
+                }
             } else {
                 val homeApi = remember { ApiClient.homeApi() }
                 val viewModel = remember {
@@ -426,11 +458,14 @@ private fun AppContent(
 
 /** Estado liviano sin VM (A14): sin vínculo activo no se puede listar actividades. */
 @Composable
-private fun SinVinculoScreen(onGoHome: () -> Unit) {
+private fun SinVinculoScreen(
+    onGoHome: () -> Unit,
+    selectedRoute: String = "activities",
+) {
     Scaffold(
         bottomBar = {
             BottomNavBar(
-                selectedRoute = "activities",
+                selectedRoute = selectedRoute,
                 onNavigate = { route -> if (route == "home") onGoHome() },
             )
         },

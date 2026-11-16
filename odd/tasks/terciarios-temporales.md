@@ -5,7 +5,7 @@ asignadas por un progenitor concreto dentro de un Bond, con acceso con fecha de 
 revocación anticipada, y una vista reducida: Home propio y sólo sus actividades asignadas, sin
 capacidad de crear, rechazar ni cancelar, pudiendo únicamente finalizar.
 
-**Estado:** L30. Back: T1–T6, T12 y T14 cerrados (T12 verificado de forma independiente); front: T7, T8, T9, T10 y T13 hechos. T11 queda parcial (e2e y tests de sesión sin infraestructura). Sólo siguen abiertas las decisiones de producto de `## Decisiones abiertas`.
+**Estado:** L32. Back: T1–T6, T12 y T14 cerrados (T12 verificado de forma independiente); front: T7, T8, T9, T10 y T13 hechos. T11 queda parcial (e2e y tests de sesión sin infraestructura). Sólo siguen abiertas las decisiones de producto de `## Decisiones abiertas`.
 **Ramas:** back `parental_coordination_back` · front `parental_coord-front` (hoy en `ft/activity-stage-rail`, con cambios sin commitear en `Bitacora*`).
 **Entrega:** por definir (ver `## Tasks`); unidades de ~400 líneas, tests junto al comportamiento, Conventional Commits, sin push ni PR.
 **Runners:** front `./gradlew :shared:testDebugUnitTest` + `./gradlew :androidApp:assembleDebug` · back `pnpm test` + `pnpm build`.
@@ -199,7 +199,7 @@ Todas pendientes. Cada una se aprueba antes de arrancar (D1).
 | T12 | S12 | Identidad del terciario: el otro progenitor ve "Autorizado por <progenitor>", sin nombre ni perfil, en DTO de Bond, de actividad y en notificaciones | back | inline | hecho (L28) |
 | T13 | S1, S2, S9 | Diálogos de permiso del artboard 03: onboarding "Tu permiso, en concreto" en el primer ingreso + "Lo que no podés hacer acá" en el detalle, abiertos desde iconos de información; sin notas explicativas dentro del producto | front | inline | hecho (L8) |
 | T14 | S14, S5, S12 | El trabajo del tercero no suma al porcentaje de cumplimiento del vínculo: excluirlo de `findActiveMembersWithActStats` (A2 de L29) | back | delegado | hecho (L30) |
-| T15 | S1, S2, S7 | Front del progenitor: lista, alta, edición y revocación de los accesos que él otorgó, con vigencia explícita y alcance acotado | front | inline | diseño (L31) |
+| T15 | S1, S2, S7 | Front del progenitor: lista, alta, edición y revocación de los accesos que él otorgó, con vigencia explícita y alcance acotado | front | delegado | hecho (L32) |
 
 ## Decisiones abiertas
 
@@ -395,3 +395,9 @@ Se diseñaron tres direcciones en `design/terceros-ui/` sobre `design/system.md`
 Restricciones que el diseño respeta del contrato real: cada progenitor ve sólo los accesos que él autorizó; el alta exige una cuenta existente (`email`), `relationship` (`family|caregiver|medical|educational`), `accessEnd` obligatorio y `note` opcional; vigencia y estado salen del servidor.
 
 Comentarios del canvas (todos resueltos): el resumen de vencimiento y el tipo de relación del 01 suman; la matriz de permisos del 03 tiene que ser un dato de consulta detrás de un icono arriba a la derecha. Se agregó `04-vigencia-a-la-vista.html`, que fusiona todo eso sobre el asistente del 02, y **es el artboard elegido para implementar**.
+
+**L32 (T15 — el progenitor ya puede otorgar y revocar).** Implementado sobre el artboard `04-vigencia-a-la-vista` con los dos deltas finales del canvas (sin resumen de permisos en la tarjeta; acciones por swipe con vías alternativas). Piezas: `ThirdPartyAccess` + requests en `ThirdPartyModels.kt` (con `relationshipLabel` congelado y tests que lo fijan), `listForBond/create/update/revoke` en `ThirdPartiesApi.kt`, `ThirdPartiesViewModel.kt` (asistente, presets de 30 días/3 meses con `kotlinx-datetime`, validación de calendario real y fecha no pasada, edición, revocación) y `ThirdPartiesScreen.kt` (tarjetas con vigencia y barra, rail por swipe + menú ⋮ + `CustomAccessibilityAction`, hojas de edición y de matriz ⓘ, estados loading/vacío/error). Navegación real del tab `thirdparty` en `BottomNavBar` y `App.kt`, con `token`/`bondId` de la sesión y `destroy()` del VM.
+
+Verificación: `:shared:testDebugUnitTest` → **690 tests, 0 fallas** (67 reportes; 13 nuevos) y `:androidApp:assembleDebug` OK. Diseño commiteado aparte (`59d331c`).
+
+Límites declarados: no se implementó "Renovar"/"Quitar" porque el back responde **409** (`Sólo se puede editar un acceso vigente` / `El acceso ya venció: no hay nada que revocar`); la palabra "Abuela"/"Niñera" del artboard no existe en el contrato (`displayName` + `relationship`), así que no se inventó; la nota de 500 caracteres la valida el back; no hay refresh por realtime de la lista (se recarga al entrar y después de cada escritura); y sigue sin haber Compose UI tests, así que la pantalla no tiene verificación de UI ejecutable — la misma limitación del resto del front. El estado "sin vínculo" mantiene la navegación previa (sólo Inicio desde la barra).
