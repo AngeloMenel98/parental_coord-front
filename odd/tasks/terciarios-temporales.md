@@ -5,7 +5,7 @@ asignadas por un progenitor concreto dentro de un Bond, con acceso con fecha de 
 revocación anticipada, y una vista reducida: Home propio y sólo sus actividades asignadas, sin
 capacidad de crear, rechazar ni cancelar, pudiendo únicamente finalizar.
 
-**Estado:** L29. Back: T1–T6 y T12 cerrados (T12 verificado de forma independiente); front: T7, T8, T9, T10 y T13 hechos. T11 queda parcial (e2e y tests de sesión sin infraestructura). Sólo siguen abiertas las decisiones de producto de `## Decisiones abiertas` y el follow-up A2 de compliance.
+**Estado:** L30. Back: T1–T6, T12 y T14 cerrados (T12 verificado de forma independiente); front: T7, T8, T9, T10 y T13 hechos. T11 queda parcial (e2e y tests de sesión sin infraestructura). Sólo siguen abiertas las decisiones de producto de `## Decisiones abiertas`.
 **Ramas:** back `parental_coordination_back` · front `parental_coord-front` (hoy en `ft/activity-stage-rail`, con cambios sin commitear en `Bitacora*`).
 **Entrega:** por definir (ver `## Tasks`); unidades de ~400 líneas, tests junto al comportamiento, Conventional Commits, sin push ni PR.
 **Runners:** front `./gradlew :shared:testDebugUnitTest` + `./gradlew :androidApp:assembleDebug` · back `pnpm test` + `pnpm build`.
@@ -37,6 +37,8 @@ capacidad de crear, rechazar ni cancelar, pudiendo únicamente finalizar.
 **S12.** "no ve el nombre del terciario pero que fue autirozao por el progenitor a ir otra persona. El terciario solo recibe notificaciones de que se le asigno una actividad y puede ver cuando es y la info de lo que tiene que hacer."
 
 **S13.** "Corregir el canComplete para todos."
+
+**S14.** "el trabajo del tercero no cuenta con el porcentaje de cumplimiento del progenitor, es individual de ese tercero."
 
 ### Decisiones acordadas (L2, L4)
 
@@ -196,6 +198,7 @@ Todas pendientes. Cada una se aprueba antes de arrancar (D1).
 | T11 | S9, S13 | Pruebas cruzadas: matriz de capacidades por rol en back (incluye el cambio de `canComplete` para progenitores), e2e de terciario, tests de sesión/enrutado en front | ambos | inline | parcial (L25: matriz por rol hecha; e2e sin infraestructura) |
 | T12 | S12 | Identidad del terciario: el otro progenitor ve "Autorizado por <progenitor>", sin nombre ni perfil, en DTO de Bond, de actividad y en notificaciones | back | inline | hecho (L28) |
 | T13 | S1, S2, S9 | Diálogos de permiso del artboard 03: onboarding "Tu permiso, en concreto" en el primer ingreso + "Lo que no podés hacer acá" en el detalle, abiertos desde iconos de información; sin notas explicativas dentro del producto | front | inline | hecho (L8) |
+| T14 | S14, S5, S12 | El trabajo del tercero no suma al porcentaje de cumplimiento del vínculo: excluirlo de `findActiveMembersWithActStats` (A2 de L29) | back | delegado | hecho (L30) |
 
 ## Decisiones abiertas
 
@@ -372,3 +375,11 @@ Advisories de la verificación, ninguno bloqueante:
 - **A4 (cosmético).** El comentario de `bond-member.entity.ts` dice que `third_party` no se persiste, pero la migración `1793664000000000` lo agrega al enum.
 
 Review nativa del commit de back: `assess` devolvió `reviewDue=false` (`under_budget`), así que no corresponde abrir lineage; la verificación independiente y las probes son la evidencia de esta unidad. La documentación de T12 sí pasó por review nativa: `approved` (tier low, `non_executable_only`) y acknowledgement consumido.
+
+**L30 (T14 — el tercero queda fuera del cumplimiento, S14).** Decisión de producto: "el trabajo del tercero no cuenta con el porcentaje de cumplimiento del progenitor, es individual de ese tercero". Se implementó en el único lugar donde se arma esa foto: `findActiveMembersWithActStats` ahora excluye `bm.role = third_party` con el parámetro bindeado `:thirdPartyRole` (nunca interpolado, y un test lo prohíbe explícitamente), además de eliminar la fuga del nombre real que marcaba A2. No se tocó DTO, controller, firma del servicio, índices ni migraciones: el único llamador es `getComplianceForBond`, y el front itera el array de miembros sin asumir una fila por miembro activo.
+
+Antes de tocar nada se verificó que el rol **sí** se persiste (`1793664000000` agrega `third_party` a `bond_member_role`; `third-parties.service.ts:154` inserta la fila con ese rol), así que filtrar por rol es correcto y no hizo falta inventar otro join. Un tercero con grant revocado o vencido también queda excluido, que es lo deseado: nunca debe sumar.
+
+Evidencia: RED real (2 de 11 tests fallan pidiendo `bm.role <> :thirdPartyRole` y recibiendo `bm.left_at IS NULL`) → GREEN 11/11. `pnpm build` OK; `pnpm test` → **100 suites, 1193 tests, 0 fallas**. La única deuda es de entorno: el SQL no se ejecutó contra Postgres real (la suite mockea el QueryBuilder), igual que el resto de las specs estructurales del repo; `bm.role` es NOT NULL, así que `<>` no pierde filas.
+
+Aparte, A4 quedó corregido: el comentario de `bond-member.entity.ts` ya no dice que `third_party` no se persiste (commit cosmético separado).
