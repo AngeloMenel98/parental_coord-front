@@ -5,7 +5,7 @@ asignadas por un progenitor concreto dentro de un Bond, con acceso con fecha de 
 revocación anticipada, y una vista reducida: Home propio y sólo sus actividades asignadas, sin
 capacidad de crear, rechazar ni cancelar, pudiendo únicamente finalizar.
 
-**Estado:** L4. Front del artboard `03-permiso-explicito` implementado y verificado (T7, T8, T9, T13). Back: grant (T1) y módulo `third-parties` (T2) implementados y verificados; siguen T3–T6 y T10–T12.
+**Estado:** L28. Back: T1–T6 y T12 cerrados; front: T7, T8, T9, T10 y T13 hechos. T11 queda parcial (e2e y tests de sesión sin infraestructura). Sólo siguen abiertas las decisiones de producto de `## Decisiones abiertas`.
 **Ramas:** back `parental_coordination_back` · front `parental_coord-front` (hoy en `ft/activity-stage-rail`, con cambios sin commitear en `Bitacora*`).
 **Entrega:** por definir (ver `## Tasks`); unidades de ~400 líneas, tests junto al comportamiento, Conventional Commits, sin push ni PR.
 **Runners:** front `./gradlew :shared:testDebugUnitTest` + `./gradlew :androidApp:assembleDebug` · back `pnpm test` + `pnpm build`.
@@ -194,7 +194,7 @@ Todas pendientes. Cada una se aprueba antes de arrancar (D1).
 | T9 | S4, S6, S10, S11 | Restricciones en Actividades: sin FAB, sin swipe, chips por estado, footer con "Finalizar" y adjuntos para el asignado | front | inline | hecho (L8) |
 | T10 | S9 | 401/403 por grant revocado/vencido: limpiar sesión y mensaje "Tu acceso temporal terminó" | front | inline | hecho (L22) |
 | T11 | S9, S13 | Pruebas cruzadas: matriz de capacidades por rol en back (incluye el cambio de `canComplete` para progenitores), e2e de terciario, tests de sesión/enrutado en front | ambos | inline | parcial (L25: matriz por rol hecha; e2e sin infraestructura) |
-| T12 | S12 | Identidad del terciario: el otro progenitor ve "Autorizado por <progenitor>", sin nombre ni perfil, en DTO de Bond, de actividad y en notificaciones | back | inline | pendiente (plan en L27) |
+| T12 | S12 | Identidad del terciario: el otro progenitor ve "Autorizado por <progenitor>", sin nombre ni perfil, en DTO de Bond, de actividad y en notificaciones | back | inline | hecho (L28) |
 | T13 | S1, S2, S9 | Diálogos de permiso del artboard 03: onboarding "Tu permiso, en concreto" en el primer ingreso + "Lo que no podés hacer acá" en el detalle, abiertos desde iconos de información; sin notas explicativas dentro del producto | front | inline | hecho (L8) |
 
 ## Decisiones abiertas
@@ -351,3 +351,13 @@ T11 queda **parcial** por dos piezas que no se pueden correr acá: el **e2e del 
 3. prueba en las dos direcciones: el progenitor del vínculo ve la frase, el tercero sigue viendo su propio vínculo redactado.
 
 No lo hice porque estoy al final del presupuesto de contexto y una T12 a medias deja justo la vista que más importa —la del **otro progenitor**— mostrando un nombre que puede ser el equivocado. Prefiero dejarla pendiente y honesta antes que publicar una atribución falsa de quién autorizó a quién.
+
+**L28 (T12 — cerrada).** Se implementó el plan de L27 en tres piezas: `BondMembersRepository.findThirdPartyAuthorizers(bondId)` (`userId → authorizedBy`, con el mismo join vivo del gateway: `status='active'`, `left_at IS NULL` y `end_date >= CURRENT_DATE`); `BondsService` recibe `BondMembersRepository` y, después de `plainToInstance`, reemplaza el nombre del miembro `third_party` por `"Autorizado por <nombre del autorizador>"` (nombre de `findMemberNames`); y dos describes nuevos con las dos direcciones.
+
+Decisiones que vale registrar:
+- **Se reemplaza el nombre y el perfil, no el `user.id`.** El id sigue siendo la llave con la que el front deriva `bondRole`, resuelve `assignedTo` y revoca el grant. `lastName` y `avatarUrl` se vacían: una foto también identifica.
+- **Sin grant vivo, o sin nombre del autorizador, el nombre queda en `null`.** No se cae al nombre del tercero: la regla es no mostrarlo, y un hueco honesto es preferible a una identidad filtrada. Es el caso de un grant revocado que todavía no se barrió de `bond_member`.
+- **Sin miembros `third_party` no se consulta nada**: el caso común (vínculo sin terceros) no paga las dos consultas nuevas, y el vínculo redactado del propio tercero llega con `members: []`, así que tampoco consulta.
+- **Con una sola pieza queda cubierto el resto de las superficies.** El `ActivityResponseDto` expone `assignedTo` como uuid, sin nombre; el front arma `memberNames` desde `GET /bonds` (`ActivitiesViewModel`), así que cards, detalle, bitácora y el desplegable de asignación heredan la frase. Las notificaciones no llevan nombres de personas (títulos fijos en `activity-notification.map.ts`), así que no había nada que redactar ahí: la parte "en notificaciones" de S12 se cumple por construcción desde T6.
+
+Verificación: `pnpm build` OK; `pnpm test` → **99 suites, 1185 tests, 0 fallas** (+7: cuatro del servicio, tres del repositorio; incluye el caso que prueba que el mapa con el nombre real del tercero **no** se usa).
