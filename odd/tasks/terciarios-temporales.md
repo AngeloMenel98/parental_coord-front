@@ -5,7 +5,7 @@ asignadas por un progenitor concreto dentro de un Bond, con acceso con fecha de 
 revocación anticipada, y una vista reducida: Home propio y sólo sus actividades asignadas, sin
 capacidad de crear, rechazar ni cancelar, pudiendo únicamente finalizar.
 
-**Estado:** L28. Back: T1–T6 y T12 cerrados; front: T7, T8, T9, T10 y T13 hechos. T11 queda parcial (e2e y tests de sesión sin infraestructura). Sólo siguen abiertas las decisiones de producto de `## Decisiones abiertas`.
+**Estado:** L29. Back: T1–T6 y T12 cerrados (T12 verificado de forma independiente); front: T7, T8, T9, T10 y T13 hechos. T11 queda parcial (e2e y tests de sesión sin infraestructura). Sólo siguen abiertas las decisiones de producto de `## Decisiones abiertas` y el follow-up A2 de compliance.
 **Ramas:** back `parental_coordination_back` · front `parental_coord-front` (hoy en `ft/activity-stage-rail`, con cambios sin commitear en `Bitacora*`).
 **Entrega:** por definir (ver `## Tasks`); unidades de ~400 líneas, tests junto al comportamiento, Conventional Commits, sin push ni PR.
 **Runners:** front `./gradlew :shared:testDebugUnitTest` + `./gradlew :androidApp:assembleDebug` · back `pnpm test` + `pnpm build`.
@@ -361,3 +361,14 @@ Decisiones que vale registrar:
 - **Con una sola pieza queda cubierto el resto de las superficies.** El `ActivityResponseDto` expone `assignedTo` como uuid, sin nombre; el front arma `memberNames` desde `GET /bonds` (`ActivitiesViewModel`), así que cards, detalle, bitácora y el desplegable de asignación heredan la frase. Las notificaciones no llevan nombres de personas (títulos fijos en `activity-notification.map.ts`), así que no había nada que redactar ahí: la parte "en notificaciones" de S12 se cumple por construcción desde T6.
 
 Verificación: `pnpm build` OK; `pnpm test` → **99 suites, 1185 tests, 0 fallas** (+7: cuatro del servicio, tres del repositorio; incluye el caso que prueba que el mapa con el nombre real del tercero **no** se usa).
+
+**L29 (T12 — verificación independiente y cierre).** El verificador independiente reprodujo el cambio en copias aisladas de los dos commits y dio **7/7 pass**: nunca viaja el nombre, apellido ni avatar del tercero (tampoco con grant revocado/vencido o autorizador sin `personal_data`), la frase sale de `auth_third_party.authorized_by` y no de un miembro cualquiera, el vínculo del propio tercero sigue redactado sin consultas extra, el caso común no paga consultas, `user.id` se conserva y la mutación ocurre sobre los DTOs, no sobre las entidades. RED/GREEN real: con el baseline `7609799` sus probes fallan **8/13** con el payload real filtrado (`"firstName":"Tere"`), y en `116f5c5` pasan **13/13**. Build y suite completos: 99 suites / 1185 tests.
+
+Se incorporaron al repo las cuatro probes durables que cubrían el hueco de la fixture original (`bonds.service.t12-verifier.spec.ts`): autorizador = segundo progenitor, autorizador sin datos personales, no mutación de la entidad y presupuesto de consultas con dos terceros. Suite: **100 suites, 1189 tests, 0 fallas**.
+
+Advisories de la verificación, ninguno bloqueante:
+- **A1 (costo, del cambio).** Dos consultas por vínculo con terceros, y `findByUserId` también se llama desde el handshake de realtime y desde adjuntos, donde el resultado se descarta. No cambia ninguna salida.
+- **A2 (fuera de esta unidad, follow-up real).** `findActiveMembersWithActStats` sigue listando a los terceros con su nombre real: el otro progenitor todavía los ve por el endpoint de compliance/reportes. `116f5c5` no toca esa consulta. Es una fuga de identidad que S12 no quiere, pero queda fuera de las superficies que la fila T12 declara (DTO de Bond, de actividad y notificaciones) y decide producto: ¿el trabajo del tercero cuenta en el cumplimiento, y con qué etiqueta?
+- **A4 (cosmético).** El comentario de `bond-member.entity.ts` dice que `third_party` no se persiste, pero la migración `1793664000000000` lo agrega al enum.
+
+Review nativa del commit de back: `assess` devolvió `reviewDue=false` (`under_budget`), así que no corresponde abrir lineage; la verificación independiente y las probes son la evidencia de esta unidad. La documentación de T12 sí pasó por review nativa: `approved` (tier low, `non_executable_only`) y acknowledgement consumido.
