@@ -1,0 +1,28 @@
+{
+  "title": "Cambio obligatorio de contraseña",
+  "brief": "Pantalla intersticial que bloquea la app hasta que el usuario cambie la contraseña provisoria que recibió por mail al otorgarle un acceso temporal. Tres direcciones para el mismo trabajo: una tarea sola, el porqué antes del formulario, o el bloqueo como hoja sobre la app apagada.",
+  "feature": "odd/tasks/credenciales-invitacion.md",
+  "artboards": [
+    {
+      "file": "01-una-sola-cosa.html",
+      "title": "Una sola cosa",
+      "tradeoff": "Minimalista: marca, una explicación de dos líneas, tres campos y CTA. La más rápida y la menos intimidante; el porqué aparece después del formulario, en un bloque pequeño.",
+      "width": 1440,
+      "height": 900
+    },
+    {
+      "file": "02-portero.html",
+      "title": "Portero",
+      "tradeoff": "Explica el porqué antes del formulario, con dos pasos numerados y un sello de candado. Máxima comprensión de por qué la app está frenada; empuja el formulario hacia abajo en pantallas chicas.",
+      "width": 1440,
+      "height": 900
+    },
+    {
+      "file": "03-app-cerrada.html",
+      "title": "App cerrada",
+      "tradeoff": "La app se ve detrás, apagada, y el formulario llega como hoja inferior. Hace sentir que el bloqueo es global e inevitable; el formulario queda más apretado y tapa el contexto.",
+      "width": 1440,
+      "height": 900
+    }
+  ]
+}

@@ -36,8 +36,8 @@ Conventional Commits. Push y PR ya están autorizados en esta sesión.
 | T1 | S1, D2 | `nodemailer` + `MailModule`/`MailerService` con config SMTP opcional; sin configuración, el alta falla con un error claro en vez de crear una cuenta sin avisar | back | delegado | hecho (L3) |
 | T2 | S1, D2 | Alta de tercero: crear cuenta con contraseña generada y enviar credenciales **después** del commit; si el envío falla, compensar borrando la cuenta. Email existente: aviso sin credenciales | back | delegado | hecho (L3) |
 | T3 | S2, D3 | `must_change_password` (migración + entidad) + login con `mustChangePassword` + `POST /auth/change-password` + guard que bloquea el resto mientras el flag esté activo | back | delegado | hecho (L3), review bloqueada |
-| T4 | S2 | Front: pantalla de cambio obligatorio y routing; sesión con `mustChangePassword` | front | inline | pendiente |
-| T5 | S1 | Actualizar el copy del artboard 04 (decía "no hay invitación por mail") y diseñar la pantalla de cambio obligatorio | front | inline | pendiente |
+| T4 | S2 | Front: pantalla de cambio obligatorio y routing; sesión con `mustChangePassword` | front | delegado | en curso (L4) |
+| T5 | S1 | Actualizar el copy del artboard 04 (decía "no hay invitación por mail") y diseñar la pantalla de cambio obligatorio | front | inline | diseño hecho (L4); copy de la app en T4 |
 
 ## Log
 
@@ -51,3 +51,6 @@ Conventional Commits. Push y PR ya están autorizados en esta sesión.
 La review nativa con 4 lentes + refuter encontró dos **CRITICAL** introducidos por el candidato: el correo con contraseña salía **dentro** de la transacción (R3-001: un commit fallido deja credenciales para una cuenta inexistente; R4-001: I/O externo con locks y conexión abiertos). Corrección aplicada (94 líneas de diff): el envío pasa a **después del commit** y, si falla, se compensa borrando la cuenta recién creada (el `DELETE` cascadea membresía y grant). Tests actualizados, incluido "si el commit falla, el mail no se envía".
 
 El **validador dirigido** del proveedor devolvió dos veces el mismo payload JSON truncado (1.848 bytes, sin cierre de array) y el admission lo rechazó sin consumir el slot. Por la regla de no reintentar automáticamente, la review queda **abierta** y el candidato (`d624159`) **sin pushear**. Decisión pendiente del humano: reintentar el validador más tarde (es un defecto del modelo/proveedor) o desactivar RDD para este clon y seguir por la política ordinaria del repo.
+
+
+**L4 (T5 · diseño y copy).** Tres direcciones en `design/cambio-password-ui/` (una sola cosa, portero, app cerrada) sobre el sistema de tokens; el humano no eligió una explícitamente y se implementa **01-una-sola-cosa** por ser la más directa y consistente con el resto. Canvas: `design/cambio-password-ui/`. Se sacó el copy falso de los artboards 02 y 04 de `terceros-ui`: donde decía "No hay invitación por mail" ahora dice que la persona recibe las credenciales por mail y que el primer ingreso pide cambiarla. T4 (routing + pantalla + endpoint) queda delegado.

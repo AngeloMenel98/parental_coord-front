@@ -1,0 +1,21 @@
+{
+  "arrangement": "free",
+  "positions": {
+    "system": {
+      "x": 0,
+      "y": 882
+    },
+    "01-una-sola-cosa.html": {
+      "x": 2160,
+      "y": 0
+    },
+    "02-portero.html": {
+      "x": 1725,
+      "y": 2330
+    },
+    "03-app-cerrada.html": {
+      "x": 3942,
+      "y": 346
+    }
+  }
+}

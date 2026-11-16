@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "chosen": "01-una-sola-cosa.html",
+  "handoffs": {
+    "01-una-sola-cosa.html": {
+      "status": "in_progress",
+      "queued": false,
+      "sentAt": "2026-11-16T15:31:14.438Z",
+      "startedAt": "2026-11-16T15:31:34.301Z",
+      "implementedAt": null,
+      "feature": "odd/tasks/credenciales-invitacion.md",
+      "note": "Implementación en curso: routing por mustChangePassword, pantalla de cambio obligatorio, endpoint change-password y copy del alta."
+    }
+  }
+}
