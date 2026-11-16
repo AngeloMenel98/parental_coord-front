@@ -1,0 +1,21 @@
+{
+  "arrangement": "free",
+  "positions": {
+    "system": {
+      "x": 0,
+      "y": 28
+    },
+    "01-accesos-a-la-vista.html": {
+      "x": 2221,
+      "y": 611
+    },
+    "02-en-dos-pasos.html": {
+      "x": 2106,
+      "y": 1928
+    },
+    "03-expediente-del-acceso.html": {
+      "x": 4560,
+      "y": 28
+    }
+  }
+}

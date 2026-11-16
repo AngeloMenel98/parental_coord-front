@@ -199,6 +199,7 @@ Todas pendientes. Cada una se aprueba antes de arrancar (D1).
 | T12 | S12 | Identidad del terciario: el otro progenitor ve "Autorizado por <progenitor>", sin nombre ni perfil, en DTO de Bond, de actividad y en notificaciones | back | inline | hecho (L28) |
 | T13 | S1, S2, S9 | Diálogos de permiso del artboard 03: onboarding "Tu permiso, en concreto" en el primer ingreso + "Lo que no podés hacer acá" en el detalle, abiertos desde iconos de información; sin notas explicativas dentro del producto | front | inline | hecho (L8) |
 | T14 | S14, S5, S12 | El trabajo del tercero no suma al porcentaje de cumplimiento del vínculo: excluirlo de `findActiveMembersWithActStats` (A2 de L29) | back | delegado | hecho (L30) |
+| T15 | S1, S2, S7 | Front del progenitor: lista, alta, edición y revocación de los accesos que él otorgó, con vigencia explícita y alcance acotado | front | inline | diseño (L31) |
 
 ## Decisiones abiertas
 
@@ -383,3 +384,14 @@ Antes de tocar nada se verificó que el rol **sí** se persiste (`1793664000000`
 Evidencia: RED real (2 de 11 tests fallan pidiendo `bm.role <> :thirdPartyRole` y recibiendo `bm.left_at IS NULL`) → GREEN 11/11. `pnpm build` OK; `pnpm test` → **100 suites, 1193 tests, 0 fallas**. La única deuda es de entorno: el SQL no se ejecutó contra Postgres real (la suite mockea el QueryBuilder), igual que el resto de las specs estructurales del repo; `bm.role` es NOT NULL, así que `<>` no pierde filas.
 
 Aparte, A4 quedó corregido: el comentario de `bond-member.entity.ts` ya no dice que `third_party` no se persiste (commit cosmético separado).
+
+**L31 (T15 — el progenitor no tenía dónde otorgar el acceso).** Pregunta del humano: "puede ser que la implemetacion de la vista de agregar terceros desde un usuario progenitor no lo hicimos?". La respuesta era sí: `App.kt` seguía tratando **Terceros** como placeholder, `ThirdPartiesApi` sólo tenía `getMyGrant()` y no existía ningún `TercerosScreen`/`ThirdPartiesScreen`. El back ya tenía el CRUD completo del dueño (T2) y el front sólo la vista del tercero (T7–T13): faltaba el lado que **da** el acceso. Decisión del humano: "vamos al diseno y luego implementacion".
+
+Se diseñaron tres direcciones en `design/terceros-ui/` sobre `design/system.md`, cada una con una estrategia distinta (no sólo color):
+- `01-accesos-a-la-vista.html` — tarjeta por acceso con vigencia, permisos y acciones; alta en una pantalla con el error 422 de email sin cuenta. Tradeoff: la más directa y rápida de revisar; lista larga con muchos accesos.
+- `02-en-dos-pasos.html` — lista compacta + asistente de dos pasos con resumen del alcance antes de otorgar. Tradeoff: el alta más segura y la lista más escaneable; gestionar cuesta un tap más.
+- `03-expediente-del-acceso.html` — lista mínima + expediente con historia, matriz de qué puede y qué no, nota y revocación al final. Tradeoff: máxima trazabilidad; la más densa y lenta.
+
+Restricciones que el diseño respeta del contrato real: cada progenitor ve sólo los accesos que él autorizó; el alta exige una cuenta existente (`email`), `relationship` (`family|caregiver|medical|educational`), `accessEnd` obligatorio y `note` opcional; vigencia y estado salen del servidor.
+
+Comentarios del canvas (todos resueltos): el resumen de vencimiento y el tipo de relación del 01 suman; la matriz de permisos del 03 tiene que ser un dato de consulta detrás de un icono arriba a la derecha. Se agregó `04-vigencia-a-la-vista.html`, que fusiona todo eso sobre el asistente del 02, y **es el artboard elegido para implementar**.

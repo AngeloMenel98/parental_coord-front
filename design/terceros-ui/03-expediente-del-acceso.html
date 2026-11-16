@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Terceros del progenitor · Dirección 03 — Expediente del acceso</title>
+<style>
+  /* Tokens = design/system.md. Dirección expediente: la lista es mínima y el detalle
+     concentra vigencia, historia y matriz de permisos antes de revocar. */
+  :root {
+    color-scheme: light;
+    --primary: #00696D; --on-primary: #FFFFFF;
+    --primary-container: #9CF1F6; --on-primary-container: #002022;
+    --secondary: #4A6365; --secondary-container: #CCE8EA; --on-secondary-container: #051F21;
+    --on-surface: #191C1D; --on-surface-variant: #3F4849;
+    --outline: #6F797A; --error: #BA1A1A; --error-container: #FFDAD6; --on-error-container: #410002;
+    --stage: #E4ECEC; --screen: #FAFDFC; --card: #FAFDFC;
+    --track: #DAE4E5; --divider: #BEC8C9;
+    --ok-text: #2E7D32; --ok-bg: rgba(67,160,71,.15);
+    --vencida: #C62828; --vencida-bg: rgba(229,57,53,.12);
+    --serif: Georgia, 'Times New Roman', serif;
+    --mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    --phone-shadow: 0 8px 32px rgba(0,32,34,.18);
+    --hover: rgba(0,105,109,.06);
+  }
+  [data-theme="dark"] {
+    color-scheme: dark;
+    --primary: #BB86FC; --on-primary: #000000;
+    --primary-container: #3700B3; --on-primary-container: #FFFFFF;
+    --secondary: #03DAC6; --secondary-container: #018786; --on-secondary-container: #000000;
+    --on-surface: #FFFFFF; --on-surface-variant: rgba(255,255,255,.70);
+    --outline: rgba(255,255,255,.40); --error: #CF6679; --error-container: #93000A; --on-error-container: #FFDAD6;
+    --stage: #0B0B0B; --screen: #121212; --card: #1E1E1E;
+    --track: rgba(255,255,255,.12); --divider: rgba(255,255,255,.12);
+    --ok-text: #C8E6C9; --ok-bg: rgba(67,160,71,.22);
+    --vencida: #FFCDD2; --vencida-bg: rgba(229,57,53,.22);
+    --phone-shadow: 0 8px 32px rgba(0,0,0,.65);
+    --hover: rgba(187,134,252,.10);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: var(--sans); background: var(--stage); color: var(--on-surface); min-height: 100vh; padding: 24px 0; }
+  .stage { display: flex; flex-direction: column; align-items: center; padding: 0 24px; }
+  .scaffold { width: 100%; max-width: 860px; border: 1px dashed var(--divider); border-radius: 8px; padding: 6px 10px; margin-bottom: 12px; }
+  .frame-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .frame-label { font-size: 11px; font-weight: 500; font-variant: small-caps; letter-spacing: .5px; color: var(--on-surface-variant); }
+  .scaffold-caption { font-size: 10px; font-family: var(--mono); letter-spacing: .2px; color: var(--on-surface-variant); margin-top: 4px; }
+  .theme-toggle .switch { width: 60px; height: 28px; border-radius: 14px; border: 0; box-shadow: inset 0 0 0 1px var(--divider); background: var(--track); position: relative; cursor: pointer; padding: 0; }
+  .theme-toggle .knob { position: absolute; top: 4px; left: 4px; width: 20px; height: 20px; border-radius: 50%; background: var(--card); box-shadow: 0 1px 2px rgba(0,0,0,.32); z-index: 1; }
+  .theme-toggle .icon { position: absolute; top: 6.5px; width: 15px; height: 15px; z-index: 2; pointer-events: none; color: var(--outline); }
+  .theme-toggle .icon.sun { left: 6.5px; } .theme-toggle .icon.moon { left: 38.5px; }
+  .theme-toggle .switch[aria-checked="false"] .sun { color: var(--primary); }
+  .theme-toggle .switch[aria-checked="true"] .moon { color: var(--on-primary); }
+  .theme-toggle .switch[aria-checked="true"] .knob { transform: translateX(32px); background: var(--primary); }
+  @media (prefers-reduced-motion: no-preference) { .theme-toggle .knob { transition: transform 150ms, background 150ms; } }
+
+  .phones { display: flex; gap: 32px; align-items: flex-start; }
+  .phone-wrap { display: flex; flex-direction: column; }
+  .phone-label { font-size: 11px; font-weight: 500; font-variant: small-caps; letter-spacing: .5px; color: var(--on-surface-variant); margin-bottom: 6px; }
+  .phone { width: 390px; height: 844px; background: var(--screen); color: var(--on-surface); display: flex; flex-direction: column; border-radius: 24px; overflow: hidden; box-shadow: var(--phone-shadow); }
+  button { font-family: inherit; }
+  :focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 4px; }
+  @media (prefers-reduced-motion: no-preference) { .icon-btn, .row, .btn { transition: background 150ms; } }
+
+  .topbar { background: var(--card); display: flex; align-items: center; height: 56px; padding: 0 8px 0 16px; flex: none; border-bottom: 1px solid var(--divider); }
+  .topbar h1 { font-size: 18px; font-weight: 500; flex: 1; }
+  .icon-btn { width: 44px; height: 44px; border: 0; background: transparent; border-radius: 50%; display: grid; place-items: center; cursor: pointer; color: var(--on-surface-variant); flex: none; }
+  .icon-btn:hover { background: var(--hover); }
+
+  .feed { flex: 1; overflow-y: auto; padding: 8px 0 16px; display: flex; flex-direction: column; scrollbar-width: none; }
+  .feed::-webkit-scrollbar { display: none; }
+  .section-label { font-size: 11px; font-weight: 500; font-variant: small-caps; letter-spacing: .5px; color: var(--on-surface-variant); padding: 12px 16px 4px; }
+  .group { background: var(--card); border-top: 1px solid var(--divider); border-bottom: 1px solid var(--divider); }
+  .row { display: flex; align-items: center; gap: 12px; padding: 12px 16px; background: transparent; border: 0; width: 100%; text-align: left; cursor: pointer; min-height: 60px; color: var(--on-surface); font-size: 14px; }
+  .row + .row { border-top: 1px solid var(--divider); }
+  .row:hover { background: var(--hover); }
+  .avatar { width: 34px; height: 34px; border-radius: 50%; background: var(--primary-container); color: var(--on-primary-container); display: grid; place-items: center; font-size: 12px; font-weight: 600; flex: none; }
+  .row .main { flex: 1; min-width: 0; }
+  .row .name { font-weight: 600; font-size: 14px; line-height: 18px; }
+  .row .meta { font-size: 11px; color: var(--on-surface-variant); line-height: 15px; font-variant-numeric: tabular-nums; }
+  .tag { font-size: 10px; font-weight: 600; font-variant: small-caps; letter-spacing: .4px; border-radius: 8px; padding: 3px 7px; white-space: nowrap; }
+  .tag.ok { color: var(--ok-text); background: var(--ok-bg); }
+  .tag.off { color: var(--vencida); background: var(--vencida-bg); }
+  .chev { color: var(--outline); flex: none; }
+  .hint { font-size: 12px; line-height: 16px; color: var(--on-surface-variant); }
+  .add-bar { padding: 16px; }
+  .btn { height: 48px; border-radius: 24px; border: 0; font-size: 14px; font-weight: 600; cursor: pointer; width: 100%; }
+  .btn.primary { background: var(--primary); color: var(--on-primary); }
+  .btn.ghost { background: transparent; color: var(--primary); box-shadow: inset 0 0 0 1px var(--divider); }
+  .btn.danger { background: transparent; color: var(--error); box-shadow: inset 0 0 0 1px var(--error); }
+  .btn.danger:hover { background: var(--vencida-bg); }
+
+  /* Expediente (frame B) */
+  .hero { background: var(--card); border-bottom: 1px solid var(--divider); padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+  .hero .who { display: flex; align-items: center; gap: 12px; }
+  .hero .avatar-lg { width: 52px; height: 52px; border-radius: 50%; background: var(--primary-container); color: var(--on-primary-container); display: grid; place-items: center; font-size: 18px; font-weight: 600; flex: none; }
+  .hero .name { font-size: 18px; font-weight: 600; line-height: 24px; }
+  .hero .meta { font-size: 12px; color: var(--on-surface-variant); }
+  .vig-line { display: flex; align-items: baseline; gap: 6px; font-size: 12px; color: var(--on-surface-variant); }
+  .vig-line b { color: var(--on-surface); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .vig-line .left { margin-left: auto; font-variant-numeric: tabular-nums; }
+  .bar { height: 6px; border-radius: 3px; background: var(--track); overflow: hidden; }
+  .bar span { display: block; height: 100%; border-radius: 3px; background: var(--primary); }
+
+  .body { padding: 16px; display: flex; flex-direction: column; gap: 16px; }
+  .block { background: var(--card); border: 1px solid var(--divider); border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+  .block h2 { font-size: 11px; font-weight: 600; font-variant: small-caps; letter-spacing: .5px; color: var(--on-surface-variant); }
+  .timeline { display: flex; flex-direction: column; gap: 0; }
+  .tl-row { display: flex; gap: 10px; min-height: 42px; }
+  .tl-rail { width: 14px; display: flex; flex-direction: column; align-items: center; flex: none; }
+  .tl-node { width: 10px; height: 10px; border-radius: 50%; background: var(--primary); margin-top: 4px; flex: none; box-shadow: 0 0 0 3px var(--primary-container); }
+  .tl-node.future { background: var(--track); box-shadow: 0 0 0 3px transparent; border: 1px solid var(--outline); }
+  .tl-line { width: 1px; flex: 1; background: var(--divider); }
+  .tl-body { padding-bottom: 12px; }
+  .tl-body .when { font-family: var(--mono); font-size: 11px; letter-spacing: .4px; color: var(--on-surface-variant); }
+  .tl-body .what { font-size: 13px; line-height: 18px; }
+  .tl-body .who-did { font-size: 11px; color: var(--on-surface-variant); }
+
+  .matrix { display: flex; flex-direction: column; gap: 2px; }
+  .mx { display: flex; align-items: center; gap: 10px; padding: 8px 0; font-size: 13px; border-top: 1px solid var(--divider); }
+  .mx:first-of-type { border-top: 0; }
+  .mx .mark { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; flex: none; }
+  .mx.yes .mark { background: var(--ok-bg); color: var(--ok-text); }
+  .mx.no .mark { background: var(--track); color: var(--on-surface-variant); }
+  .mx.no { color: var(--on-surface-variant); }
+  .note { font-size: 12px; line-height: 17px; color: var(--on-surface-variant); font-style: italic; }
+
+  .footer { flex: none; border-top: 1px solid var(--divider); background: var(--card); padding: 12px 16px; display: flex; flex-direction: column; gap: 8px; }
+  .footer .caption { font-size: 10px; text-align: center; color: var(--on-surface-variant); }
+
+  .navbar { flex: none; display: flex; border-top: 1px solid var(--divider); background: var(--card); }
+  .nav-item { flex: 1; border: 0; background: none; padding: 8px 0 10px; font-size: 11px; color: var(--on-surface-variant); cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+  .nav-item .pill { display: block; padding: 3px 14px; border-radius: 16px; }
+  .nav-item[aria-current="page"] { color: var(--primary); font-weight: 600; }
+  .nav-item[aria-current="page"] .pill { background: var(--primary-container); }
+</style>
+</head>
+<body>
+<div class="stage">
+  <div class="scaffold">
+    <div class="frame-head">
+      <span class="frame-label">Terceros · Dirección 03 — Expediente del acceso</span>
+      <div class="theme-toggle">
+        <button class="switch" role="switch" aria-checked="false" aria-label="Cambiar a tema oscuro" onclick="toggleTheme(this)">
+          <svg class="icon sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M19.1 4.9l-1.4 1.4M6.3 17.7l-1.4 1.4"/></svg>
+          <svg class="icon moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></svg>
+          <span class="knob"></span>
+        </button>
+      </div>
+    </div>
+    <div class="scaffold-caption">390 × 844 · lista mínima + expediente con vigencia, historia, matriz de permisos y revocación</div>
+  </div>
+
+  <div class="phones">
+    <!-- Frame A: lista mínima -->
+    <div class="phone-wrap">
+      <span class="phone-label">A · Terceros — sólo lo indispensable para elegir</span>
+      <div class="phone">
+        <header class="topbar">
+          <h1>Terceros</h1>
+          <button class="icon-btn" aria-label="Agregar acceso">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+          </button>
+        </header>
+        <main class="feed">
+          <p class="section-label">Con acceso</p>
+          <div class="group">
+            <button class="row">
+              <span class="avatar" aria-hidden="true">MG</span>
+              <span class="main">
+                <span class="name">Marta Gómez</span>
+                <span class="meta">Familiar · vence 12 dic 2026</span>
+              </span>
+              <span class="tag ok">Activo</span>
+              <svg class="chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg>
+            </button>
+            <button class="row">
+              <span class="avatar" aria-hidden="true">SR</span>
+              <span class="main">
+                <span class="name">Sofía Ruiz</span>
+                <span class="meta">Cuidadora · vence 30 nov 2026</span>
+              </span>
+              <span class="tag ok">Activo</span>
+              <svg class="chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg>
+            </button>
+          </div>
+
+          <p class="section-label">Archivados</p>
+          <div class="group">
+            <button class="row">
+              <span class="avatar" style="background:var(--track);color:var(--on-surface-variant)" aria-hidden="true">DP</span>
+              <span class="main">
+                <span class="name">Dr. Pérez</span>
+                <span class="meta">Médico · venció 2 nov 2026</span>
+              </span>
+              <span class="tag off">Vencido</span>
+              <svg class="chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg>
+            </button>
+          </div>
+          <p class="hint" style="padding:8px 16px 0">Un acceso vencido o revocado no muestra nada del vínculo.</p>
+
+          <div class="add-bar">
+            <button class="btn primary">Otorgar un acceso</button>
+          </div>
+        </main>
+        <nav class="navbar" aria-label="Navegación principal">
+          <button class="nav-item"><span class="pill">Inicio</span></button>
+          <button class="nav-item"><span class="pill">Actividades</span></button>
+          <button class="nav-item"><span class="pill">Gastos</span></button>
+          <button class="nav-item" aria-current="page"><span class="pill">Terceros</span></button>
+        </nav>
+      </div>
+    </div>
+
+    <!-- Frame B: expediente -->
+    <div class="phone-wrap">
+      <span class="phone-label">B · Expediente — vigencia, historia y permisos</span>
+      <div class="phone">
+        <header class="topbar">
+          <button class="icon-btn" aria-label="Volver">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+          </button>
+          <h1>Acceso de Marta</h1>
+          <button class="icon-btn" aria-label="Editar acceso">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20h4l10-10-4-4L4 16v4Z"/><path d="M13.5 6.5l4 4"/></svg>
+          </button>
+        </header>
+
+        <div class="hero">
+          <div class="who">
+            <span class="avatar-lg" aria-hidden="true">MG</span>
+            <div>
+              <div class="name">Marta Gómez</div>
+              <div class="meta">Abuela · Familiar · abuela@example.com</div>
+            </div>
+            <span class="tag ok" style="margin-left:auto">Activo</span>
+          </div>
+          <div>
+            <div class="vig-line"><span>Otorgado el</span><b>12 sep 2026</b><span class="left">86 de 120 días</span></div>
+            <div class="bar" style="margin-top:6px"><span style="width:72%"></span></div>
+            <div class="vig-line" style="margin-top:6px"><span>Vence el</span><b>12 dic 2026</b><span class="left">quedan 26 días</span></div>
+          </div>
+        </div>
+
+        <main class="feed">
+          <div class="body">
+            <section class="block">
+              <h2>Historia del acceso</h2>
+              <div class="timeline">
+                <div class="tl-row">
+                  <div class="tl-rail"><span class="tl-node"></span><span class="tl-line"></span></div>
+                  <div class="tl-body">
+                    <div class="when">12 SEP 2026 · 18:40</div>
+                    <div class="what">Acceso otorgado</div>
+                    <div class="who-did">por vos · relación Familiar · nota: “Retira a los chicos los martes y jueves.”</div>
+                  </div>
+                </div>
+                <div class="tl-row">
+                  <div class="tl-rail"><span class="tl-node"></span><span class="tl-line"></span></div>
+                  <div class="tl-body">
+                    <div class="when">14 SEP 2026 · 09:02</div>
+                    <div class="what">Primer ingreso</div>
+                    <div class="who-did">desde el dispositivo de Marta</div>
+                  </div>
+                </div>
+                <div class="tl-row">
+                  <div class="tl-rail"><span class="tl-node future"></span></div>
+                  <div class="tl-body">
+                    <div class="when">12 DIC 2026</div>
+                    <div class="what">Vence solo</div>
+                    <div class="who-did">el acceso se corta sin intervención</div>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section class="block">
+              <h2>Qué puede y qué no</h2>
+              <div class="matrix">
+                <div class="mx yes"><span class="mark">✓</span> Ver las actividades que le asignes</div>
+                <div class="mx yes"><span class="mark">✓</span> Finalizarlas y adjuntar archivos</div>
+                <div class="mx no"><span class="mark">—</span> Crear, reasignar o cancelar</div>
+                <div class="mx no"><span class="mark">—</span> Ver el cumplimiento o los gastos</div>
+                <div class="mx no"><span class="mark">—</span> Ver a los otros miembros o a los hijos</div>
+              </div>
+            </section>
+
+            <section class="block">
+              <h2>Nota del progenitor</h2>
+              <p class="note">“Retira a los chicos los martes y jueves. Si hay un feriado, avisame por el chat.”</p>
+            </section>
+          </div>
+        </main>
+
+        <div class="footer">
+          <button class="btn danger">Revocar acceso</button>
+          <p class="caption">Revocar corta el acceso al instante. No se puede deshacer.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+  function toggleTheme(btn) {
+    const on = btn.getAttribute('aria-checked') !== 'true';
+    btn.setAttribute('aria-checked', String(on));
+    document.documentElement.setAttribute('data-theme', on ? 'dark' : 'light');
+  }
+</script>
+</body>
+</html>
