@@ -27,6 +27,8 @@ import com.parental.shared.feature.activities.ui.ActividadesViewModel
 import com.parental.shared.feature.expenses.ui.ExpensesScreen
 import com.parental.shared.feature.expenses.ui.ExpensesViewModel
 import com.parental.shared.feature.auth.data.repository.AuthRepository
+import com.parental.shared.feature.auth.ui.ChangePasswordScreen
+import com.parental.shared.feature.auth.ui.ChangePasswordViewModel
 import com.parental.shared.feature.auth.ui.LoginScreen
 import com.parental.shared.feature.auth.ui.LoginViewModel
 import com.parental.shared.feature.admin.ui.AdminScreen
@@ -43,9 +45,17 @@ import com.parental.shared.feature.thirdparty.ui.ThirdPartiesViewModel
 import com.parental.shared.feature.thirdparty.ui.ThirdPartyRoot
 import com.parental.shared.core.network.realtime.RealtimeConnectionManager
 import com.parental.shared.platform.Platform
+import kotlinx.coroutines.launch
 
 private sealed class Screen(val route: String) {
     data object Login : Screen("login")
+
+    /**
+     * La hoja de cambio obligatorio de contraseña (S2). No es una pantalla del recorrido:
+     * mientras `mustChangePassword` esté encendido es la ÚNICA, y por eso se resuelve antes
+     * que el rol.
+     */
+    data object ChangePassword : Screen("change_password")
     data object Home : Screen("home")
     data object Admin : Screen("admin")
     data object ThirdParty : Screen("third_party")
@@ -125,10 +135,23 @@ private fun AppContent(
         sessionManager.clear()
     }
 
+    /**
+     * Scope de la SESIÓN, no de una rama: el trabajo que sigue después de cambiar la
+     * contraseña obligatoria tiene que sobrevivir a que esa rama se desmonte — es
+     * exactamente lo que pasa cuando el flag se apaga.
+     */
+    val sessionScope = rememberCoroutineScope()
+
     val currentScreen = if (sessionManager.loginPending) {
         Screen.Login
     } else if (sessionManager.isLoggedIn) {
         when {
+            // S2 · el bloqueo gana sobre el rol: da igual si es admin, progenitor o
+            // tercero, con una contraseña provisoria el back responde 403 en todas las
+            // rutas autenticadas. Se resuelve ANTES de `role`/`bondRole` para que ninguna
+            // vista con datos llegue a montarse. Cuando el flag se apaga, este mismo
+            // `when` recalcula y cae en el destino real sin ninguna navegación explícita.
+            sessionManager.mustChangePassword -> Screen.ChangePassword
             sessionManager.role == "admin" -> Screen.Admin
             // S1/S5: el tercero temporal tiene su propio árbol. El `systemRole` sigue
             // siendo `user`; lo que decide acá es el rol DENTRO del vínculo.
@@ -157,37 +180,53 @@ private fun AppContent(
                         userName = name,
                         role = response.user.systemRole,
                         userId = response.user.id,
+                        // S2/D3: es el servidor el que dice si la contraseña con la que se
+                        // entró la generó el sistema. Si el flag se pierde acá, la app
+                        // abriría el Inicio de alguien que debe cambiarla.
+                        mustChangePassword = response.user.mustChangePassword,
                     )
 
-                    val bondsApi = ApiClient.bondsApi()
+                    // D2/F7: el rol vive en el miembro del vínculo, no en el JWT ni en
+                    // `system_role`. Un solo dueño de esta derivación: la comparte la
+                    // salida del cambio obligatorio de contraseña, donde el 403 del guard
+                    // impidió hacerla al entrar (S2).
                     try {
-                        val result = bondsApi.getMyBonds(response.access_token)
-                        when (result) {
-                            is ApiResult.Success -> {
-                                if (result.data.isNotEmpty()) {
-                                    val firstBond = result.data.first()
-                                    sessionManager.updateBondId(firstBond.id)
-                                    // D2/F7: el rol vive en el miembro del vínculo, no en
-                                    // el JWT ni en `system_role`.
-                                    sessionManager.updateBondRole(
-                                        firstBond.members
-                                            .firstOrNull { it.user?.id == response.user.id }
-                                            ?.role,
-                                    )
-                                } else {
-                                    // No bonds found for this user
-                                }
-                            }
-                            is ApiResult.Error -> {
-                                // Failed to fetch bonds
-                            }
-                        }
-                    } catch (e: Exception) {
-                        // Exception fetching bonds
+                        sessionManager.deriveBondFromServer()
                     } finally {
                         // Complete login — now safe to navigate to Home/Admin
                         sessionManager.completeLogin()
                     }
+                },
+            )
+        }
+
+        Screen.ChangePassword -> {
+            // El VM es dueño de la sesión: al aceptar el cambio escribe el token nuevo y
+            // apaga el flag. El `currentScreen` de arriba se recalcula solo, así que la
+            // hoja no navega a ningún lado.
+            val changePasswordViewModel = remember {
+                ChangePasswordViewModel(
+                    authRepository = authRepository,
+                    sessionManager = sessionManager,
+                )
+            }
+            DisposableEffect(Unit) {
+                onDispose {
+                    changePasswordViewModel.destroy()
+                    // S2: mientras el flag estaba encendido `GET /bonds` respondía 403, así
+                    // que el login no pudo derivar el vínculo y un tercero caería en el
+                    // Home de los progenitores. Se deriva al desmontarse la hoja además de
+                    // en `onSuccess` porque el efecto de éxito puede quedar cancelado por
+                    // la MISMA recomposición que apaga el flag; el guard deja una sola
+                    // request efectiva entre los dos caminos.
+                    sessionScope.launch { sessionManager.deriveBondIfUnblocked() }
+                }
+            }
+            ChangePasswordScreen(
+                viewModel = changePasswordViewModel,
+                onLogout = logout,
+                onSuccess = {
+                    sessionScope.launch { sessionManager.deriveBondIfUnblocked() }
                 },
             )
         }
@@ -454,6 +493,51 @@ private fun AppContent(
             }
         }
     }
+}
+
+/**
+ * Deriva el vínculo de quien está logueado — `bondId` y el rol DENTRO del vínculo — desde
+ * `GET /bonds`.
+ *
+ * La llaman dos caminos y por eso vive acá: el login y la salida del cambio obligatorio de
+ * contraseña (S2). Mientras el flag está encendido el back responde
+ * `403 PASSWORD_CHANGE_REQUIRED` en esa ruta, así que después del login lo único que se
+ * sabe es el `systemRole`; el rol del vínculo —el que decide si la persona es un tercero—
+ * sólo se puede derivar una vez que la contraseña ya cambió.
+ *
+ * Degrada en SILENCIO a propósito: sin vínculo no hay rol, y sin rol el routing cae en el
+ * Home de siempre, que es la degradación segura — nunca una vista restringida por
+ * accidente.
+ */
+private suspend fun SessionManager.deriveBondFromServer() {
+    val token = token ?: return
+    val userId = userId
+    try {
+        when (val bonds = ApiClient.bondsApi().getMyBonds(token)) {
+            is ApiResult.Success -> {
+                val bond = bonds.data.firstOrNull() ?: return
+                updateBondId(bond.id)
+                updateBondRole(bond.members.firstOrNull { it.user?.id == userId }?.role)
+            }
+            is ApiResult.Error -> Unit
+        }
+    } catch (e: Exception) {
+        // Sin red no hay nada que derivar: el `else` del routing ya es el Home de siempre.
+    }
+}
+
+/**
+ * La derivación de [deriveBondFromServer], sólo cuando tiene sentido: sesión abierta, sin
+ * bloqueo de contraseña provisoria y sin rol de vínculo todavía.
+ *
+ * El guard es lo que hace idempotentes a los dos caminos que la llaman al salir del cambio
+ * obligatorio (el callback de éxito y el desmontaje de la hoja): el primero que corre deja
+ * el rol puesto y el otro no gasta una request. Tras un logout no queda token y tampoco se
+ * pide nada.
+ */
+private suspend fun SessionManager.deriveBondIfUnblocked() {
+    if (!isLoggedIn || mustChangePassword || bondRole != null) return
+    deriveBondFromServer()
 }
 
 /** Estado liviano sin VM (A14): sin vínculo activo no se puede listar actividades. */

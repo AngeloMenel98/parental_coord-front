@@ -91,9 +91,10 @@ data class ThirdPartyAccess(
 /**
  * El cuerpo del alta (`POST /bonds/:bondId/third-parties`).
  *
- * `email` tiene que pertenecer a una cuenta que YA existe: el alta de credenciales quedó
- * diferida (D4), así que el servidor responde **422** con el motivo y esta capa lo muestra
- * tal cual en vez de inventar un texto propio que se desincronice del back.
+ * `email` puede no tener cuenta: el alta la crea con una contraseña provisoria y le manda
+ * los datos por mail (S1/D2). Si el correo no sale, el back revierte cuenta y acceso y
+ * responde un error que esta capa muestra tal cual, sin inventar un texto propio que se
+ * desincronice del back.
  */
 @Serializable
 data class CreateThirdPartyAccessRequest(

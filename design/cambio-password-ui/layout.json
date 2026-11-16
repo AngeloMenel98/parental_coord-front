@@ -3,19 +3,19 @@
   "positions": {
     "system": {
       "x": 0,
-      "y": 882
+      "y": 1251
     },
     "01-una-sola-cosa.html": {
-      "x": 2160,
+      "x": 2070,
       "y": 0
     },
     "02-portero.html": {
       "x": 1725,
-      "y": 2330
+      "y": 2699
     },
     "03-app-cerrada.html": {
-      "x": 3856,
-      "y": 679
+      "x": 3969,
+      "y": 881
     }
   }
 }

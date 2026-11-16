@@ -53,6 +53,27 @@ class AuthRepository : IAuthRepository {
         }
     }
 
+    /**
+     * El token sale de [cachedToken] y, en el éxito, se reemplaza por el que devolvió el
+     * back: el cambio emite un token nuevo a propósito (el anterior llevaba la claim
+     * `mustChangePassword` en `true`), así que quedarse con el viejo dejaría al usuario
+     * bloqueado en la primera ruta autenticada.
+     */
+    override suspend fun changePassword(
+        currentPassword: String,
+        newPassword: String,
+    ): Result<AuthResponse> {
+        val token = cachedToken ?: return Result.failure(Exception("Not authenticated"))
+        return when (val result = authApi.changePassword(token, currentPassword, newPassword)) {
+            is ApiResult.Success -> {
+                cachedToken = result.data.access_token
+                cachedUser = result.data.user
+                Result.success(result.data)
+            }
+            is ApiResult.Error -> Result.failure(Exception(result.message))
+        }
+    }
+
     override fun logout() {
         cachedToken = null
         cachedUser = null

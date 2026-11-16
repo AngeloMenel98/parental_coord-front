@@ -19,9 +19,9 @@ import kotlinx.serialization.json.put
  * Traduce una respuesta fallida a [ApiResult.Error] preservando el código estable del back.
  *
  * Mismo criterio que `ActivitiesApi` y `ExpensesApi`: el mensaje del servidor es el que ve
- * la persona. Acá no es un detalle de estilo — el **422 del alta** (email sin cuenta, D4)
- * sólo se puede explicar bien con el texto del servidor, y el cliente no tiene forma de
- * saber de antemano si un email tiene cuenta.
+ * la persona. Acá no es un detalle de estilo — el motivo por el que un alta no se pudo
+ * completar (mail que no salió, conflicto de acceso, fecha inválida) sólo se puede
+ * explicar bien con el texto del servidor.
  */
 private suspend fun HttpResponse.toApiError(): ApiResult.Error {
     val body = runCatching { body<ApiErrorBody>() }.getOrNull()
@@ -128,10 +128,10 @@ open class ThirdPartiesApi(
     /**
      * POST /bonds/:bondId/third-parties — otorgar el acceso.
      *
-     * Errores que la pantalla muestra inline: **422** si el email no tiene cuenta (D4),
-     * **409** si esa persona ya tiene un acceso vivo en el vínculo, **400** si `accessEnd`
-     * no es una fecha real o ya pasó. El servidor crea membresía + grant + audit en una
-     * transacción; el cliente no adelanta nada de eso.
+     * El back crea la cuenta con contraseña provisoria si el email no existe y manda las
+     * credenciales por mail (S1/D2). Errores que la pantalla muestra inline: el fallo del
+     * envío (502, sin dejar cuenta ni acceso), **409** si esa persona ya tiene un acceso
+     * vivo en el vínculo, **400** si `accessEnd` no es una fecha real o ya pasó.
      */
     open suspend fun create(
         token: String,

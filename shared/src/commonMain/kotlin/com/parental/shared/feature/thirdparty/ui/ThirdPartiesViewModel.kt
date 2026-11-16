@@ -314,10 +314,14 @@ class ThirdPartiesViewModel(
      *
      * Valida la fecha ANTES de llamar: `accessEnd` es obligatorio (D3) y el back responde
      * 400 tanto por una fecha imposible (`2026-02-30`) como por una pasada, así que el
-     * formulario no gasta una request para decirlo. Un error del servidor —el **422** del
-     * email sin cuenta, el 409 del acceso duplicado— se muestra **inline** y el formulario
-     * queda intacto: perder lo que la persona escribió por un email que no existe sería
-     * castigarla por un dato que el cliente no podía conocer.
+     * formulario no gasta una request para decirlo. Un error del servidor —el 409 del
+     * acceso duplicado, el 422 de un email que no se puede dar de alta— se muestra
+     * **inline** y el formulario queda intacto: perder lo que la persona escribió la
+     * castigaría por un dato que el cliente no podía conocer.
+     *
+     * 🔴 El email SIN cuenta ya no es un error (D2): el back crea la cuenta con una
+     * contraseña generada y le manda las credenciales por mail. El 422 que quede es para
+     * lo que de verdad no se puede completar, y su mensaje es el que se muestra.
      */
     fun submit() {
         val wizard = _state.value.wizard ?: return

@@ -34,20 +34,57 @@ class SessionManager {
     var loginPending: Boolean by mutableStateOf(false)
         internal set
 
+    /**
+     * La contraseña con la que se entró la generó el sistema y todavía no se cambió (S2).
+     *
+     * Mientras esté en `true`, `App` no monta ninguna vista de la app: el único destino es
+     * la pantalla de cambio. Se persiste porque el bloqueo no puede evaporarse al cerrar y
+     * volver a abrir: el back responde 403 en el resto de las rutas de todos modos, pero la
+     * app no tiene por qué descubrirlo con un error.
+     */
+    var mustChangePassword: Boolean by mutableStateOf(false)
+        private set
+
     val isLoggedIn: Boolean get() = token != null
 
-    fun setSession(token: String, userName: String, role: String?, bondId: String? = null, userId: String? = null) {
+    fun setSession(
+        token: String,
+        userName: String,
+        role: String?,
+        bondId: String? = null,
+        userId: String? = null,
+        mustChangePassword: Boolean = false,
+    ) {
         this.token = token
         this.userName = userName
         this.role = role
         this.bondId = bondId
         this.userId = userId
+        this.mustChangePassword = mustChangePassword
         // Persist to storage
         Platform.saveString(KEY_TOKEN, token)
         Platform.saveString(KEY_USER_NAME, userName)
         role?.let { Platform.saveString(KEY_ROLE, it) }
         bondId?.let { Platform.saveString(KEY_BOND_ID, it) }
         userId?.let { Platform.saveString(KEY_USER_ID, it) }
+        Platform.saveString(KEY_MUST_CHANGE_PASSWORD, mustChangePassword.toString())
+    }
+
+    /**
+     * Reemplaza el token vigente por el que emitió el cambio de contraseña.
+     *
+     * Existe como operación propia —y no como un `setSession` completo— porque el cambio
+     * de contraseña no toca nombre, rol ni vínculo: sólo la credencial.
+     */
+    fun updateToken(newToken: String) {
+        this.token = newToken
+        Platform.saveString(KEY_TOKEN, newToken)
+    }
+
+    /** Apaga (o vuelve a poner) el bloqueo por contraseña provisoria, y lo persiste. */
+    fun updateMustChangePassword(mustChangePassword: Boolean) {
+        this.mustChangePassword = mustChangePassword
+        Platform.saveString(KEY_MUST_CHANGE_PASSWORD, mustChangePassword.toString())
     }
 
     /** Mark login as in-progress so UI stays on Login screen during bonds fetch. */
@@ -96,6 +133,7 @@ class SessionManager {
         bondId = null
         userId = null
         bondRole = null
+        mustChangePassword = false
         loginPending = false
         // Clear from storage
         Platform.remove(KEY_TOKEN)
@@ -104,6 +142,7 @@ class SessionManager {
         Platform.remove(KEY_BOND_ID)
         Platform.remove(KEY_USER_ID)
         Platform.remove(KEY_BOND_ROLE)
+        Platform.remove(KEY_MUST_CHANGE_PASSWORD)
     }
 
     /**
@@ -123,6 +162,7 @@ class SessionManager {
         bondId = savedBondId
         userId = savedUserId
         bondRole = savedBondRole
+        mustChangePassword = Platform.loadString(KEY_MUST_CHANGE_PASSWORD) == "true"
         return true
     }
 
@@ -133,5 +173,6 @@ class SessionManager {
         private const val KEY_BOND_ID = "session_bond_id"
         private const val KEY_USER_ID = "session_user_id"
         private const val KEY_BOND_ROLE = "session_bond_role"
+        private const val KEY_MUST_CHANGE_PASSWORD = "session_must_change_password"
     }
 }

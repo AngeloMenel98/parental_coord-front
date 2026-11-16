@@ -772,8 +772,8 @@ private fun ThirdPartiesErrorState(
  * antes de otorgar).
  *
  * El error del formulario es INLINE y hay uno solo: el del paso en el que se está. El
- * mensaje del servidor —el 422 del email sin cuenta— ocupa ese mismo lugar, así que la
- * persona lo lee donde está escribiendo y no en un snackbar que se va.
+ * mensaje del servidor ocupa ese mismo lugar, así que la persona lo lee donde está
+ * escribiendo y no en un snackbar que se va.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -881,7 +881,7 @@ private fun ThirdPartiesWizard(
                     isError = wizard.error != null,
                 )
                 Text(
-                    text = "La persona tiene que tener cuenta en la app. El alta de cuentas nuevas todavía no está disponible desde acá.",
+                    text = "Si no tiene cuenta, la creamos con una contraseña provisoria y le mandamos los datos por mail.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -975,7 +975,7 @@ private fun ThirdPartiesWizard(
                 wizard.error?.let { FormError(it) }
 
                 Text(
-                    text = "Al otorgarlo, la persona recibe el acceso en el momento. No hay invitación por mail.",
+                    text = "Al otorgarlo, la persona recibe las credenciales por mail. Al entrar por primera vez le pedimos que cambie la contraseña.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
