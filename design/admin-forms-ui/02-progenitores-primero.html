@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Admin — Progenitores primero</title>
+<style>
+  :root{
+    --primary:#00696D;--on-primary:#FFFFFF;--primary-container:#9CF1F6;--on-primary-container:#002022;
+    --secondary:#4A6365;--secondary-container:#CCE8EA;--on-secondary-container:#051F21;
+    --surface:#FAFDFC;--on-surface:#191C1D;--surface-variant:#DAE4E5;--on-surface-variant:#3F4849;
+    --outline:#6F797A;--outline-variant:#BEC8C9;--error:#BA1A1A;--error-container:#FFDAD6;
+    --done:#43A047;--overdue:#E53935;--assigned:#1E88E5;--verify:#B26A00;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    --serif:Georgia,"Times New Roman",Times,serif;
+    --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+    --r4:4px;--r8:8px;--r12:12px;--r16:16px;--r24:24px;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--surface-variant);font-family:var(--sans);color:var(--on-surface);-webkit-font-smoothing:antialiased}
+  .board{display:flex;gap:24px;padding:28px 24px;align-items:flex-start}
+  .caption{position:absolute;left:24px;top:6px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--on-surface-variant)}
+  .phone{width:390px;height:844px;background:var(--surface);border-radius:var(--r24);overflow:hidden;
+    box-shadow:0 1px 2px rgba(0,0,0,.08),0 12px 32px rgba(0,0,0,.10);display:flex;flex-direction:column;position:relative}
+  .topbar{display:flex;align-items:center;gap:12px;padding:14px 16px 12px;border-bottom:1px solid var(--outline-variant)}
+  .topbar h1{margin:0;font-family:var(--serif);font-size:20px;line-height:28px;font-weight:600;flex:1}
+  .content{flex:1;overflow:hidden;padding:16px;display:flex;flex-direction:column;gap:12px}
+  .label{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--on-surface-variant)}
+  .field{display:grid;gap:4px}
+  .field > span{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--on-surface-variant)}
+  .box{border:1px solid var(--outline);border-radius:var(--r12);padding:11px 12px;font-size:14px}
+  .box.ok{border-color:var(--done)}
+  .box.invalid{border-color:var(--error);background:var(--error-container)}
+  .oktxt{font-size:11px;color:var(--done)}
+  .errtxt{font-size:11px;color:var(--error)}
+  .helptxt{font-size:11px;color:var(--on-surface-variant);line-height:16px}
+  .meter{display:flex;gap:4px}
+  .meter i{flex:1;height:4px;border-radius:var(--r4);background:var(--surface-variant)}
+  .meter i.on{background:var(--done)}
+  .meter i.mid{background:var(--verify)}
+  .cta{font:inherit;font-size:14px;font-weight:500;padding:14px;border:0;border-radius:var(--r12);background:var(--primary);
+    color:var(--on-primary);text-align:center;cursor:pointer}
+  .cta[aria-disabled="true"]{background:var(--surface-variant);color:var(--outline);cursor:not-allowed}
+  .ghost{font:inherit;font-size:13px;padding:8px 12px;border-radius:var(--r12);border:1px solid var(--outline);
+    background:transparent;color:var(--on-surface);cursor:pointer}
+  .search{display:flex;align-items:center;gap:8px;border:1px solid var(--primary);border-radius:var(--r12);padding:11px 12px;font-size:14px}
+  .pick{display:flex;align-items:center;gap:12px;border:1px solid var(--outline-variant);border-radius:var(--r12);padding:10px 12px;cursor:pointer}
+  .pick .av{width:36px;height:36px;border-radius:var(--r24);background:var(--primary-container);color:var(--on-primary-container);
+    display:grid;place-items:center;font-size:12px;font-weight:600;flex:none}
+  .pick .who{display:grid;gap:1px;flex:1}
+  .pick .who b{font-size:14px;font-weight:500}
+  .pick .who span{font-size:11px;color:var(--on-surface-variant)}
+  .pick[aria-selected="true"]{border-color:var(--primary);background:var(--secondary-container)}
+  .pick .tick{font-size:12px;font-weight:600;color:var(--primary)}
+  .chips{display:flex;flex-wrap:wrap;gap:6px}
+  .chip{display:inline-flex;align-items:center;gap:6px;padding:4px 8px 4px 4px;border-radius:var(--r24);background:var(--surface-variant);
+    font-size:12px;line-height:16px}
+  .chip .av{width:20px;height:20px;border-radius:50%;background:var(--primary);color:var(--on-primary);display:grid;place-items:center;
+    font-size:9px;font-weight:600}
+  .chip .x{color:var(--on-surface-variant);font-size:12px}
+  .divider{height:1px;background:var(--outline-variant)}
+  .card{border:1px solid var(--outline-variant);border-radius:var(--r12);padding:12px;display:grid;gap:6px}
+  .card b{font-size:16px;font-weight:500}
+  .card span{font-size:12px;color:var(--on-surface-variant)}
+  .summary{border:1px solid var(--outline-variant);border-radius:var(--r12);padding:12px;display:grid;gap:8px}
+  .kv{display:flex;justify-content:space-between;font-size:12px;color:var(--on-surface-variant)}
+  .kv b{color:var(--on-surface);font-weight:500}
+  .banner{border-radius:var(--r12);padding:10px 12px;font-size:12px;background:rgba(67,160,71,.15);color:var(--done);
+    display:flex;align-items:center;gap:8px}
+  :focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+</style>
+</head>
+<body>
+<p class="caption">02 · Progenitores primero — las personas son el dato escaso; el nombre del acuerdo es trivial</p>
+<div class="board">
+
+  <!-- Frame 1: full-screen new progenitor with live validation -->
+  <section class="phone" aria-label="Pantalla 1: alta de progenitor a pantalla completa con validación en vivo">
+    <header class="topbar">
+      <button class="ghost">‹ Usuarios</button>
+      <h1 style="font-size:18px">Nuevo progenitor</h1>
+    </header>
+    <main class="content">
+      <div class="field">
+        <span>Nombre</span>
+        <div class="box ok">Mario</div>
+      </div>
+      <div class="field">
+        <span>Apellido</span>
+        <div class="box ok">Paz</div>
+      </div>
+      <div class="field">
+        <span>Email</span>
+        <div class="box ok">mario.paz@mail.com</div>
+        <p class="oktxt">✓ Formato válido y sin cuenta previa</p>
+      </div>
+      <div class="field">
+        <span>Contraseña provisoria</span>
+        <div class="box ok" style="display:flex;justify-content:space-between;align-items:center">
+          <span>••••••••••</span><span class="helptxt">Ocultar</span>
+        </div>
+        <div class="meter" role="img" aria-label="Fuerza de la contraseña: aceptable">
+          <i class="on"></i><i class="on"></i><i class="mid"></i><i></i>
+        </div>
+        <p class="helptxt">Aceptable. Con 12 caracteres o más, mejor.</p>
+      </div>
+
+      <div class="divider"></div>
+      <p class="helptxt">Se crea con rol <b>progenitor</b> y queda activo. Compartí la contraseña por un canal privado: no se vuelve a mostrar.</p>
+
+      <div style="margin-top:auto;display:grid;gap:8px">
+        <div class="cta" role="button">Crear progenitor</div>
+        <p class="helptext" style="margin:0;text-align:center">Todo listo: los cuatro campos son válidos.</p>
+      </div>
+    </main>
+  </section>
+
+  <!-- Frame 2: bond creation starts with people -->
+  <section class="phone" aria-label="Pantalla 2: creación de vínculo empezando por las personas">
+    <header class="topbar">
+      <button class="ghost">‹ Volver</button>
+      <h1 style="font-size:18px">Crear vínculo</h1>
+    </header>
+    <main class="content">
+      <p class="label" style="margin:0">1 · ¿Quiénes forman el vínculo?</p>
+
+      <div class="chips">
+        <span class="chip"><span class="av">MP</span>Mario Paz<span class="x">✕</span></span>
+        <span class="chip"><span class="av">LG</span>Lucía Gómez<span class="x">✕</span></span>
+      </div>
+
+      <div class="search">⌕ mar</div>
+
+      <div style="display:grid;gap:8px">
+        <div class="pick" aria-selected="true">
+          <span class="av">MP</span>
+          <div class="who"><b>Mario Paz</b><span>mario.paz@mail.com</span></div>
+          <span class="tick">✓</span>
+        </div>
+        <div class="pick" aria-selected="true">
+          <span class="av">MV</span>
+          <div class="who"><b>Marina Vera</b><span>marina.vera@mail.com</span></div>
+          <span class="tick">✓</span>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <p class="label" style="margin:0">2 · Datos del acuerdo</p>
+      <div class="field">
+        <span>Nombre del vínculo</span>
+        <div class="box" style="color:var(--on-surface-variant)">Paz–Vera</div>
+        <p class="helptext">Se propone a partir de los apellidos; podés cambiarlo.</p>
+      </div>
+      <div class="field">
+        <span>Tipo de acuerdo</span>
+        <div style="display:flex;gap:8px">
+          <div class="chip" style="background:var(--primary);color:var(--on-primary);padding:8px 14px">Formal</div>
+          <div class="chip" style="background:var(--surface-variant);padding:8px 14px">Informal</div>
+        </div>
+      </div>
+
+      <div style="margin-top:auto">
+        <div class="cta" role="button">Siguiente: revisar</div>
+      </div>
+    </main>
+  </section>
+
+  <!-- Frame 3: review + success -->
+  <section class="phone" aria-label="Pantalla 3: revisión y vínculo creado">
+    <header class="topbar">
+      <button class="ghost">‹ Volver</button>
+      <h1 style="font-size:18px">Revisar</h1>
+    </header>
+    <main class="content">
+      <div class="banner">✓ Vínculo creado. Ya podés cargar hijos y actividades.</div>
+
+      <div class="card">
+        <b>Paz–Vera</b>
+        <span>Acuerdo formal · activo</span>
+        <div class="chips" style="margin-top:4px">
+          <span class="chip"><span class="av">MP</span>Mario Paz</span>
+          <span class="chip"><span class="av">MV</span>Marina Vera</span>
+        </div>
+      </div>
+
+      <div class="summary">
+        <div class="kv"><span>Progenitores</span><b>2 de 2</b></div>
+        <div class="kv"><span>Hijos</span><b>0 — se agregan en el detalle</b></div>
+        <div class="kv"><span>Reportes</span><b>Disponibles desde hoy</b></div>
+      </div>
+
+      <div style="display:grid;gap:8px;margin-top:auto">
+        <div class="cta" role="button">Abrir el vínculo</div>
+        <div class="ghost" role="button" style="text-align:center">Crear otro vínculo</div>
+      </div>
+    </main>
+  </section>
+
+</div>
+</body>
+</html>

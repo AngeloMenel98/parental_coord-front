@@ -1,0 +1,34 @@
+{
+  "title": "Actividad — detalle",
+  "brief": "Tres direcciones para mostrar mejor la información de UNA actividad (hoy es un ModalBottomSheet con pares etiqueta/valor, Descripción, Motivo de no asistencia, Por verificar y Comprobantes, con el footer de acciones fijo). Datos reales del modelo ActividadDetalle: título, tipo, estado, categoría, criticidad, inicio/fin, límite de evidencia, asignado y confirmación, hijos, descripción, creador y fecha de creación, motivo de declinación, comprobantes y código ACT-XXXX. Acciones reales disponibles: Asignar, Reasignar, Confirmar asignación, Finalizar, No asistir y Cargar comprobante. No hay comentarios, recurrencia ni edición de campos en la app.",
+  "artboards": [
+    {
+      "file": "01-expediente-lineal.html",
+      "title": "Expediente lineal",
+      "tradeoff": "Documento completo a pantalla completa, hermano de Gasto › Expediente: hero con estado y categoría, grilla de datos, descripción, comprobantes con su plazo y trazabilidad del ciclo de vida. Máxima confianza y consistencia con Gastos; a cambio, es scroll largo y la acción principal queda lejos del estado que la explica.",
+      "width": 412,
+      "height": 915
+    },
+    {
+      "file": "02-siguiente-paso.html",
+      "title": "El siguiente paso",
+      "tradeoff": "Decisión primero: una tarjeta abre con el estado, qué toca ahora y la acción principal adentro, más el plazo de evidencia en cuenta regresiva; debajo, datos en grilla sin cromo de tarjeta y comprobantes/historial plegados. La pantalla más rápida para actuar y entender el estado; a cambio, la tarjeta domina y el detalle exige un toque extra.",
+      "width": 412,
+      "height": 915
+    },
+    {
+      "file": "03-ficha-acordeon.html",
+      "title": "Ficha acordeón",
+      "tradeoff": "Continuidad con la agenda: misma anatomía de tarjeta (riel de categoría, estado arriba a la derecha) y secciones plegables que muestran un resumen en una línea, con Datos abierto y barra de acción inferior. Todo entra sin scroll y se siente parte de la lista; a cambio, esconde información por defecto y suma toques, justo en los flujos donde la evidencia importa.",
+      "width": 412,
+      "height": 915
+    },
+    {
+      "file": "04-bitacora-visual.html",
+      "title": "Bitácora visual",
+      "tradeoff": "Gráficos y bitácora primero: riel de 5 etapas del ciclo de vida, bloque “Qué falta” con medidor de 3 pasos y checklist (turno, evidencia, verificación), tira de densidad de eventos por día y bitácora con íconos que lleva la descripción, el hijo al que refiere y los chips en el propio evento. Comunica estado y contexto sin abrir nada; a cambio usa más tinta visual, gasta alto de pantalla en gráficos y depende de que el modelo exponga hitos y el paso de verificación, que hoy solo existen como createdAt/confirmedAt/completedAt y el estado VERIFY.",
+      "width": 412,
+      "height": 915
+    }
+  ]
+}

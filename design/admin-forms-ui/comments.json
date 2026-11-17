@@ -1,0 +1,60 @@
+{
+  "version": 1,
+  "comments": [
+    {
+      "id": "12iusrx4",
+      "file": "03-un-solo-panel.html",
+      "selector": "body > div > section:nth-of-type(3) > main",
+      "excerpt": "NOMBRE DEL VÍNCULO Paz–Vera sugerido PROGENITORES 1 DE 2 MP Mario Paz ✕ marina ▾ Sin resultados Nadie coincide con «marina» en nombre ni email. + Crear progenitor «marina» Pedís nombre, apellido, email y contraseña acá mismo Falta un progenitor: el botón de crear se habilita con 2. La cuenta nueva s",
+      "comment": "Agrega al crear el Vinculo, que puedas sumar los datos de los Hijos.",
+      "createdAt": "2026-11-05T12:56:18.695Z",
+      "status": "resolved",
+      "sentAt": "2026-11-05T12:56:54.431Z",
+      "resolvedAt": "2026-11-05T12:57:26.314Z"
+    },
+    {
+      "id": "y7xglyw4",
+      "file": "03-un-solo-panel.html",
+      "selector": "body > div > section:nth-of-type(3) > main > div:nth-of-type(2)",
+      "excerpt": "PROGENITORES 1 DE 2",
+      "comment": "Deja el Titulo de Progenitores.",
+      "createdAt": "2026-11-05T13:00:55.459Z",
+      "status": "resolved",
+      "sentAt": "2026-11-05T13:02:59.616Z",
+      "resolvedAt": "2026-11-05T13:03:48.609Z"
+    },
+    {
+      "id": "9qp2wrly",
+      "file": "03-un-solo-panel.html",
+      "selector": "body > div > section:nth-of-type(4) > main > div:nth-of-type(5) > div > span",
+      "excerpt": "15/05/2020 · 6 años",
+      "comment": "No es Opcional. Por lo menos tiene que haber un hijo creado",
+      "createdAt": "2026-11-05T13:01:16.487Z",
+      "status": "resolved",
+      "sentAt": "2026-11-05T13:02:59.616Z",
+      "resolvedAt": "2026-11-05T13:03:48.609Z"
+    },
+    {
+      "id": "am6qucb6",
+      "file": "03-un-solo-panel.html",
+      "selector": "body > div > section:nth-of-type(3) > header",
+      "excerpt": "Crear vínculo Cancelar",
+      "comment": "Me gustaria que sea 3 steps Primero, Le pongo un nombre boton siguiente, Agrego progenitores, boton siguiente Agrego hijos, boton crear vinculo",
+      "createdAt": "2026-11-05T13:02:58.527Z",
+      "status": "resolved",
+      "sentAt": "2026-11-05T13:02:59.616Z",
+      "resolvedAt": "2026-11-05T13:03:48.609Z"
+    },
+    {
+      "id": "15724f8g",
+      "file": "03-un-solo-panel.html",
+      "selector": "body > div > section:nth-of-type(1) > main > div:nth-of-type(4) > p",
+      "excerpt": "Paso 1 de 3. Todavía no se crea nada.",
+      "comment": "Sacame estos textos.",
+      "createdAt": "2026-11-05T13:28:45.606Z",
+      "status": "resolved",
+      "sentAt": "2026-11-05T13:29:06.103Z",
+      "resolvedAt": "2026-11-05T13:30:25.562Z"
+    }
+  ]
+}

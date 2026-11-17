@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Inicio · Dirección 03 — Triaje</title>
+<style>
+  :root {
+    --primary: #00696D; --on-primary: #FFFFFF;
+    --primary-container: #9CF1F6; --on-primary-container: #002022;
+    --secondary: #4A6365; --secondary-container: #CCE8EA; --on-secondary-container: #051F21;
+    --surface: #FAFDFC; --on-surface: #191C1D;
+    --surface-variant: #DAE4E5; --on-surface-variant: #3F4849;
+    --outline: #6F797A; --outline-variant: #BEC8C9;
+    --error: #BA1A1A;
+
+    --vencida: #C62828; --verificar: #9E5F00; --asignada: #1565C0; --cumplida: #2E7D32;
+
+    --serif: Georgia, 'Times New Roman', serif;
+    --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    --mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: var(--sans); background: #E4ECEC; min-height: 100vh; padding: 24px 0; }
+  .stage { display: flex; gap: 40px; justify-content: center; align-items: flex-start; flex-wrap: wrap; padding: 0 24px; }
+  .frame-label { font-size: 11px; font-weight: 500; font-variant: small-caps; letter-spacing: .5px; color: #3F4849; margin-bottom: 8px; }
+  .frame-note { font-size: 12px; color: #3F4849; max-width: 390px; margin-top: 10px; line-height: 1.55; }
+
+  .phone { width: 390px; height: 844px; background: var(--surface-variant); color: var(--on-surface); display: flex; flex-direction: column; border-radius: 24px; overflow: hidden; box-shadow: 0 8px 32px rgba(0,32,34,.18); }
+  button { font-family: inherit; }
+  :focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 4px; }
+  @media (prefers-reduced-motion: no-preference) {
+    .queue-row, .act, .stat, .chip, .icon-btn, .text-btn { transition: background 150ms, box-shadow 150ms; }
+  }
+
+  .topbar { background: var(--surface); display: flex; align-items: center; height: 56px; padding: 0 8px 0 16px; flex: none; border-bottom: 1px solid var(--outline-variant); }
+  .topbar h1 { font-size: 18px; font-weight: 500; flex: 1; white-space: nowrap; }
+  .icon-btn { width: 44px; height: 44px; border: 0; background: transparent; border-radius: 50%; display: grid; place-items: center; cursor: pointer; color: var(--on-surface-variant); position: relative; flex: none; }
+  .icon-btn:hover { background: rgba(0,105,109,.06); }
+  .badge { position: absolute; top: 6px; right: 6px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: var(--error); color: #FFF; font-size: 10px; font-weight: 700; display: grid; place-items: center; }
+
+  .feed { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; scrollbar-width: none; }
+  .feed::-webkit-scrollbar { display: none; }
+  .feed > * { flex: none; }
+
+  .navbar { flex: none; display: flex; border-top: 1px solid var(--outline-variant); background: var(--surface); }
+  .nav-item { flex: 1; border: 0; background: none; padding: 8px 0 12px; font-size: 12px; color: var(--on-surface-variant); cursor: pointer; }
+  .nav-item svg { display: block; margin: 0 auto 2px; }
+  .nav-item .pill { display: inline-block; padding: 3px 16px; border-radius: 16px; }
+  .nav-item[aria-current="page"] { color: var(--primary); font-weight: 600; }
+  .nav-item[aria-current="page"] .pill { background: var(--primary-container); }
+
+  .eyebrow { font-size: 11px; font-weight: 500; font-variant: small-caps; letter-spacing: .5px; color: var(--on-surface-variant); }
+  .text-btn { border: 0; background: none; color: var(--primary); font-size: 12px; font-weight: 500; padding: 6px 8px; border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; gap: 2px; min-height: 32px; }
+  .text-btn:hover { background: rgba(0,105,109,.08); }
+  .text-btn svg { width: 14px; height: 14px; }
+
+  /* ── Saludo de una sola línea ── */
+  .hello { display: flex; align-items: center; gap: 12px; min-height: 36px; }
+  .hello h2 { font-family: var(--serif); font-size: 24px; font-weight: 400; flex: none; line-height: 32px; }
+  .hello .date { font-size: 11px; font-weight: 500; font-variant: small-caps; letter-spacing: .5px; color: var(--on-surface-variant); padding-top: 6px; flex: 1; }
+  .bond { display: inline-flex; align-items: center; gap: 6px; border-radius: 12px; padding: 4px 10px; font-size: 11px; font-weight: 500; color: var(--cumplida); background: #E8F5E9; border: 1px solid #C8E6C9; flex: none; white-space: nowrap; }
+  .bond i { width: 6px; height: 6px; border-radius: 50%; background: var(--cumplida); }
+
+  /* ── Cola: lo que reclama una acción, en orden de urgencia ── */
+  .section-head { display: flex; align-items: center; gap: 8px; padding: 4px 2px 0; }
+  .section-head h2 { font-size: 16px; font-weight: 600; flex: 1; }
+  .count-chip { font-size: 11px; font-weight: 600; color: var(--on-primary-container); background: var(--primary-container); border-radius: 12px; padding: 2px 8px; }
+  .queue { display: flex; flex-direction: column; gap: 8px; }
+  .queue-row { position: relative; display: flex; align-items: center; gap: 10px; background: var(--surface); border: 1px solid var(--outline-variant); border-radius: 12px; padding: 10px 10px 10px 14px; min-height: 68px; cursor: pointer; text-align: left; color: inherit; width: 100%; overflow: hidden; }
+  .queue-row::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; }
+  .queue-row.overdue::before { background: #E53935; }
+  .queue-row.verify::before { background: #B26A00; }
+  .queue-row.assigned::before { background: #1E88E5; }
+  .queue-row.money::before { background: #43A047; }
+  .queue-row:hover { box-shadow: 0 2px 8px rgba(0,32,34,.10); }
+  .queue-row .body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+  .queue-row .kicker { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 600; font-variant: small-caps; letter-spacing: .5px; }
+  .queue-row .kicker i { width: 6px; height: 6px; border-radius: 50%; flex: none; }
+  .queue-row.overdue .kicker { color: var(--vencida); }
+  .queue-row.overdue .kicker i { background: #E53935; }
+  .queue-row.verify .kicker { color: var(--verificar); }
+  .queue-row.verify .kicker i { background: #B26A00; }
+  .queue-row.assigned .kicker { color: var(--asignada); }
+  .queue-row.assigned .kicker i { background: #1E88E5; }
+  .queue-row.money .kicker { color: var(--cumplida); }
+  .queue-row.money .kicker i { background: #43A047; }
+  .queue-row .title { font-size: 15px; font-weight: 500; line-height: 22px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .queue-row .meta { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--on-surface-variant); }
+  .queue-row .meta .cat-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+  .queue-row .meta .when { font-family: var(--mono); letter-spacing: .2px; }
+  .queue-row .amount { font-family: var(--serif); font-size: 20px; font-weight: 600; color: var(--cumplida); flex: none; margin-right: 2px; }
+  .act { flex: none; border: 1px solid var(--primary); background: transparent; color: var(--primary); font-size: 12px; font-weight: 600; border-radius: 12px; min-height: 32px; padding: 0 12px; cursor: pointer; }
+  .act:hover { background: rgba(0,105,109,.08); }
+  .act.solid { background: var(--primary); color: var(--on-primary); border-color: var(--primary); }
+  .act.solid:hover { box-shadow: inset 0 0 0 99px rgba(0,32,34,.10); }
+  .chev { width: 18px; height: 18px; color: var(--outline); flex: none; }
+
+  /* ── Resumen: tres cifras en una línea, sin tarjetas ── */
+  .summary { display: grid; grid-template-columns: repeat(3, 1fr); background: var(--surface); border: 1px solid var(--outline-variant); border-radius: 12px; overflow: hidden; }
+  .stat { border: 0; background: none; text-align: left; padding: 8px 12px; cursor: pointer; color: inherit; display: flex; flex-direction: column; gap: 0; min-height: 54px; justify-content: center; }
+  .stat + .stat { border-left: 1px solid var(--outline-variant); }
+  .stat:hover { background: rgba(0,105,109,.05); }
+  .stat .label { font-size: 11px; font-weight: 500; font-variant: small-caps; letter-spacing: .5px; color: var(--on-surface-variant); white-space: nowrap; }
+  .stat .value { font-family: var(--serif); font-size: 20px; font-weight: 600; line-height: 26px; }
+  .stat .value.alert { color: var(--vencida); }
+
+  /* ── Cumplimiento comprimido a una barra y dos filas ── */
+  .card { background: var(--surface); border: 1px solid var(--outline-variant); border-radius: 12px; }
+  .comp { padding: 12px 14px; }
+  .comp-head { display: flex; align-items: baseline; gap: 8px; }
+  .comp-head h3 { font-size: 14px; font-weight: 600; }
+  .comp-head .period { font-size: 11px; color: var(--on-surface-variant); flex: 1; }
+  .comp-head .you { font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .segments { display: grid; grid-template-columns: repeat(12, 1fr); gap: 3px; margin-top: 8px; }
+  .segments span { height: 8px; border-radius: 4px; background: var(--surface-variant); }
+  .segments span.on { background: var(--primary); }
+  .member-row { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+  .member-row .name { font-size: 12px; font-weight: 500; flex: none; width: 62px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .member-row .bar { flex: 1; height: 4px; border-radius: 2px; background: var(--surface-variant); overflow: hidden; }
+  .member-row .bar span { display: block; height: 100%; background: var(--secondary); border-radius: 2px; }
+  .member-row .pct { font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; flex: none; width: 38px; text-align: right; }
+
+  /* ── Familiares ── */
+  .fam { display: flex; align-items: baseline; gap: 8px; padding: 2px 2px 0; }
+  .fam h2 { font-size: 16px; font-weight: 600; flex: 1; }
+  .roster { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
+  .roster::-webkit-scrollbar { display: none; }
+  .chip { display: flex; align-items: center; gap: 8px; padding: 6px 12px 6px 6px; border-radius: 12px; border: 1px solid var(--outline-variant); background: var(--surface); cursor: pointer; min-height: 48px; flex: none; text-align: left; color: inherit; }
+  .chip:hover { box-shadow: 0 2px 8px rgba(0,32,34,.10); }
+  .avatar { width: 34px; height: 34px; border-radius: 50%; background: var(--primary-container); color: var(--on-primary-container); display: grid; place-items: center; font-size: 14px; font-weight: 600; flex: none; }
+  .chip .who { display: flex; flex-direction: column; }
+  .chip .who b { font-size: 13px; font-weight: 500; line-height: 18px; }
+  .chip .who small { font-size: 10px; color: var(--on-surface-variant); line-height: 14px; }
+  .chip .who small.alert { color: var(--vencida); font-weight: 500; }
+</style>
+</head>
+<body>
+<div class="stage">
+
+  <section class="frame" aria-label="Inicio: Triaje">
+    <p class="frame-label">03 · Triaje</p>
+
+    <div class="phone">
+      <header class="topbar">
+        <h1>Coordinación Parental</h1>
+        <button class="icon-btn" aria-label="Notificaciones: 2 sin leer">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 22a2 2 0 0 0 2-2h-4a2 2 0 0 0 2 2zm6-6V11c0-3.07-1.63-5.64-4.5-6.32V4a1.5 1.5 0 0 0-3 0v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></svg>
+          <span class="badge" aria-hidden="true">2</span>
+        </button>
+        <button class="icon-btn" aria-label="Cerrar sesión">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/></svg>
+        </button>
+      </header>
+
+      <main class="feed">
+        <div class="hello">
+          <h2>Hola, Ángelo</h2>
+          <span class="date">3 de noviembre</span>
+          <span class="bond"><i aria-hidden="true"></i>Vínculo activo</span>
+        </div>
+
+        <div class="section-head">
+          <h2>Necesita tu atención</h2>
+          <span class="count-chip" aria-label="4 pendientes">4</span>
+        </div>
+
+        <div class="queue" role="list" aria-label="Pendientes ordenados por urgencia">
+          <button class="queue-row overdue" role="listitem" aria-label="Vencida: Comprar útiles escolares, Educación, venció ayer. Ver">
+            <span class="body">
+              <span class="kicker"><i aria-hidden="true"></i>Vencida</span>
+              <span class="title">Comprar útiles escolares</span>
+              <span class="meta"><span class="cat-dot" style="background:#3F51B5" aria-hidden="true"></span>Educación<span aria-hidden="true">·</span><span class="when">venció ayer</span></span>
+            </span>
+            <span class="act">Ver</span>
+          </button>
+
+          <button class="queue-row verify" role="listitem" aria-label="Por verificar: Armar la mochila de Emma, Educación, entregada el domingo. Revisar">
+            <span class="body">
+              <span class="kicker"><i aria-hidden="true"></i>Por verificar</span>
+              <span class="title">Armar la mochila de Emma</span>
+              <span class="meta"><span class="cat-dot" style="background:#3F51B5" aria-hidden="true"></span>Educación<span aria-hidden="true">·</span><span class="when">entregada el domingo</span></span>
+            </span>
+            <span class="act">Revisar</span>
+          </button>
+
+          <button class="queue-row assigned" role="listitem" aria-label="Asignada a vos: Control pediátrico de Tomás, Salud, hoy a las 08:30. Confirmar">
+            <span class="body">
+              <span class="kicker"><i aria-hidden="true"></i>Asignada a vos</span>
+              <span class="title">Control pediátrico de Tomás</span>
+              <span class="meta"><span class="cat-dot" style="background:#D81B60" aria-hidden="true"></span>Salud<span aria-hidden="true">·</span><span class="when">hoy 08:30</span></span>
+            </span>
+            <span class="act solid">Confirmar</span>
+          </button>
+
+          <button class="queue-row money" role="listitem" aria-label="Saldo a favor de 1.250 pesos con 00 en noviembre. Ver gastos">
+            <span class="body">
+              <span class="kicker"><i aria-hidden="true"></i>Saldo a favor</span>
+              <span class="title">Gastos de noviembre</span>
+              <span class="meta">Sin deudas pendientes</span>
+            </span>
+            <span class="amount">$1.250,00</span>
+            <svg class="chev" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M9.29 6.71 4 12l5.29 5.29 1.42-1.42L6.83 12l3.88-3.88z" transform="rotate(180 12 12)"/></svg>
+          </button>
+        </div>
+
+        <div class="summary" role="group" aria-label="Resumen del vínculo">
+          <button class="stat" aria-label="Asignadas a vos: 2">
+            <span class="label">Asignadas</span>
+            <span class="value">2</span>
+          </button>
+          <button class="stat" aria-label="Vencidas: 1">
+            <span class="label">Vencidas</span>
+            <span class="value alert">1</span>
+          </button>
+          <button class="stat" aria-label="Cumplimiento del mes: 66,7 por ciento">
+            <span class="label">Cumplimiento</span>
+            <span class="value">66,7%</span>
+          </button>
+        </div>
+
+        <section class="card comp" aria-labelledby="comp-title">
+          <div class="comp-head">
+            <h3 id="comp-title">Cumplimiento</h3>
+            <span class="period">Noviembre · 8 de 12</span>
+            <span class="you">66,7%</span>
+          </div>
+          <div class="segments" role="img" aria-label="8 de 12 tareas cumplidas este mes">
+            <span class="on"></span><span class="on"></span><span class="on"></span><span class="on"></span>
+            <span class="on"></span><span class="on"></span><span class="on"></span><span class="on"></span>
+            <span></span><span></span><span></span><span></span>
+          </div>
+          <div class="member-row">
+            <span class="name">Mariana</span>
+            <span class="bar" aria-hidden="true"><span style="width:91.7%"></span></span>
+            <span class="pct">91,7%</span>
+          </div>
+          <div class="member-row">
+            <span class="name">Rosa</span>
+            <span class="bar" aria-hidden="true"><span style="width:62.5%"></span></span>
+            <span class="pct">62,5%</span>
+          </div>
+        </section>
+
+        <div class="fam">
+          <h2>Familiares</h2>
+          <button class="text-btn">Ver todos</button>
+        </div>
+        <div class="roster">
+          <button class="chip" aria-label="Emma: 1 tarea vencida">
+            <span class="avatar" aria-hidden="true">E</span>
+            <span class="who"><b>Emma</b><small class="alert">1 vencida</small></span>
+          </button>
+          <button class="chip" aria-label="Tomás: al día">
+            <span class="avatar" aria-hidden="true">T</span>
+            <span class="who"><b>Tomás</b><small>Al día</small></span>
+          </button>
+        </div>
+      </main>
+
+      <nav class="navbar" aria-label="Navegación principal">
+        <button class="nav-item" aria-current="page"><span class="pill"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg></span>Inicio</button>
+        <button class="nav-item"><span class="pill"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M19 4h-1V2h-2v2H8V2H6v2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2zm0 16H5V10h14v10zM5 8V6h14v2H5z"/></svg></span>Actividades</button>
+        <button class="nav-item"><span class="pill"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M21 18v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v1h-9a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h9zm-9-2h10V8H12v8zm4-2.5a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z"/></svg></span>Gastos</button>
+        <button class="nav-item"><span class="pill"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16 11c1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3 1.34 3 3 3zm-8 0c1.66 0 3-1.34 3-3S9.66 5 8 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg></span>Terceros</button>
+      </nav>
+    </div>
+
+    <p class="frame-note">
+      El inicio es una <strong>cola de triaje</strong>: primero lo que vence, después lo que espera tu
+      revisión, después lo que está asignado a vos y al final el dinero. Cada fila trae su acción
+      (Ver / Revisar / Confirmar), así que la portada sirve para resolver sin navegar. Las cifras
+      bajan a una franja y el cumplimiento a una barra de 12 segmentos. Gana velocidad y pierde
+      calidez: es la portada de alguien que entra a trabajar, no a mirar cómo va la casa.
+    </p>
+  </section>
+
+</div>
+</body>
+</html>

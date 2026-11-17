@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Fondo de los iconos de lanzador. El de producción es el `primary` del sistema de
+         diseño (teal); el de desarrollo es el naranja de estado "En progreso", para que las
+         dos apps se distingan por color incluso antes de leer el nombre. -->
+    <color name="ic_launcher_prod_background">#00696D</color>
+    <color name="ic_launcher_local_background">#E65100</color>
+</resources>

@@ -1,9 +1,15 @@
 package com.parental.shared.feature.expenses.ui
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -11,12 +17,19 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -39,29 +52,44 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.parental.shared.core.files.FileData
+import com.parental.shared.core.files.rememberFilePicker
 import com.parental.shared.core.ui.components.AppTopBar
+import com.parental.shared.core.ui.theme.CategoryTokens
+import com.parental.shared.core.ui.theme.MotionTokens
+import com.parental.shared.core.ui.theme.Spacing
+import com.parental.shared.core.ui.theme.StatusTokens
 import com.parental.shared.core.util.formatMoney
 import com.parental.shared.core.util.formatShortDate
+import com.parental.shared.feature.expenses.domain.ExpenseStepState
+import com.parental.shared.feature.expenses.domain.ExpenseTimelineStep
+import com.parental.shared.feature.expenses.domain.expenseTimeline
 import com.parental.shared.feature.expenses.domain.model.ExpenseResponseDto
 import com.parental.shared.feature.expenses.domain.model.ExpenseStatus
 import com.parental.shared.feature.expenses.domain.model.ExpenseUpdateRequest
 import com.parental.shared.feature.expenses.domain.model.displayName
+import com.parental.shared.feature.expenses.domain.viewerShare
+import kotlinx.datetime.LocalDate
 
 /**
- * Pantalla de detalle de un gasto (S5/T19).
+ * Detalle del gasto como "expediente" (design/expense-detail-ui/01).
  *
- * Renderiza los datos del gasto y los botones de acción que el SERVIDOR manda
- * (`canEdit`, `canCancel`, `canApprove`, `canReject`, `canMarkPaid`, `isTerminal`).
- * Después de una acción exitosa refresca el detalle y el resumen.
+ * Encabezado con estado, categoría, monto y división; datos en grilla; descripción; documento
+ * con acción de adjuntar; y la trazabilidad en un bloque desplegable con una línea temporal que
+ * sólo suma pasos ocurridos. Las acciones del pie salen de los flags del SERVIDOR.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ExpenseDetailScreen(
     viewModel: ExpensesViewModel,
     onBack: () -> Unit,
+    currentUserId: String? = null,
     onLogout: () -> Unit = {},
 ) {
     val uiState = viewModel.uiState.collectAsState().value
@@ -78,7 +106,7 @@ fun ExpenseDetailScreen(
     Scaffold(
         topBar = {
             AppTopBar(
-                title = "Detalle del gasto",
+                title = "Gasto",
                 onLogout = onLogout,
                 navigationIcon = {
                     IconButton(onClick = onBack) {
@@ -105,11 +133,13 @@ fun ExpenseDetailScreen(
                 )
                 is DetailUiState.Content -> ExpenseDetailContent(
                     expense = detail.expense,
+                    currentUserId = currentUserId,
                     onApprove = { viewModel.approve(detail.expense.id) },
                     onReject = { reason -> viewModel.reject(detail.expense.id, reason) },
                     onPay = { viewModel.pay(detail.expense.id) },
                     onCancel = { viewModel.cancel(detail.expense.id); onBack() },
                     onEdit = { request -> viewModel.update(detail.expense.id, request) },
+                    onAttach = { file -> viewModel.attachDocument(detail.expense.id, file.name, file.mimeType, file.bytes) },
                 )
                 DetailUiState.Closed -> {
                     LaunchedEffect(Unit) { onBack() }
@@ -122,11 +152,13 @@ fun ExpenseDetailScreen(
 @Composable
 private fun ExpenseDetailContent(
     expense: ExpenseResponseDto,
+    currentUserId: String?,
     onApprove: () -> Unit,
     onReject: (String?) -> Unit,
     onPay: () -> Unit,
     onCancel: () -> Unit,
     onEdit: (ExpenseUpdateRequest) -> Unit,
+    onAttach: (FileData) -> Unit,
 ) {
     var showRejectDialog by remember { mutableStateOf(false) }
     var showEditDialog by remember { mutableStateOf(false) }
@@ -178,16 +210,21 @@ private fun ExpenseDetailContent(
         )
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        DetailHeader(expense = expense)
-        DetailInfo(expense = expense)
-        DetailActions(
+    Column(modifier = Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = Spacing.lg, vertical = Spacing.md),
+            verticalArrangement = Arrangement.spacedBy(Spacing.md),
+        ) {
+            HeroCard(expense = expense, currentUserId = currentUserId)
+            FactsCard(expense = expense)
+            DescriptionCard(expense = expense)
+            DocumentCard(expense = expense, onAttach = onAttach)
+            TimelineCard(expense = expense)
+        }
+        DetailActionsBar(
             expense = expense,
             onApprove = onApprove,
             onReject = { showRejectDialog = true },
@@ -198,92 +235,366 @@ private fun ExpenseDetailContent(
     }
 }
 
+// ── S1 · encabezado ───────────────────────────────────────────────────────────
+
 @Composable
-private fun DetailHeader(expense: ExpenseResponseDto) {
-    Surface(
+private fun HeroCard(expense: ExpenseResponseDto, currentUserId: String?) {
+    val dark = isSystemInDarkTheme()
+    val share = viewerShare(expense, currentUserId)
+
+    Card(
         modifier = Modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.surfaceVariant,
         shape = MaterialTheme.shapes.large,
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        ),
     ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-        ) {
+        Column(modifier = Modifier.padding(Spacing.lg)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.xxs)) {
+                StatusChip(status = expense.status)
+                CategoryChip(name = expense.categoryName)
+            }
+            Spacer(modifier = Modifier.height(Spacing.sm))
             Text(
                 text = expense.concept,
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
             )
-            Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = formatMoney(expense.amount),
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary,
+                style = MaterialTheme.typography.displaySmall,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
             )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = "Estado: ${expense.status.displayName()}",
-                style = MaterialTheme.typography.bodyLarge,
+            if (share != null) {
+                Text(
+                    text = "Tu parte: ${formatMoney(share)}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Spacer(modifier = Modifier.height(Spacing.md))
+            SplitBar(
+                payer = expense.splitRatioPayer,
+                other = expense.splitRatioOther,
             )
+            Spacer(modifier = Modifier.height(Spacing.xxs))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(
+                    text = "Pagador ${expense.splitRatioPayer}%",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    text = "Otro ${expense.splitRatioOther}%",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 }
 
+/** S1 · dos tramos que suman el reparto; si el servidor manda 0/0 se dibuja mitad y mitad. */
 @Composable
-private fun DetailInfo(expense: ExpenseResponseDto) {
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        DetailInfoRow(label = "Categoría", value = expense.categoryName)
-        DetailInfoRow(label = "Fecha", value = formatShortDateString(expense.expenseDate))
-        DetailInfoRow(label = "Descripción", value = expense.description?.takeIf { it.isNotBlank() } ?: "—")
-        DetailInfoRow(label = "División", value = "Pagador ${expense.splitRatioPayer}% / Otro ${expense.splitRatioOther}%")
-        // Los NOMBRES, no los ids: un UUID en pantalla no le dice nada a nadie. El
-        // nombre viene del servidor (que ya resuelve el de la categoría); si no hay
-        // perfil, se cae al id — mejor un UUID que un hueco sin explicación.
-        DetailInfoRow(label = "Solicitado por", value = expense.requestedByName ?: expense.requestedBy)
-        DetailInfoRow(
-            label = "Contraparte",
-            value = expense.counterpartName ?: expense.counterpartId ?: "Sin contraparte",
-        )
-        expense.approvedBy?.let {
-            DetailInfoRow(label = "Aprobado por", value = expense.approvedByName ?: it)
-        }
-        expense.approvedAt?.let { DetailInfoRow(label = "Aprobado el", value = it) }
-        expense.paidAt?.let { DetailInfoRow(label = "Pagado el", value = it) }
-        if (!expense.hasDocument) {
-            Text(
-                text = "⚠️ Este gasto no tiene documento de respaldo.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.error,
-            )
-        }
-    }
-}
+private fun SplitBar(payer: Int, other: Int) {
+    val payerWeight = payer.coerceAtLeast(0).toFloat()
+    val otherWeight = other.coerceAtLeast(0).toFloat()
+    val total = payerWeight + otherWeight
+    val (first, second) = if (total <= 0f) 1f to 1f else payerWeight to otherWeight
+    val dark = isSystemInDarkTheme()
 
-@Composable
-private fun DetailInfoRow(label: String, value: String) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(Spacing.sm)
+            .clip(MaterialTheme.shapes.small),
     ) {
+        Box(
+            modifier = Modifier
+                .weight(first)
+                .fillMaxSize()
+                .background(StatusTokens.triple(StatusTokens.Status.InProgress, dark).content),
+        )
+        Box(
+            modifier = Modifier
+                .weight(second)
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.secondaryContainer),
+        )
+    }
+}
+
+@Composable
+private fun StatusChip(status: ExpenseStatus) {
+    val triple = StatusTokens.triple(status.toTokenStatus(), isSystemInDarkTheme())
+    Surface(
+        color = triple.container,
+        contentColor = triple.content,
+        shape = MaterialTheme.shapes.small,
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = Spacing.sm, vertical = Spacing.xs),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.xxs),
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(Spacing.xxs)
+                    .clip(CircleShape)
+                    .background(triple.dot),
+            )
+            Text(
+                text = status.displayName(),
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+            )
+        }
+    }
+}
+
+/** S1 · la categoría va con su color y SIN ícono. */
+@Composable
+private fun CategoryChip(name: String) {
+    val dark = isSystemInDarkTheme()
+    val triple = CategoryTokens.resolve(name)?.let { CategoryTokens.triple(it, dark) }
+    val container = triple?.container ?: MaterialTheme.colorScheme.surfaceVariant
+    val content = triple?.content ?: MaterialTheme.colorScheme.onSurfaceVariant
+
+    Surface(color = container, contentColor = content, shape = MaterialTheme.shapes.small) {
+        Text(
+            text = name,
+            modifier = Modifier.padding(horizontal = Spacing.sm, vertical = Spacing.xs),
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+// ── S2/S3 · datos y descripción ───────────────────────────────────────────────
+
+@Composable
+private fun FactsCard(expense: ExpenseResponseDto) {
+    SectionCard(title = "Datos del gasto") {
+        Row(modifier = Modifier.fillMaxWidth()) {
+            Fact(
+                label = "Fecha",
+                value = formatShortDateString(expense.expenseDate),
+                modifier = Modifier.weight(1f),
+            )
+            Fact(
+                label = "Solicitó",
+                value = expense.requestedByName ?: expense.requestedBy,
+                modifier = Modifier.weight(1f),
+            )
+        }
+        Spacer(modifier = Modifier.height(Spacing.md))
+        Row(modifier = Modifier.fillMaxWidth()) {
+            Fact(
+                label = "Contraparte",
+                value = expense.counterpartName ?: expense.counterpartId ?: "—",
+                modifier = Modifier.weight(1f),
+            )
+            // El contrato todavía no expone los hijos del gasto: se muestra el hueco, nunca
+            // un nombre inventado.
+            Fact(
+                label = "Hijos",
+                value = "—",
+                modifier = Modifier.weight(1f),
+            )
+        }
+    }
+}
+
+@Composable
+private fun DescriptionCard(expense: ExpenseResponseDto) {
+    SectionCard(title = "Descripción") {
+        Text(
+            text = expense.description?.takeIf { it.isNotBlank() } ?: "—",
+            style = MaterialTheme.typography.bodyMedium,
+        )
+    }
+}
+
+@Composable
+private fun Fact(label: String, value: String, modifier: Modifier = Modifier) {
+    Column(modifier = modifier) {
         Text(
             text = label,
-            style = MaterialTheme.typography.bodyMedium,
+            style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Text(
             text = value,
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.Medium,
-            textAlign = TextAlign.End,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
         )
     }
 }
 
+// ── S4 · documento ────────────────────────────────────────────────────────────
+
 @Composable
-private fun DetailActions(
+private fun DocumentCard(expense: ExpenseResponseDto, onAttach: (FileData) -> Unit) {
+    val picker = rememberFilePicker()
+
+    SectionCard(title = "Documento") {
+        if (expense.hasDocument) {
+            Text(
+                text = "Comprobante adjunto",
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Medium,
+            )
+            return@SectionCard
+        }
+
+        Surface(
+            color = MaterialTheme.colorScheme.surfaceVariant,
+            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            shape = MaterialTheme.shapes.medium,
+        ) {
+            Row(
+                modifier = Modifier.padding(Spacing.sm),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Sin comprobante adjunto",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Text(
+                        text = "El gasto se registró sin documento de respaldo.",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+                OutlinedButton(
+                    onClick = { picker.launch { file -> if (file != null) onAttach(file) } },
+                    modifier = Modifier.heightIn(min = 44.dp),
+                    shape = MaterialTheme.shapes.small,
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.AttachFile,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                    )
+                    Spacer(modifier = Modifier.width(Spacing.xs))
+                    Text("Adjuntar", style = MaterialTheme.typography.labelMedium)
+                }
+            }
+        }
+    }
+}
+
+// ── S5 · trazabilidad plegable ────────────────────────────────────────────────
+
+@Composable
+private fun TimelineCard(expense: ExpenseResponseDto) {
+    var expanded by remember(expense.id) { mutableStateOf(true) }
+    val chevronRotation by animateFloatAsState(
+        targetValue = if (expanded) 90f else 0f,
+        animationSpec = tween(durationMillis = MotionTokens.durationStandard),
+        label = "timeline-chevron",
+    )
+    val steps = remember(expense) { expenseTimeline(expense) }
+
+    SectionCard(title = null) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { expanded = !expanded },
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = "Trazabilidad",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.weight(1f),
+            )
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = if (expanded) "Ocultar trazabilidad" else "Mostrar trazabilidad",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.rotate(chevronRotation),
+            )
+        }
+        if (expanded) {
+            Spacer(modifier = Modifier.height(Spacing.sm))
+            steps.forEachIndexed { index, step ->
+                TimelineRow(step = step, isLast = index == steps.lastIndex)
+            }
+        }
+    }
+}
+
+@Composable
+private fun TimelineRow(step: ExpenseTimelineStep, isLast: Boolean) {
+    val dotColor = when (step.state) {
+        ExpenseStepState.Done -> MaterialTheme.colorScheme.primary
+        ExpenseStepState.Current -> StatusTokens.triple(StatusTokens.Status.InProgress, isSystemInDarkTheme()).content
+        ExpenseStepState.Rejected -> MaterialTheme.colorScheme.error
+    }
+
+    Row(modifier = Modifier.fillMaxWidth()) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Box(
+                modifier = Modifier
+                    .padding(top = Spacing.xs)
+                    .size(Spacing.sm + 2.dp)
+                    .clip(CircleShape)
+                    .background(dotColor),
+            )
+            if (!isLast) {
+                Box(
+                    modifier = Modifier
+                        .padding(top = 2.dp)
+                        .width(1.dp)
+                        .height(26.dp)
+                        .background(MaterialTheme.colorScheme.outlineVariant),
+                )
+            }
+        }
+        Spacer(modifier = Modifier.width(Spacing.sm))
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .padding(bottom = if (isLast) 0.dp else Spacing.sm),
+        ) {
+            Text(
+                text = step.title,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Medium,
+            )
+            step.detail?.let {
+                Text(
+                    text = it,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+// ── S6 · acciones ─────────────────────────────────────────────────────────────
+
+@Composable
+private fun DetailActionsBar(
     expense: ExpenseResponseDto,
     onApprove: () -> Unit,
     onReject: () -> Unit,
@@ -291,58 +602,113 @@ private fun DetailActions(
     onCancel: () -> Unit,
     onEdit: () -> Unit,
 ) {
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+    Surface(
+        color = MaterialTheme.colorScheme.surface,
+        contentColor = MaterialTheme.colorScheme.onSurface,
     ) {
-        if (expense.canApprove) {
-            Button(
-                onClick = onApprove,
-                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
-            ) {
-                Text("Aprobar")
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = Spacing.lg, vertical = Spacing.md),
+            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+        ) {
+            when {
+                expense.canApprove || expense.canReject -> {
+                    Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                        if (expense.canReject) {
+                            OutlinedButton(
+                                onClick = onReject,
+                                modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                                shape = MaterialTheme.shapes.medium,
+                            ) {
+                                Text("Rechazar")
+                            }
+                        }
+                        if (expense.canApprove) {
+                            Button(
+                                onClick = onApprove,
+                                modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                                shape = MaterialTheme.shapes.medium,
+                            ) {
+                                Text("Aprobar")
+                            }
+                        }
+                    }
+                    Text(
+                        text = "Solo la contraparte puede aprobar o rechazar mientras siga pendiente.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+
+                expense.canMarkPaid -> Button(
+                    onClick = onPay,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                    shape = MaterialTheme.shapes.medium,
+                ) {
+                    Text("Marcar como pagado")
+                }
+
+                expense.canEdit || expense.canCancel -> Row(
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                ) {
+                    if (expense.canEdit) {
+                        OutlinedButton(
+                            onClick = onEdit,
+                            modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                            shape = MaterialTheme.shapes.medium,
+                        ) {
+                            Text("Editar")
+                        }
+                    }
+                    if (expense.canCancel) {
+                        OutlinedButton(
+                            onClick = onCancel,
+                            modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                            shape = MaterialTheme.shapes.medium,
+                        ) {
+                            Text("Cancelar")
+                        }
+                    }
+                }
+
+                expense.isTerminal -> Text(
+                    text = "Este gasto está cerrado y no admite más acciones.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth(),
+                )
             }
         }
-        if (expense.canReject) {
-            OutlinedButton(
-                onClick = onReject,
-                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
-            ) {
-                Text("Rechazar")
+    }
+}
+
+// ── compartidos ───────────────────────────────────────────────────────────────
+
+@Composable
+private fun SectionCard(
+    title: String?,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+    ) {
+        Column(modifier = Modifier.padding(Spacing.md)) {
+            if (title != null) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Spacer(modifier = Modifier.height(Spacing.sm))
             }
-        }
-        if (expense.canMarkPaid) {
-            Button(
-                onClick = onPay,
-                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
-            ) {
-                Text("Marcar pagado")
-            }
-        }
-        if (expense.canEdit) {
-            OutlinedButton(
-                onClick = onEdit,
-                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
-            ) {
-                Text("Editar")
-            }
-        }
-        if (expense.canCancel) {
-            OutlinedButton(
-                onClick = onCancel,
-                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
-            ) {
-                Text("Cancelar")
-            }
-        }
-        if (expense.isTerminal) {
-            Text(
-                text = "Este gasto está cerrado y no admite más acciones.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth(),
-            )
+            content()
         }
     }
 }
@@ -398,7 +764,7 @@ private fun EditExpenseDialog(
         text = {
             Column(
                 modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(Spacing.sm),
             ) {
                 TextField(
                     value = concept,
@@ -412,13 +778,10 @@ private fun EditExpenseDialog(
                     label = { Text("Monto") },
                     modifier = Modifier.fillMaxWidth(),
                 )
-                // La categoría se MUESTRA pero no se edita aquí: pedir un UUID
-                // escrito a mano no es una interfaz, es una invitinga a escribir
-                // basura. El selector de categoría (una sola taxonomía, R2) llega
-                // con el formulario de alta de T27 y se reutiliza en las dos
-                // superficies.
+                // La categoría se MUESTRA pero no se edita aquí: pedir un UUID a mano no es
+                // una interfaz. El selector de la alta (una sola taxonomía, R2) es el dueño.
                 Text(
-                    "Categoría: ${expense.categoryName ?: "—"}",
+                    "Categoría: ${expense.categoryName}",
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -436,7 +799,7 @@ private fun EditExpenseDialog(
                 )
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
                 ) {
                     TextField(
                         value = splitPayer,
@@ -444,8 +807,7 @@ private fun EditExpenseDialog(
                         label = { Text("% pagador") },
                         modifier = Modifier.weight(1f),
                     )
-                    // La contraparte la DERIVA el servidor: no es un campo que
-                    // el usuario pueda mandar.
+                    // La contraparte la DERIVA el servidor: no es un campo que el usuario mande.
                     Text(
                         "La otra parte: ${expense.splitRatioOther}%",
                         style = MaterialTheme.typography.bodyMedium,
@@ -464,7 +826,7 @@ private fun EditExpenseDialog(
                             expenseDate = expenseDate.takeIf { it != expense.expenseDate },
                             description = description.takeIf { it != (expense.description ?: "") },
                             splitRatioPayer = splitPayer.toIntOrNull()?.takeIf { it != expense.splitRatioPayer },
-                        )
+                        ),
                     )
                 },
             ) {
@@ -497,13 +859,13 @@ private fun DetailErrorState(
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(24.dp),
+            .padding(Spacing.xl),
         color = MaterialTheme.colorScheme.errorContainer,
         contentColor = MaterialTheme.colorScheme.onErrorContainer,
         shape = MaterialTheme.shapes.large,
     ) {
         Column(
-            modifier = Modifier.padding(24.dp),
+            modifier = Modifier.padding(Spacing.xl),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text(
@@ -511,19 +873,23 @@ private fun DetailErrorState(
                 style = MaterialTheme.typography.bodyLarge,
                 textAlign = TextAlign.Center,
             )
-            Spacer(modifier = Modifier.height(16.dp))
-            Button(
-                onClick = onRetry,
-                modifier = Modifier.heightIn(min = 48.dp),
-            ) {
+            Spacer(modifier = Modifier.height(Spacing.lg))
+            Button(onClick = onRetry, modifier = Modifier.heightIn(min = 48.dp)) {
                 Text("Reintentar")
             }
         }
     }
 }
 
-private fun formatShortDateString(isoOrDate: String): String {
-    return runCatching {
-        kotlinx.datetime.LocalDate.parse(isoOrDate)
-    }.getOrNull()?.let { formatShortDate(it) } ?: isoOrDate
+private fun ExpenseStatus.toTokenStatus(): StatusTokens.Status = when (this) {
+    ExpenseStatus.PENDING -> StatusTokens.Status.InProgress
+    ExpenseStatus.APPROVED -> StatusTokens.Status.Done
+    ExpenseStatus.PAID -> StatusTokens.Status.Paid
+    ExpenseStatus.REJECTED -> StatusTokens.Status.Rejected
 }
+
+private fun formatShortDateString(isoOrDate: String): String =
+    runCatching { LocalDate.parse(isoOrDate) }
+        .getOrNull()
+        ?.let { formatShortDate(it) }
+        ?: isoOrDate

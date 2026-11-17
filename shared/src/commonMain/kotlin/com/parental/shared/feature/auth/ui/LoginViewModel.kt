@@ -55,7 +55,7 @@ class LoginViewModel(
                 .onFailure { e ->
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
-                        error = e.message ?: "Login failed",
+                        error = e.message?.ifBlank { "Login failed" } ?: "Login failed",
                     )
                 }
         }

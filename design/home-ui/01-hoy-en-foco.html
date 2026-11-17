@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Inicio · Dirección 01 — Hoy, en foco</title>
+<style>
+  /* Tokens = design/system.md. Claro y oscuro salen de LightColorScheme / DarkColorScheme
+     en Color.kt; no hay un hex nuevo en este artboard. */
+  :root {
+    color-scheme: light;
+
+    --primary: #00696D; --on-primary: #FFFFFF;
+    --primary-container: #9CF1F6; --on-primary-container: #002022;
+    --secondary: #4A6365; --secondary-container: #CCE8EA; --on-secondary-container: #051F21;
+    --on-surface: #191C1D; --on-surface-variant: #3F4849;
+    --outline: #6F797A; --error: #BA1A1A; --badge-fg: #FFFFFF;
+
+    /* Roles de superficie: en claro la pantalla es surfaceVariant y la tarjeta surface;
+       en oscuro se invierte para que la tarjeta siga siendo el plano más cercano. */
+    --stage: #E4ECEC;
+    --screen: #DAE4E5;
+    --card: #FAFDFC;
+    --track: #DAE4E5;
+    --divider: #BEC8C9;
+
+    --salud-dot: #D81B60; --recreacion-dot: #F4511E;
+    --asignada-text: #1565C0; --asignada-bg: rgba(30,136,229,.15);
+    --creada-text: #616161; --creada-bg: rgba(117,117,117,.15);
+    --vencida: #C62828;
+    --ok-text: #2E7D32; --bond-bg: #E8F5E9; --bond-border: #C8E6C9;
+
+    --hover: rgba(0,105,109,.05);
+    --hover-strong: rgba(0,105,109,.10);
+    --phone-shadow: 0 8px 32px rgba(0,32,34,.18);
+    --card-hover-shadow: 0 2px 8px rgba(0,32,34,.10);
+
+    --serif: Georgia, 'Times New Roman', serif;
+    --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    --mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  }
+
+  [data-theme="dark"] {
+    color-scheme: dark;
+
+    --primary: #80D4D9; --on-primary: #00373A;
+    --primary-container: #004F53; --on-primary-container: #9CF1F6;
+    --secondary: #B0CCCE; --secondary-container: #334D4F; --on-secondary-container: #CCE8EA;
+    --on-surface: #E0E3E3; --on-surface-variant: #BEC8C9;
+    --outline: #899294; --error: #FFB4AB; --badge-fg: #690005;
+
+    --stage: #0A0E0F;
+    --screen: #101415;
+    --card: #3F4849;
+    --track: rgba(224,227,227,.22);
+    --divider: rgba(190,200,201,.22);
+
+    --asignada-text: #BBDEFB; --asignada-bg: rgba(30,136,229,.22);
+    --creada-text: #E0E0E0; --creada-bg: rgba(158,158,158,.20);
+    --vencida: #FFCDD2;
+    --ok-text: #C8E6C9; --bond-bg: #1B5E20; --bond-border: #2E7D32;
+
+    --hover: rgba(128,212,217,.08);
+    --hover-strong: rgba(128,212,217,.14);
+    --phone-shadow: 0 8px 32px rgba(0,0,0,.55);
+    --card-hover-shadow: 0 2px 8px rgba(0,0,0,.45);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: var(--sans); background: var(--stage); color: var(--on-surface); min-height: 100vh; padding: 24px 0; transition: background 150ms; }
+  .stage { display: flex; gap: 40px; justify-content: center; align-items: flex-start; flex-wrap: wrap; padding: 0 24px; }
+
+  .frame-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 390px; margin-bottom: 8px; }
+  .frame-label { font-size: 11px; font-weight: 500; font-variant: small-caps; letter-spacing: .5px; color: var(--on-surface-variant); }
+  .frame-note { font-size: 12px; color: var(--on-surface-variant); max-width: 390px; margin-top: 10px; line-height: 1.55; }
+
+  /* El interruptor de tema es andamiaje de revisión, no parte de la pantalla. */
+  .theme-toggle { display: inline-flex; align-items: center; gap: 6px; }
+  .theme-toggle svg { width: 16px; height: 16px; color: var(--outline); flex: none; }
+  .theme-toggle svg.on { color: var(--primary); }
+  .theme-toggle .switch { width: 44px; height: 24px; min-height: 24px; border-radius: 12px; border: 1px solid var(--divider); background: var(--track); position: relative; cursor: pointer; padding: 0; flex: none; }
+  .theme-toggle .switch .knob { position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%; background: var(--card); box-shadow: 0 1px 2px rgba(0,0,0,.28); }
+  .theme-toggle .switch[aria-checked="true"] { background: var(--primary-container); border-color: var(--primary); }
+  .theme-toggle .switch[aria-checked="true"] .knob { transform: translateX(20px); background: var(--on-primary-container); }
+  @media (prefers-reduced-motion: no-preference) { .theme-toggle .switch .knob { transition: transform 150ms, background 150ms; } }
+
+  .phone { width: 390px; height: 844px; background: var(--screen); color: var(--on-surface); display: flex; flex-direction: column; border-radius: 24px; overflow: hidden; box-shadow: var(--phone-shadow); }
+  button { font-family: inherit; }
+  :focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 4px; }
+  @media (prefers-reduced-motion: no-preference) {
+    .day, .stat, .chip, .icon-btn, .text-btn { transition: background 150ms, box-shadow 150ms; }
+  }
+
+  /* ── Chrome global (AppTopBar / BottomNavBar, sin cambios) ── */
+  .topbar { background: var(--card); display: flex; align-items: center; height: 56px; padding: 0 8px 0 16px; flex: none; border-bottom: 1px solid var(--divider); }
+  .topbar h1 { font-size: 18px; font-weight: 500; flex: 1; white-space: nowrap; }
+  .icon-btn { width: 44px; height: 44px; border: 0; background: transparent; border-radius: 50%; display: grid; place-items: center; cursor: pointer; color: var(--on-surface-variant); position: relative; flex: none; }
+  .icon-btn:hover { background: var(--hover); }
+  .badge { position: absolute; top: 6px; right: 6px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: var(--error); color: var(--badge-fg); font-size: 10px; font-weight: 700; display: grid; place-items: center; }
+
+  .feed { flex: 1; overflow-y: auto; padding: 20px 16px 24px; display: flex; flex-direction: column; gap: 16px; scrollbar-width: none; }
+  .feed::-webkit-scrollbar { display: none; }
+  .feed > * { flex: none; }
+
+  .navbar { flex: none; display: flex; border-top: 1px solid var(--divider); background: var(--card); }
+  .nav-item { flex: 1; border: 0; background: none; padding: 8px 0 12px; font-size: 12px; color: var(--on-surface-variant); cursor: pointer; }
+  .nav-item svg { display: block; margin: 0 auto 2px; }
+  .nav-item .pill { display: inline-block; padding: 3px 16px; border-radius: 16px; }
+  .nav-item[aria-current="page"] { color: var(--primary); font-weight: 600; }
+  .nav-item[aria-current="page"] .pill { background: var(--primary-container); }
+
+  /* ── Átomos ── */
+  .eyebrow { font-size: 11px; font-weight: 500; font-variant: small-caps; letter-spacing: .5px; color: var(--on-surface-variant); }
+  .text-btn { border: 0; background: none; color: var(--primary); font-size: 12px; font-weight: 500; padding: 6px 8px; border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; min-height: 32px; }
+  .text-btn:hover { background: var(--hover); }
+
+  /* ── Saludo ── */
+  .greeting { display: flex; align-items: flex-start; gap: 12px; }
+  .greeting .block { flex: 1; min-width: 0; }
+  .greeting h2 { font-family: var(--serif); font-size: 28px; font-weight: 400; line-height: 36px; margin-top: 2px; }
+  .bond { display: inline-flex; align-items: center; gap: 6px; border-radius: 12px; padding: 4px 10px; font-size: 11px; font-weight: 500; color: var(--ok-text); background: var(--bond-bg); border: 1px solid var(--bond-border); flex: none; margin-top: 18px; white-space: nowrap; }
+  .bond i { width: 6px; height: 6px; border-radius: 50%; background: var(--ok-text); }
+
+  /* ── Tarjeta HOY: toda la tarjeta es el objetivo, sin chevron ── */
+  .card { background: var(--card); border: 1px solid var(--divider); border-radius: 16px; }
+  .day { display: block; width: 100%; text-align: left; padding: 14px 12px 8px; cursor: pointer; color: inherit; font: inherit; }
+  .day:hover { box-shadow: var(--card-hover-shadow); background: var(--hover); }
+  .day:active { background: var(--hover-strong); }
+  .day-head { display: flex; align-items: center; gap: 8px; padding: 0 4px 6px; }
+  .day-head .count { font-size: 12px; color: var(--on-surface-variant); flex: 1; }
+  .day-row { display: grid; grid-template-columns: 40px 1fr; column-gap: 10px; align-items: start; padding: 10px 4px; }
+  .day-row + .day-row { border-top: 1px solid var(--divider); }
+  .time { font-family: var(--mono); font-size: 12px; font-weight: 500; letter-spacing: .5px; color: var(--on-surface-variant); padding-top: 4px; }
+  .cat-dot { width: 14px; height: 14px; border-radius: 50%; flex: none; }
+  .day-row .main { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+  .day-row .meta { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--on-surface-variant); }
+  .day-row .meta .cat-dot { width: 8px; height: 8px; }
+  .day-row .meta .tag { margin-left: auto; }
+  .day-row .title { display: block; font-size: 16px; font-weight: 500; line-height: 22px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tag { display: inline-flex; align-items: center; gap: 6px; border-radius: 12px; padding: 3px 8px; font-size: 11px; font-weight: 500; flex: none; }
+  .tag i { width: 6px; height: 6px; border-radius: 50%; }
+  .tag.assigned { color: var(--asignada-text); background: var(--asignada-bg); }
+  .tag.assigned i { background: #1E88E5; }
+  .tag.created { color: var(--creada-text); background: var(--creada-bg); }
+  .tag.created i { background: #757575; }
+  .day-foot { display: flex; align-items: center; gap: 4px; padding: 8px 4px 4px; border-top: 1px solid var(--divider); margin-top: 4px; }
+  .day-foot .more { font-size: 12px; color: var(--on-surface-variant); flex: 1; }
+
+  /* ── Franja de métricas: cada celda es una tarjeta pulsable ── */
+  .stats { display: grid; grid-template-columns: 1fr 1fr 1.4fr; background: var(--card); border: 1px solid var(--divider); border-radius: 12px; overflow: hidden; }
+  .stat { border: 0; background: none; text-align: left; padding: 10px 12px; cursor: pointer; color: inherit; min-height: 70px; display: flex; flex-direction: column; justify-content: center; gap: 1px; }
+  .stat + .stat { border-left: 1px solid var(--divider); }
+  .stat:hover, .stat:focus-visible { background: var(--hover); box-shadow: inset 0 0 0 2px var(--primary); }
+  .stat:active { background: var(--hover-strong); }
+  .stat .label { font-size: 11px; font-weight: 500; font-variant: small-caps; letter-spacing: .5px; color: var(--on-surface-variant); white-space: nowrap; }
+  .stat .value { font-family: var(--serif); font-size: 23px; font-weight: 600; line-height: 28px; white-space: nowrap; }
+  .stat .value.alert { color: var(--vencida); }
+  .stat .value.ok { color: var(--ok-text); }
+  .stat .value.money { font-size: 18px; }
+
+  /* ── Cumplimiento ── */
+  .compliance { padding: 16px; }
+  .comp-head { display: flex; align-items: baseline; gap: 8px; }
+  .comp-head h3 { font-size: 16px; font-weight: 600; }
+  .comp-head .period { font-size: 12px; color: var(--on-surface-variant); flex: 1; }
+  .comp-body { display: flex; align-items: flex-end; gap: 12px; margin-top: 10px; }
+  .comp-value { font-family: var(--serif); font-size: 36px; font-weight: 600; line-height: 40px; flex: none; }
+  .comp-meta { font-size: 12px; color: var(--on-surface-variant); line-height: 18px; padding-bottom: 3px; }
+  .comp-meta b { color: var(--on-surface); font-weight: 600; }
+  .segments { display: grid; grid-template-columns: repeat(12, 1fr); gap: 3px; margin-top: 12px; }
+  .segments span { height: 8px; border-radius: 4px; background: var(--track); }
+  .segments span.on { background: var(--primary); }
+  .member-row { display: flex; align-items: center; gap: 10px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--divider); }
+  .member-row .name { font-size: 14px; font-weight: 500; flex: none; }
+  .member-row .bar { flex: 1; height: 4px; border-radius: 2px; background: var(--track); overflow: hidden; }
+  .member-row .bar span { display: block; height: 100%; background: var(--secondary); border-radius: 2px; }
+  .member-row .pct { font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; flex: none; }
+
+  /* ── Hijos ── */
+  .section-head { display: flex; align-items: baseline; gap: 8px; }
+  .section-head h2 { font-size: 16px; font-weight: 600; flex: 1; }
+  .roster { display: flex; gap: 8px; margin-top: 8px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
+  .roster::-webkit-scrollbar { display: none; }
+  .chip { display: flex; align-items: center; gap: 10px; padding: 8px 14px 8px 8px; border-radius: 12px; border: 1px solid var(--divider); background: var(--card); cursor: pointer; min-height: 56px; flex: none; text-align: left; color: inherit; }
+  .chip:hover { box-shadow: var(--card-hover-shadow); background: var(--hover); }
+  .avatar { width: 40px; height: 40px; border-radius: 50%; background: var(--primary-container); color: var(--on-primary-container); display: grid; place-items: center; font-size: 16px; font-weight: 600; flex: none; }
+  .chip .who { display: flex; flex-direction: column; gap: 1px; }
+  .chip .who b { font-size: 14px; font-weight: 500; }
+  .chip .who small { font-size: 11px; color: var(--on-surface-variant); }
+  .chip .who small.alert { color: var(--vencida); font-weight: 500; }
+</style>
+</head>
+<body>
+<div class="stage">
+
+  <section class="frame" aria-label="Inicio: Hoy, en foco">
+    <div class="frame-head">
+      <p class="frame-label">01 · Hoy, en foco</p>
+      <div class="theme-toggle">
+        <svg class="sun" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 7a5 5 0 1 0 0 10 5 5 0 0 0 0-10zm-1-5v2a1 1 0 1 0 2 0V2a1 1 0 1 0-2 0zm0 18v2a1 1 0 1 0 2 0v-2a1 1 0 1 0-2 0zM2 11a1 1 0 1 0 0 2h2a1 1 0 1 0 0-2H2zm18 0a1 1 0 1 0 0 2h2a1 1 0 1 0 0-2h-2zM4.6 5.99a1 1 0 0 0 1.4 1.42l1.06-1.06A1 1 0 0 0 5.65 4.93L4.6 5.99zm12.37 12.37a1 1 0 0 0 1.4 1.42l1.07-1.06a1 1 0 0 0-1.42-1.42l-1.05 1.06zm2.47-12.37-1.06 1.06a1 1 0 0 0 1.42 1.42l1.06-1.06a1 1 0 0 0-1.42-1.42zM7.05 18.36l-1.06 1.06a1 1 0 0 0 1.42 1.42l1.06-1.06a1 1 0 0 0-1.42-1.42z"/></svg>
+        <button type="button" class="switch" role="switch" aria-checked="false" aria-label="Tema oscuro">
+          <span class="knob" aria-hidden="true"></span>
+        </button>
+        <svg class="moon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 3a9 9 0 1 0 9 9c0-.46-.04-.92-.1-1.36A6.4 6.4 0 0 1 12 3z"/></svg>
+      </div>
+    </div>
+
+    <div class="phone">
+      <header class="topbar">
+        <h1>Coordinación Parental</h1>
+        <button class="icon-btn" aria-label="Notificaciones: 2 sin leer">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 22a2 2 0 0 0 2-2h-4a2 2 0 0 0 2 2zm6-6V11c0-3.07-1.63-5.64-4.5-6.32V4a1.5 1.5 0 0 0-3 0v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></svg>
+          <span class="badge" aria-hidden="true">2</span>
+        </button>
+        <button class="icon-btn" aria-label="Cerrar sesión">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/></svg>
+        </button>
+      </header>
+
+      <main class="feed">
+        <div class="greeting">
+          <div class="block">
+            <p class="eyebrow">Martes 3 de noviembre</p>
+            <h2>Hola, Ángelo</h2>
+          </div>
+          <span class="bond"><i aria-hidden="true"></i>Vínculo activo</span>
+        </div>
+
+        <button class="card day" aria-label="Hoy, 3 actividades. 08:30 Control pediátrico de Tomás, Salud, asignada. 17:00 Fútbol de Emma, Recreación, creada. Abrir la agenda del día">
+          <span class="day-head">
+            <span class="eyebrow">Hoy</span>
+            <span class="count">3 actividades</span>
+          </span>
+
+          <span class="day-row">
+            <span class="time">08:30</span>
+            <span class="main">
+              <span class="title">Control pediátrico de Tomás</span>
+              <span class="meta">
+                <span class="cat-dot" style="background:var(--salud-dot)" aria-hidden="true"></span>Salud
+                <span class="tag assigned"><i aria-hidden="true"></i>Asignada</span>
+              </span>
+            </span>
+          </span>
+
+          <span class="day-row">
+            <span class="time">17:00</span>
+            <span class="main">
+              <span class="title">Fútbol de Emma</span>
+              <span class="meta">
+                <span class="cat-dot" style="background:var(--recreacion-dot)" aria-hidden="true"></span>Recreación
+                <span class="tag created"><i aria-hidden="true"></i>Creada</span>
+              </span>
+            </span>
+          </span>
+
+          <span class="day-foot">
+            <span class="more">1 actividad más hoy</span>
+          </span>
+        </button>
+
+        <div class="stats" role="group" aria-label="Resumen del vínculo">
+          <button class="stat" aria-label="Asignadas a vos: 2. Abrir Actividades filtradas por asignadas a vos">
+            <span class="label">Asignadas</span>
+            <span class="value">2</span>
+          </button>
+          <button class="stat" aria-label="Vencidas: 1. Abrir Actividades filtradas por vencidas">
+            <span class="label">Vencidas</span>
+            <span class="value alert">1</span>
+          </button>
+          <button class="stat" aria-label="Saldo de gastos a favor: 1.250 pesos con 00. Abrir Gastos">
+            <span class="label">Saldo gastos</span>
+            <span class="value ok money">$1.250,00</span>
+          </button>
+        </div>
+
+        <section class="card compliance" aria-labelledby="comp-title">
+          <div class="comp-head">
+            <h3 id="comp-title">Cumplimiento</h3>
+            <span class="period">Noviembre</span>
+            <button class="text-btn" aria-label="Ver el detalle del mes">Detalle</button>
+          </div>
+
+          <div class="comp-body">
+            <span class="comp-value">66,7%</span>
+            <span class="comp-meta"><b>8 de 12</b> tareas cumplidas</span>
+          </div>
+
+          <div class="segments" role="img" aria-label="Cumplimiento de Ángelo: 8 de 12 tareas cumplidas">
+            <span class="on"></span><span class="on"></span><span class="on"></span><span class="on"></span>
+            <span class="on"></span><span class="on"></span><span class="on"></span><span class="on"></span>
+            <span></span><span></span><span></span><span></span>
+          </div>
+
+          <div class="member-row">
+            <span class="name">Mariana</span>
+            <span class="bar" aria-hidden="true"><span style="width:91.7%"></span></span>
+            <span class="pct">91,7%</span>
+          </div>
+        </section>
+
+        <section aria-labelledby="fam-title">
+          <div class="section-head">
+            <h2 id="fam-title">Hijos</h2>
+            <button class="text-btn">Ver todos</button>
+          </div>
+          <div class="roster">
+            <button class="chip" aria-label="Emma: 1 tarea vencida">
+              <span class="avatar" aria-hidden="true">E</span>
+              <span class="who"><b>Emma</b><small class="alert">1 vencida</small></span>
+            </button>
+            <button class="chip" aria-label="Tomás: al día">
+              <span class="avatar" aria-hidden="true">T</span>
+              <span class="who"><b>Tomás</b><small>Al día</small></span>
+            </button>
+          </div>
+        </section>
+      </main>
+
+      <nav class="navbar" aria-label="Navegación principal">
+        <button class="nav-item" aria-current="page"><span class="pill"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg></span>Inicio</button>
+        <button class="nav-item"><span class="pill"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M19 4h-1V2h-2v2H8V2H6v2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2zm0 16H5V10h14v10zM5 8V6h14v2H5z"/></svg></span>Actividades</button>
+        <button class="nav-item"><span class="pill"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M21 18v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v1h-9a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h9zm-9-2h10V8H12v8zm4-2.5a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z"/></svg></span>Gastos</button>
+        <button class="nav-item"><span class="pill"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16 11c1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3 1.34 3 3 3zm-8 0c1.66 0 3-1.34 3-3S9.66 5 8 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg></span>Terceros</button>
+      </nav>
+    </div>
+
+    <p class="frame-note">
+      El inicio responde una sola pregunta: <strong>¿qué pasa hoy?</strong> La agenda del día es el
+      primer bloque y <strong>toda la tarjeta es el objetivo</strong>: sin chevron, con elevación y
+      fondo al pasar el puntero. Las tres métricas se funden en una franja de una sola superficie y
+      cada celda es una tarjeta pulsable que abre su destino (<strong>Asignadas</strong> y
+      <strong>Vencidas</strong> → Actividades ya filtrada; <strong>Saldo gastos</strong> → Gastos).
+      El cumplimiento se comprime a un número grande con barra de 12 segmentos y el vínculo sube al
+      saludo porque es salud global, no un detalle del mes. El tema sigue al sistema y el interruptor sol/luna lo sobrescribe.
+    </p>
+  </section>
+
+</div>
+
+<script>
+  (function () {
+    var root = document.documentElement;
+    var sw = document.querySelector('.theme-toggle .switch');
+    var sun = document.querySelector('.theme-toggle .sun');
+    var moon = document.querySelector('.theme-toggle .moon');
+    var media = window.matchMedia('(prefers-color-scheme: dark)');
+    var choice = 'system';
+
+    function isDark() {
+      return choice === 'system' ? media.matches : choice === 'dark';
+    }
+
+    function apply() {
+      var dark = isDark();
+      root.setAttribute('data-theme', dark ? 'dark' : 'light');
+      sw.setAttribute('aria-checked', String(dark));
+      sun.classList.toggle('on', !dark);
+      moon.classList.toggle('on', dark);
+      if (typeof window.__afterTheme === 'function') window.__afterTheme();
+    }
+
+    sw.addEventListener('click', function () {
+      choice = isDark() ? 'light' : 'dark';
+      apply();
+    });
+
+    if (media.addEventListener) media.addEventListener('change', function () { if (choice === 'system') apply(); });
+    apply();
+  })();
+</script>
+</body>
+</html>

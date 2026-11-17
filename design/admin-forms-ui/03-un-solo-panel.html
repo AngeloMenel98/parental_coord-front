@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Admin — Un solo panel (3 pasos)</title>
+<style>
+  :root{
+    --primary:#00696D;--on-primary:#FFFFFF;--primary-container:#9CF1F6;--on-primary-container:#002022;
+    --secondary:#4A6365;--secondary-container:#CCE8EA;--on-secondary-container:#051F21;
+    --surface:#FAFDFC;--on-surface:#191C1D;--surface-variant:#DAE4E5;--on-surface-variant:#3F4849;
+    --outline:#6F797A;--outline-variant:#BEC8C9;--error:#BA1A1A;--error-container:#FFDAD6;
+    --done:#43A047;--overdue:#E53935;--assigned:#1E88E5;--verify:#B26A00;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    --serif:Georgia,"Times New Roman",Times,serif;
+    --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+    --r4:4px;--r8:8px;--r12:12px;--r16:16px;--r24:24px;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--surface-variant);font-family:var(--sans);color:var(--on-surface);-webkit-font-smoothing:antialiased}
+  .board{display:flex;gap:24px;padding:28px 24px;align-items:flex-start}
+  .caption{position:absolute;left:24px;top:6px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--on-surface-variant)}
+  .phone{width:390px;height:844px;background:var(--surface);border-radius:var(--r24);overflow:hidden;
+    box-shadow:0 1px 2px rgba(0,0,0,.08),0 12px 32px rgba(0,0,0,.10);display:flex;flex-direction:column;position:relative}
+  .topbar{display:flex;align-items:center;justify-content:space-between;padding:14px 16px 12px;border-bottom:1px solid var(--outline-variant)}
+  .topbar h1{margin:0;font-family:var(--serif);font-size:20px;line-height:28px;font-weight:600}
+  .avatar{width:32px;height:32px;border-radius:var(--r24);background:var(--primary-container);color:var(--on-primary-container);
+    display:grid;place-items:center;font-size:11px;font-weight:600}
+  .seg{display:flex;gap:4px;padding:8px 16px;border-bottom:1px solid var(--outline-variant)}
+  .seg button{flex:1;font:inherit;font-size:13px;line-height:20px;font-weight:500;padding:8px 0;border:0;border-radius:var(--r24);
+    background:transparent;color:var(--on-surface-variant);cursor:pointer}
+  .seg button[aria-selected="true"]{background:var(--secondary-container);color:var(--on-secondary-container)}
+  /* F7 · 16px de padding + 12px de colchón: el CTA queda abajo, por encima de la barra del sistema. */
+  .content{flex:1;overflow:hidden;padding:16px 16px 28px;display:flex;flex-direction:column;gap:10px}
+  /* stepper */
+  .steps{display:flex;align-items:center;gap:6px;font-size:10px;letter-spacing:.05em;text-transform:uppercase;
+    color:var(--on-surface-variant)}
+  .steps i{width:20px;height:20px;border-radius:50%;display:grid;place-items:center;font-style:normal;font-weight:600;
+    background:var(--surface-variant);color:var(--on-surface-variant);flex:none}
+  .steps i.on{background:var(--primary);color:var(--on-primary)}
+  .steps i.done{background:var(--primary-container);color:var(--on-primary-container)}
+  .steps .bar{flex:1;height:2px;background:var(--outline-variant)}
+  .steps .now{color:var(--on-surface);font-weight:600}
+  .label{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--on-surface-variant)}
+  .field{display:grid;gap:4px}
+  .field > span{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--on-surface-variant)}
+  .box{border:1px solid var(--outline);border-radius:var(--r12);padding:11px 12px;font-size:14px}
+  .box.invalid{border-color:var(--error);background:var(--error-container)}
+  .box.combo{display:flex;align-items:center;justify-content:space-between;border-color:var(--primary)}
+  .errtxt{font-size:11px;color:var(--error);line-height:16px}
+  .helptxt{font-size:11px;color:var(--on-surface-variant);line-height:16px}
+  .cta{font:inherit;font-size:14px;font-weight:500;padding:14px;border:0;border-radius:var(--r12);background:var(--primary);
+    color:var(--on-primary);text-align:center;cursor:pointer}
+  .cta[aria-disabled="true"]{background:var(--surface-variant);color:var(--outline);cursor:not-allowed}
+  .ghost{font:inherit;font-size:13px;padding:9px 12px;border-radius:var(--r12);border:1px solid var(--outline);
+    background:transparent;color:var(--on-surface);cursor:pointer;text-align:center}
+  .scrim{position:absolute;inset:0;background:rgba(25,28,29,.32)}
+  .sheet{position:absolute;left:0;right:0;bottom:0;background:var(--surface);border-radius:var(--r24) var(--r24) 0 0;
+    padding:10px 16px 16px;display:grid;gap:10px;box-shadow:0 -8px 24px rgba(0,0,0,.16)}
+  .grab{width:36px;height:4px;border-radius:var(--r4);background:var(--outline-variant);margin:0 auto 2px}
+  .sheet h2{margin:0;font-family:var(--serif);font-size:20px;line-height:26px;font-weight:600}
+  .chips{display:flex;flex-wrap:wrap;gap:6px}
+  .chip{display:inline-flex;align-items:center;gap:6px;padding:4px 8px 4px 4px;border-radius:var(--r24);background:var(--surface-variant);
+    font-size:12px;line-height:16px}
+  .chip .av{width:20px;height:20px;border-radius:50%;background:var(--primary);color:var(--on-primary);display:grid;place-items:center;
+    font-size:9px;font-weight:600}
+  .chip .x{color:var(--on-surface-variant);font-size:12px}
+  .results{border:1px solid var(--outline-variant);border-radius:var(--r12);overflow:hidden}
+  .opt{display:flex;align-items:center;gap:10px;padding:10px 12px;border-top:1px solid var(--outline-variant);cursor:pointer}
+  .opt:first-child{border-top:0}
+  .opt .av{width:30px;height:30px;border-radius:var(--r24);background:var(--primary-container);color:var(--on-primary-container);
+    display:grid;place-items:center;font-size:11px;font-weight:600;flex:none}
+  .opt .who{display:grid;gap:1px;flex:1}
+  .opt .who b{font-size:13px;font-weight:500}
+  .opt .who span{font-size:11px;color:var(--on-surface-variant)}
+  .opt[aria-disabled="true"]{opacity:.45;cursor:not-allowed}
+  .opt .tag{font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--on-surface-variant)}
+  .opt.action{background:var(--surface-variant)}
+  .opt.action .plus{width:30px;height:30px;border-radius:var(--r24);border:1px dashed var(--outline);display:grid;place-items:center;
+    color:var(--primary);font-size:15px;flex:none}
+  .divider{height:1px;background:var(--outline-variant)}
+  .note{font-size:11px;line-height:16px;color:var(--on-surface-variant)}
+  .count{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--on-surface-variant)}
+  /* children */
+  .child{display:flex;align-items:center;gap:10px;border:1px solid var(--outline-variant);border-radius:var(--r12);padding:10px 12px}
+  .child .who{display:grid;gap:1px;flex:1}
+  .child .who b{font-size:14px;font-weight:500}
+  .child .who span{font-size:11px;color:var(--on-surface-variant)}
+  .child .x{color:var(--on-surface-variant);font-size:13px}
+  .form{border:1px solid var(--outline-variant);border-radius:var(--r12);padding:12px;display:grid;gap:8px}
+  .form .pair{display:flex;gap:8px}
+  .form .pair .field{flex:1}
+  .mini{font:inherit;font-size:12px;font-weight:500;padding:9px 12px;border-radius:var(--r12);border:1px solid var(--outline);
+    background:transparent;color:var(--on-surface);cursor:pointer;text-align:center}
+  .required{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--on-surface-variant)}
+  .required b{color:var(--error);font-weight:600}
+  :focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+</style>
+</head>
+<body>
+<p class="caption">03 · Un solo panel — tres pasos: nombre → progenitores → hijos</p>
+<div class="board">
+
+  <!-- Frame 1 · paso 1: nombre y acuerdo -->
+  <section class="phone" aria-label="Pantalla 1: paso 1 de 3, nombre del vínculo">
+    <header class="topbar">
+      <h1>Crear vínculo</h1>
+      <div class="who"><span class="ghost" style="padding:6px 10px">Cancelar</span></div>
+    </header>
+    <main class="content">
+      <div class="steps" aria-label="Paso 1 de 3">
+        <i class="on">1</i><span class="now">Nombre</span><span class="bar"></span>
+        <i>2</i><span>Progenitores</span><span class="bar"></span>
+        <i>3</i><span>Hijos</span>
+      </div>
+
+      <div class="field">
+        <span>Nombre del vínculo</span>
+        <div class="box">Paz–Gómez</div>
+        <p class="helptext" style="font-size:11px;color:var(--on-surface-variant)">Es el nombre que vas a ver en la lista y en el reporte.</p>
+      </div>
+
+      <div class="field">
+        <span>Tipo de acuerdo</span>
+        <div style="display:flex;gap:8px">
+          <span class="chip" style="background:var(--primary);color:var(--on-primary);padding:8px 14px">Formal</span>
+          <span class="chip" style="background:var(--surface-variant);padding:8px 14px">Informal</span>
+        </div>
+      </div>
+
+      <div style="margin-top:auto;display:grid;gap:8px">
+        <div class="cta" role="button">Siguiente</div>
+      </div>
+    </main>
+  </section>
+
+  <!-- Frame 2 · paso 2: progenitores con combobox -->
+  <section class="phone" aria-label="Pantalla 2: paso 2 de 3, progenitores">
+    <header class="topbar">
+      <h1 style="font-size:18px">Crear vínculo</h1>
+      <div class="who"><span class="ghost" style="padding:6px 10px">Atrás</span></div>
+    </header>
+    <main class="content">
+      <div class="steps" aria-label="Paso 2 de 3">
+        <i class="done">✓</i><span>Nombre</span><span class="bar"></span>
+        <i class="on">2</i><span class="now">Progenitores</span><span class="bar"></span>
+        <i>3</i><span>Hijos</span>
+      </div>
+
+      <!-- El título de la sección se queda: es el paso, no un contador. -->
+      <div style="display:flex;justify-content:space-between;align-items:baseline">
+        <span class="label">Progenitores</span>
+        <span class="count">2 de 2 · obligatorio</span>
+      </div>
+
+      <div class="chips">
+        <span class="chip"><span class="av">MP</span>Mario Paz<span class="x">✕</span></span>
+        <span class="chip"><span class="av">LG</span>Lucía Gómez<span class="x">✕</span></span>
+      </div>
+
+      <div class="field">
+        <div class="box combo"><span style="color:var(--on-surface-variant)">⌕ Buscar por nombre o email</span><span>▾</span></div>
+        <div class="results">
+          <div class="opt" aria-disabled="true">
+            <span class="av">MP</span>
+            <div class="who"><b>Mario Paz</b><span>mario.paz@mail.com</span></div>
+            <span class="tag">Ya está</span>
+          </div>
+          <div class="opt" aria-disabled="true">
+            <span class="av">LG</span>
+            <div class="who"><b>Lucía Gómez</b><span>lucia.gomez@mail.com</span></div>
+            <span class="tag">Ya está</span>
+          </div>
+          <div class="opt">
+            <span class="av">CR</span>
+            <div class="who"><b>Caro Ruiz</b><span>caro.ruiz@mail.com</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-top:auto;display:grid;gap:8px">
+        <div class="cta" role="button">Siguiente: hijos</div>
+      </div>
+    </main>
+  </section>
+
+  <!-- Frame 3 · paso 2, búsqueda sin resultados -->
+  <section class="phone" aria-label="Pantalla 3: paso 2 sin resultados, ofrece crear la cuenta">
+    <header class="topbar">
+      <h1 style="font-size:18px">Crear vínculo</h1>
+      <div class="who"><span class="ghost" style="padding:6px 10px">Atrás</span></div>
+    </header>
+    <main class="content">
+      <div class="steps" aria-label="Paso 2 de 3">
+        <i class="done">✓</i><span>Nombre</span><span class="bar"></span>
+        <i class="on">2</i><span class="now">Progenitores</span><span class="bar"></span>
+        <i>3</i><span>Hijos</span>
+      </div>
+
+      <div style="display:flex;justify-content:space-between;align-items:baseline">
+        <span class="label">Progenitores</span>
+        <span class="count">1 de 2 · obligatorio</span>
+      </div>
+
+      <div class="chips">
+        <span class="chip"><span class="av">MP</span>Mario Paz<span class="x">✕</span></span>
+      </div>
+
+      <div class="field">
+        <div class="box combo"><span>marina</span><span>▾</span></div>
+        <div class="results">
+          <div class="opt" aria-disabled="true" style="opacity:1;cursor:default">
+            <div class="who"><b>Sin resultados</b><span>Nadie coincide con «marina» en nombre ni email.</span></div>
+          </div>
+          <div class="opt action">
+            <span class="plus">+</span>
+            <div class="who"><b>Crear progenitor «marina»</b><span>Pedís nombre, apellido, email y contraseña acá mismo</span></div>
+          </div>
+        </div>
+      </div>
+
+      <p class="note">Falta un progenitor. La cuenta nueva se crea primero y queda elegida en el vínculo.</p>
+
+      <div style="margin-top:auto">
+        <div class="cta" aria-disabled="true" role="button">Siguiente: hijos</div>
+      </div>
+    </main>
+  </section>
+
+  <!-- Frame 4 · paso 3: hijos, mínimo uno -->
+  <section class="phone" aria-label="Pantalla 4: paso 3 de 3, hijos obligatorios">
+    <header class="topbar">
+      <h1 style="font-size:18px">Crear vínculo</h1>
+      <div class="who"><span class="ghost" style="padding:6px 10px">Atrás</span></div>
+    </header>
+    <main class="content">
+      <div class="steps" aria-label="Paso 3 de 3">
+        <i class="done">✓</i><span>Nombre</span><span class="bar"></span>
+        <i class="done">✓</i><span>Progenitores</span><span class="bar"></span>
+        <i class="on">3</i><span class="now">Hijos</span>
+      </div>
+
+      <div style="display:flex;justify-content:space-between;align-items:baseline">
+        <span class="label">Hijos</span>
+        <span class="count">1 cargado</span>
+      </div>
+
+      <div class="child">
+        <div class="who"><b>Mateo Paz</b><span>15/05/2020 · 6 años</span></div>
+        <span class="x" aria-label="Quitar Mateo">✕</span>
+      </div>
+
+      <div class="form">
+        <span class="label">Agregar un hijo</span>
+        <div class="pair">
+          <div class="field"><span>Nombre</span><div class="box">Lucía</div></div>
+          <div class="field"><span>Apellido</span><div class="box">Paz</div></div>
+        </div>
+        <div class="field">
+          <span>Nacimiento</span>
+          <div class="box" style="display:flex;justify-content:space-between;align-items:center">
+            <span>02/09/2022</span><span class="helptxt">Elegir fecha</span>
+          </div>
+        </div>
+        <div class="mini" role="button">+ Agregar hijo</div>
+      </div>
+
+      <p class="required"><b>•</b> El vínculo necesita al menos un hijo. Con cero, el botón de crear queda deshabilitado.</p>
+
+      <div style="margin-top:auto;display:grid;gap:8px">
+        <div class="cta" role="button">Crear vínculo con 1 hijo</div>
+      </div>
+    </main>
+  </section>
+
+</div>
+</body>
+</html>

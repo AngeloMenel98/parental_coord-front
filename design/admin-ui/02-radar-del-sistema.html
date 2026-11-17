@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Admin — Radar del sistema</title>
+<style>
+  :root{
+    --primary:#00696D;--on-primary:#FFFFFF;--primary-container:#9CF1F6;--on-primary-container:#002022;
+    --secondary:#4A6365;--secondary-container:#CCE8EA;--on-secondary-container:#051F21;
+    --surface:#FAFDFC;--on-surface:#191C1D;--surface-variant:#DAE4E5;--on-surface-variant:#3F4849;
+    --outline:#6F797A;--outline-variant:#BEC8C9;--error:#BA1A1A;--error-container:#FFDAD6;
+    --done:#43A047;--overdue:#E53935;--assigned:#1E88E5;--verify:#B26A00;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    --serif:Georgia,"Times New Roman",Times,monospace;
+    --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+    --r4:4px;--r8:8px;--r12:12px;--r16:16px;--r24:24px;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--surface-variant);font-family:var(--sans);color:var(--on-surface);-webkit-font-smoothing:antialiased}
+  .board{display:flex;gap:24px;padding:28px 24px;align-items:flex-start}
+  .caption{position:absolute;left:24px;top:6px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--on-surface-variant)}
+  .phone{width:390px;height:844px;background:var(--surface);border-radius:var(--r24);overflow:hidden;
+    box-shadow:0 1px 2px rgba(0,0,0,.08),0 12px 32px rgba(0,0,0,.10);display:flex;flex-direction:column;position:relative}
+  .topbar{display:flex;align-items:center;justify-content:space-between;padding:14px 16px 12px;border-bottom:1px solid var(--outline-variant)}
+  .topbar h1{margin:0;font-family:var(--serif);font-size:22px;line-height:30px;font-weight:600}
+  .avatar{width:32px;height:32px;border-radius:var(--r24);background:var(--primary-container);color:var(--on-primary-container);
+    display:grid;place-items:center;font-size:11px;font-weight:600}
+  .seg{display:flex;gap:4px;padding:8px 16px;border-bottom:1px solid var(--outline-variant)}
+  .seg button{flex:1;font:inherit;font-size:13px;line-height:20px;font-weight:500;padding:8px 0;border:0;border-radius:var(--r24);
+    background:transparent;color:var(--on-surface-variant);cursor:pointer}
+  .seg button[aria-selected="true"]{background:var(--secondary-container);color:var(--on-secondary-container)}
+  .content{flex:1;overflow:hidden;padding:16px;display:flex;flex-direction:column;gap:12px}
+  /* hero */
+  .hero{display:flex;align-items:center;gap:16px;border:1px solid var(--outline-variant);border-radius:var(--r16);padding:14px}
+  .hero .num{display:grid;gap:2px}
+  .hero .num b{font-family:var(--serif);font-size:36px;line-height:40px;font-weight:600;letter-spacing:-.01em}
+  .hero .num span{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--on-surface-variant)}
+  .hero .num em{font-style:normal;font-size:12px;color:var(--on-surface-variant)}
+  .ring{width:96px;height:96px;flex:none}
+  /* metric grid */
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .metric{border:1px solid var(--outline-variant);border-radius:var(--r12);padding:10px 12px;display:grid;gap:2px}
+  .metric b{font-family:var(--mono);font-size:16px;font-weight:500;letter-spacing:.4px}
+  .metric span{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--on-surface-variant)}
+  .metric small{font-size:11px;color:var(--on-surface-variant)}
+  .delta{font-size:11px;font-weight:500}
+  .delta.up{color:var(--done)}.delta.down{color:var(--overdue)}
+  /* attention */
+  .block{border:1px solid var(--outline-variant);border-radius:var(--r12);overflow:hidden}
+  .block h3{margin:0;padding:10px 12px;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--on-surface-variant);
+    background:var(--surface-variant)}
+  .item{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 12px;border-top:1px solid var(--outline-variant)}
+  .item:first-of-type{border-top:0}
+  .item .t{display:grid;gap:2px}
+  .item .t b{font-size:14px;line-height:20px;font-weight:500}
+  .item .t span{font-size:12px;line-height:16px;color:var(--on-surface-variant)}
+  .chip{display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border-radius:var(--r12);font-size:11px;line-height:16px;font-weight:500}
+  .chip .dot{width:8px;height:8px;border-radius:50%}
+  .chip.ko{background:rgba(229,57,53,.15);color:var(--overdue)}
+  .chip.pend{background:rgba(178,106,0,.15);color:var(--verify)}
+  .chip.ok{background:rgba(67,160,71,.15);color:var(--done)}
+  .chip.info{background:rgba(30,136,229,.15);color:var(--assigned)}
+  /* dense table */
+  .searchrow{display:flex;gap:8px}
+  .searchrow input{flex:1;font:inherit;font-size:13px;padding:10px 12px;border-radius:var(--r12);border:1px solid var(--outline);
+    background:var(--surface);color:var(--on-surface)}
+  .searchrow button{font:inherit;font-size:13px;padding:10px 12px;border-radius:var(--r12);border:1px solid var(--outline);
+    background:transparent;color:var(--on-surface);cursor:pointer}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  thead th{text-align:left;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--on-surface-variant);
+    font-weight:500;padding:6px 0;border-bottom:1px solid var(--outline-variant)}
+  tbody td{padding:10px 0;border-bottom:1px solid var(--outline-variant);vertical-align:middle}
+  tbody td.num{font-family:var(--mono);font-size:12px;letter-spacing:.3px;text-align:right;white-space:nowrap}
+  tbody td .name{display:block;font-weight:500;font-size:13px}
+  tbody td .sub{display:block;font-size:11px;color:var(--on-surface-variant)}
+  .spark{width:56px;height:18px;display:block}
+  /* report */
+  .card{border:1px solid var(--outline-variant);border-radius:var(--r12);padding:12px;display:grid;gap:8px}
+  .card h3{margin:0;font-size:14px;line-height:20px;font-weight:500;display:flex;justify-content:space-between;align-items:baseline}
+  .card h3 small{font-size:11px;font-weight:400;color:var(--on-surface-variant);letter-spacing:.04em}
+  .kv{display:flex;justify-content:space-between;font-size:12px;line-height:16px;color:var(--on-surface-variant)}
+  .kv b{font-family:var(--mono);color:var(--on-surface);font-weight:500}
+  .hbar{display:grid;grid-template-columns:84px 1fr 64px;align-items:center;gap:8px;font-size:11px;color:var(--on-surface-variant)}
+  .hbar .track{height:8px;border-radius:var(--r4);background:var(--surface-variant);overflow:hidden}
+  .hbar .track i{display:block;height:100%;background:var(--primary)}
+  .hbar b{font-family:var(--mono);font-size:11px;text-align:right;color:var(--on-surface);font-weight:500}
+  .primary-cta{font:inherit;font-size:14px;font-weight:500;padding:14px;border:0;border-radius:var(--r12);background:var(--primary);
+    color:var(--on-primary);cursor:pointer}
+  :focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+</style>
+</head>
+<body>
+<p class="caption">02 · Radar del sistema — primero cómo está todo, después el vínculo</p>
+<div class="board">
+
+  <!-- Frame 1: system overview -->
+  <section class="phone" aria-label="Pantalla 1: panorama del sistema">
+    <header class="topbar">
+      <h1>Panorama</h1>
+      <div class="who"><span class="avatar">AM</span></div>
+    </header>
+    <nav class="seg" aria-label="Secciones del panel">
+      <button aria-selected="true">Panorama</button>
+      <button aria-selected="false">Vínculos</button>
+      <button aria-selected="false">Reportes</button>
+    </nav>
+    <main class="content">
+      <div class="hero">
+        <svg class="ring" viewBox="0 0 120 120" role="img" aria-label="11 de 12 vínculos activos, 92 por ciento">
+          <circle cx="60" cy="60" r="48" fill="none" stroke="#DAE4E5" stroke-width="11"/>
+          <circle cx="60" cy="60" r="48" fill="none" stroke="#00696D" stroke-width="11" stroke-linecap="round"
+                  stroke-dasharray="277.4 301.6" transform="rotate(-90 60 60)"/>
+          <text x="60" y="58" text-anchor="middle" font-family="Georgia,serif" font-size="22" fill="#191C1D">92%</text>
+          <text x="60" y="74" text-anchor="middle" font-family="system-ui,sans-serif" font-size="8" fill="#3F4849"
+                letter-spacing="1">ACTIVOS</text>
+        </svg>
+        <div class="num">
+          <b>11 / 12</b>
+          <span>Vínculos activos</span>
+          <em>1 dado de baja este mes</em>
+        </div>
+      </div>
+
+      <div class="grid">
+        <div class="metric"><b>24</b><span>Usuarios</span><small>2 nuevos</small></div>
+        <div class="metric"><b>318</b><span>Actividades junio</span><small><span class="delta up">▲ 12%</span> vs mayo</small></div>
+        <div class="metric"><b>62,00%</b><span>Gastos pagados</span><small><span class="delta down">▼ 4 pts</span> vs mayo</small></div>
+        <div class="metric"><b>2</b><span>Reportes pedidos</span><small>1 en proceso</small></div>
+      </div>
+
+      <section class="block" aria-label="Requiere atención">
+        <h3>Requiere atención</h3>
+        <div class="item">
+          <div class="t"><b>Ruiz–Sosa</b><span>7 actividades vencidas · sin pagos hace 21 días</span></div>
+          <span class="chip ko"><i class="dot" style="background:var(--overdue)"></i>Atrasos</span>
+        </div>
+        <div class="item">
+          <div class="t"><b>Ferreyra–Duarte</b><span>3 hijos sin actividades en junio</span></div>
+          <span class="chip pend"><i class="dot" style="background:var(--verify)"></i>Sin uso</span>
+        </div>
+        <div class="item">
+          <div class="t"><b>Reporte solicitado</b><span>Paz–Gómez · junio · pedido ayer</span></div>
+          <span class="chip info"><i class="dot" style="background:var(--assigned)"></i>En proceso</span>
+        </div>
+      </section>
+    </main>
+  </section>
+
+  <!-- Frame 2: dense bond table -->
+  <section class="phone" aria-label="Pantalla 2: tabla de vínculos">
+    <header class="topbar">
+      <h1 style="font-size:20px">Vínculos</h1>
+      <div class="who"><span class="chip ok"><i class="dot" style="background:var(--done)"></i>11 activos</span></div>
+    </header>
+    <nav class="seg" aria-label="Secciones del panel">
+      <button aria-selected="false">Panorama</button>
+      <button aria-selected="true">Vínculos</button>
+      <button aria-selected="false">Reportes</button>
+    </nav>
+    <main class="content">
+      <div class="searchrow">
+        <input type="search" placeholder="Buscar por progenitor o hijo" aria-label="Buscar vínculos">
+        <button aria-label="Filtros">Filtros</button>
+      </div>
+
+      <table>
+        <thead>
+          <tr><th scope="col">Vínculo</th><th scope="col">Tendencia</th><th scope="col" style="text-align:right">Cumpl.</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="name">Paz–Gómez</span><span class="sub">2 hijos · formal</span></td>
+            <td><svg class="spark" viewBox="0 0 56 18" aria-hidden="true"><polyline fill="none" stroke="#43A047" stroke-width="2"
+              points="1,14 12,11 23,12 34,7 45,6 55,4"/></svg></td>
+            <td class="num">74%</td>
+          </tr>
+          <tr>
+            <td><span class="name">Ruiz–Sosa</span><span class="sub">1 hijo · informal</span></td>
+            <td><svg class="spark" viewBox="0 0 56 18" aria-hidden="true"><polyline fill="none" stroke="#E53935" stroke-width="2"
+              points="1,6 12,8 23,10 34,9 45,13 55,15"/></svg></td>
+            <td class="num">48%</td>
+          </tr>
+          <tr>
+            <td><span class="name">Ferreyra–Duarte</span><span class="sub">3 hijos · formal</span></td>
+            <td><svg class="spark" viewBox="0 0 56 18" aria-hidden="true"><polyline fill="none" stroke="#B26A00" stroke-width="2"
+              points="1,12 12,12 23,11 34,12 45,12 55,12"/></svg></td>
+            <td class="num">—</td>
+          </tr>
+          <tr>
+            <td><span class="name">Benítez–Aguirre</span><span class="sub">2 hijos · formal</span></td>
+            <td><svg class="spark" viewBox="0 0 56 18" aria-hidden="true"><polyline fill="none" stroke="#43A047" stroke-width="2"
+              points="1,13 12,12 23,9 34,8 45,6 55,5"/></svg></td>
+            <td class="num">81%</td>
+          </tr>
+          <tr>
+            <td><span class="name">Costa–Molina</span><span class="sub">1 hijo · informal</span></td>
+            <td><svg class="spark" viewBox="0 0 56 18" aria-hidden="true"><polyline fill="none" stroke="#43A047" stroke-width="2"
+              points="1,10 12,10 23,8 34,9 45,7 55,6"/></svg></td>
+            <td class="num">69%</td>
+          </tr>
+          <tr>
+            <td><span class="name">Ríos–Vera</span><span class="sub">2 hijos · formal</span></td>
+            <td><svg class="spark" viewBox="0 0 56 18" aria-hidden="true"><polyline fill="none" stroke="#B26A00" stroke-width="2"
+              points="1,9 12,10 23,11 34,10 45,11 55,10"/></svg></td>
+            <td class="num">57%</td>
+          </tr>
+        </tbody>
+      </table>
+    </main>
+  </section>
+
+  <!-- Frame 3: report with deltas -->
+  <section class="phone" aria-label="Pantalla 3: reporte comparado">
+    <header class="topbar">
+      <h1 style="font-size:20px">Reporte · Paz–Gómez</h1>
+      <div class="who"><span class="chip ok"><i class="dot" style="background:var(--done)"></i>Listo</span></div>
+    </header>
+    <nav class="seg" aria-label="Períodos">
+      <button aria-selected="false">Abril</button>
+      <button aria-selected="false">Mayo</button>
+      <button aria-selected="true">Junio</button>
+    </nav>
+    <main class="content">
+      <div class="card">
+        <h3>Actividades <small>42 · <span class="delta up">▲ 12%</span></small></h3>
+        <div class="kv"><span>Cumplidas</span><b>31</b></div>
+        <div class="kv"><span>Vencidas</span><b>3</b></div>
+        <div class="kv"><span>Cumplimiento</span><b>73,81%</b></div>
+      </div>
+
+      <div class="card">
+        <h3>Gastos <small>$ 248.500,00</small></h3>
+        <div class="kv"><span>Pagado por monto</span><b>62,00%</b></div>
+        <div class="kv"><span>Pagado por cantidad</span><b>58,33%</b></div>
+        <div class="kv"><span>Pendiente</span><b>$ 94.430,00</b></div>
+        <div class="hbar"><span>Educación</span><span class="track"><i style="width:74%"></i></span><b>$ 92.000</b></div>
+        <div class="hbar"><span>Salud</span><span class="track"><i style="width:50%"></i></span><b>$ 61.500</b></div>
+        <div class="hbar"><span>Recreación</span><span class="track"><i style="width:39%"></i></span><b>$ 48.000</b></div>
+        <div class="hbar"><span>Alimentación</span><span class="track"><i style="width:38%"></i></span><b>$ 47.000</b></div>
+      </div>
+
+      <div class="card">
+        <h3>Hijos <small>2</small></h3>
+        <div class="kv"><span>Mateo · 6 años</span><b>18 act.</b></div>
+        <div class="kv"><span>Lucía · 4 años</span><b>11 act.</b></div>
+      </div>
+
+      <button class="primary-cta">Generar PDF del reporte</button>
+    </main>
+  </section>
+
+</div>
+</body>
+</html>

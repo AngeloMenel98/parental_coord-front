@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Actividad — Ficha acordeón</title>
+<style>
+  :root{
+    --primary:#00696D; --on-primary:#FFFFFF;
+    --primary-container:#9CF1F6; --on-primary-container:#002022;
+    --secondary:#4A6365; --secondary-container:#CCE8EA;
+    --error:#BA1A1A; --error-container:#FFDAD6;
+    --surface:#FAFDFC; --on-surface:#191C1D;
+    --surface-variant:#DAE4E5; --on-surface-variant:#3F4849;
+    --outline:#6F797A; --outline-variant:#BEC8C9;
+    --st-progress:#E65100; --st-done:#43A047;
+    --cat-salud:#D81B60; --cat-salud-c:#FCE4EC; --cat-salud-t:#AD1457;
+    --r-xs:4px; --r-sm:8px; --r-md:12px; --r-lg:16px; --r-xl:24px;
+    --serif:ui-serif, Georgia, "Times New Roman", serif;
+    --sans:system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --mono:ui-monospace, "Roboto Mono", Menlo, monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;background:var(--surface);color:var(--on-surface);font-family:var(--sans);font-size:14px;line-height:20px;-webkit-font-smoothing:antialiased}
+  .phone{display:flex;flex-direction:column;height:100%}
+  :focus-visible{outline:2px solid var(--primary);outline-offset:2px;border-radius:var(--r-xs)}
+
+  .appbar{display:flex;align-items:center;gap:4px;padding:6px 8px;border-bottom:1px solid var(--outline-variant);position:sticky;top:0;background:var(--surface);z-index:3}
+  .icon-btn{width:48px;height:48px;display:grid;place-items:center;border:0;background:none;border-radius:var(--r-xl);color:var(--on-surface-variant);cursor:pointer;transition:background 150ms}
+  .icon-btn:hover{background:var(--surface-variant)}
+  .appbar h1{font-size:16px;line-height:24px;font-weight:600;margin:0;flex:1}
+
+  main{flex:1;overflow-y:auto;padding:12px 16px 16px;max-width:640px;width:100%;margin:0 auto}
+
+  /* Header card mirrors the agenda card anatomy: category rail + status top-right */
+  .card{position:relative;border:1px solid var(--outline-variant);border-radius:var(--r-md);background:var(--surface);overflow:hidden}
+  .head{padding:12px 12px 12px 16px;display:flex;gap:12px}
+  .rail{position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--cat-salud)}
+  .head .main{flex:1;min-width:0;padding:0;margin:0;overflow:visible}
+  .head .time{font-family:var(--mono);font-size:12px;letter-spacing:.5px;font-weight:500;text-transform:uppercase;color:var(--on-surface-variant)}
+  .head h2{font-size:16px;line-height:24px;font-weight:600;margin:2px 0 6px}
+  .tags{display:flex;gap:6px;flex-wrap:wrap}
+  .chip{display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border-radius:var(--r-md);font-size:11px;line-height:16px;font-weight:500;letter-spacing:.3px}
+  .chip .dot{width:8px;height:8px;border-radius:50%;flex:none}
+  .chip-cat{background:var(--cat-salud-c);color:var(--cat-salud-t)}
+  .chip-cat .dot{background:var(--cat-salud)}
+  .chip-state{background:var(--surface-variant);color:var(--on-surface)}
+  .chip-state .dot{background:var(--st-progress)}
+
+  .stack{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+  details.card{padding:0}
+  summary{display:flex;align-items:center;gap:12px;min-height:56px;padding:8px 12px 8px 16px;cursor:pointer;list-style:none}
+  summary::-webkit-details-marker{display:none}
+  summary .t{flex:1;min-width:0}
+  summary .t b{display:block;font-size:14px;line-height:20px;font-weight:600}
+  summary .t small{display:block;font-size:12px;line-height:16px;color:var(--on-surface-variant);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  summary .chev{color:var(--on-surface-variant);transition:transform 150ms;flex:none}
+  details[open] summary .chev{transform:rotate(90deg)}
+  .inner{padding:0 16px 16px;border-top:1px solid var(--outline-variant);margin-top:0;padding-top:12px}
+
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px 16px;margin:0}
+  .grid div{min-width:0}
+  .grid dt{font-size:11px;line-height:16px;font-weight:500;letter-spacing:.6px;font-variant-caps:all-small-caps;color:var(--on-surface-variant);margin:0 0 2px}
+  .grid dd{margin:0;font-size:14px;line-height:20px}
+  .grid .wide{grid-column:1 / -1}
+  /* The child's name replaces the generic "Para" label: it is the identity of the row. */
+  .grid dt.person{font-variant-caps:normal;text-transform:none;letter-spacing:0;font-size:12px;line-height:16px;color:var(--on-surface-variant)}
+  .time{font-family:var(--mono);font-size:12px;letter-spacing:.5px;font-weight:500;text-transform:uppercase}
+  p.body{margin:0;font-size:14px;line-height:20px}
+
+  .file{display:flex;align-items:center;gap:12px;padding:10px 12px;border:1px solid var(--outline-variant);border-radius:var(--r-sm);background:var(--surface);margin-bottom:12px}
+  .file .glyph{width:32px;height:32px;border-radius:var(--r-sm);background:var(--secondary-container);display:grid;place-items:center;flex:none;color:#051F21}
+  .file .name{font-size:14px;line-height:20px;font-weight:500}
+  .file .meta{font-size:12px;line-height:16px;color:var(--on-surface-variant)}
+  .note{font-size:12px;line-height:16px;color:var(--on-surface-variant);margin:0 0 12px}
+
+  .trace{list-style:none;margin:0;padding:0 0 0 20px;position:relative}
+  .trace::before{content:"";position:absolute;left:4px;top:6px;bottom:6px;width:1px;background:var(--outline)}
+  .trace li{position:relative;padding-bottom:12px;font-size:14px;line-height:20px}
+  .trace li:last-child{padding-bottom:0}
+  .trace .node{position:absolute;left:-20px;top:5px;width:9px;height:9px;border-radius:50%;border:2px solid var(--outline);background:var(--surface)}
+  .trace .node.done{background:var(--st-done);border-color:var(--st-done)}
+  .trace .when2{display:block;font-size:12px;line-height:16px;color:var(--on-surface-variant)}
+
+  .btn{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:0 16px;border-radius:var(--r-xl);border:1px solid var(--outline);background:transparent;color:var(--primary);font-family:inherit;font-size:14px;font-weight:500;cursor:pointer;transition:background 150ms}
+  .btn:hover{background:var(--surface-variant)}
+
+  /* Bottom action bar */
+  .actions{padding:12px 16px calc(12px + env(safe-area-inset-bottom));border-top:1px solid var(--outline-variant);background:var(--surface);display:flex;gap:8px}
+  .actions .primary{flex:1;min-height:48px;border:0;border-radius:var(--r-xl);background:var(--primary);color:var(--on-primary);font-family:inherit;font-size:14px;font-weight:500;cursor:pointer;transition:background 150ms}
+  .actions .primary:hover{background:var(--primary);filter:brightness(.92)}
+  .actions .more{width:48px;min-height:48px;border:1px solid var(--outline);border-radius:var(--r-xl);background:transparent;color:var(--on-surface-variant);cursor:pointer;display:grid;place-items:center}
+  .actions .more:hover{background:var(--surface-variant)}
+  @media (prefers-reduced-motion: reduce){*{transition:none !important}}
+</style>
+</head>
+<body>
+<div class="phone">
+  <header class="appbar">
+    <button class="icon-btn" aria-label="Volver">
+      <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+    </button>
+    <h1>Actividad</h1>
+    <button class="icon-btn" aria-label="Compartir">
+      <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7M12 16V3M8 7l4-4 4 4"/></svg>
+    </button>
+  </header>
+
+  <main>
+    <div class="card">
+      <span class="rail" aria-hidden="true"></span>
+      <div class="head">
+        <div class="main">
+          <span class="time">jue 12 mar · 15:30</span>
+          <h2>Turno odontológico de Sofi</h2>
+          <div class="tags">
+            <span class="chip chip-state"><span class="dot"></span>En progreso</span>
+            <span class="chip chip-cat"><span class="dot"></span>Salud</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="stack">
+      <details class="card" open>
+        <summary>
+          <span class="t"><b>Datos</b><small>jue 12 mar, 15:30 · Martín Aguirre · Alta</small></span>
+          <svg class="chev" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+        </summary>
+        <div class="inner">
+          <dl class="grid">
+            <div><dt>Fecha</dt><dd>jue 12 mar<br>15:30 – 16:15</dd></div>
+            <div><dt>Límite evidencia</dt><dd>vie 13 mar<br>23:59</dd></div>
+            <div><dt>Asignado a</dt><dd>Martín Aguirre</dd></div>
+            <div><dt>Asignación</dt><dd style="margin:0">Confirmada<br><span style="font-size:12px;line-height:16px;color:var(--on-surface-variant)">lun 2 mar, 11:02</span></dd></div>
+            <div><dt>Prioridad</dt><dd>Alta</dd></div>
+            <div><dt class="person">Sofía Aguirre</dt><dd>Hija</dd></div>
+            <div class="wide"><dt>Código</dt><dd><span class="time">ACT-B4F1</span></dd></div>
+          </dl>
+        </div>
+      </details>
+
+      <details class="card">
+        <summary>
+          <span class="t"><b>Descripción</b><small>Control semestral con la odontopediatra…</small></span>
+          <svg class="chev" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+        </summary>
+        <div class="inner">
+          <p class="body">Control semestral con la odontopediatra. Llevar la orden de la obra social y el cepillo nuevo: pidió cambiarlo en el último control. Consultorio 3B, tercer piso.</p>
+        </div>
+      </details>
+
+      <details class="card">
+        <summary>
+          <span class="t"><b>Comprobantes</b><small>1 archivo · falta la evidencia del turno</small></span>
+          <svg class="chev" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+        </summary>
+        <div class="inner">
+          <div class="file">
+            <span class="glyph" aria-hidden="true">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3v5h5M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/></svg>
+            </span>
+            <span>
+              <span class="name">orden-obra-social.pdf</span><br>
+              <span class="meta">480 KB · Carolina Pérez · 2 mar</span>
+            </span>
+          </div>
+          <p class="note">Tenés hasta el vie 13 mar, 23:59 para adjuntar la evidencia.</p>
+          <button class="btn">Agregar comprobante</button>
+        </div>
+      </details>
+
+      <details class="card">
+        <summary>
+          <span class="t"><b>Historial</b><small>4 eventos · último: hoy</small></span>
+          <svg class="chev" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+        </summary>
+        <div class="inner">
+          <ol class="trace">
+            <li><span class="node done" aria-hidden="true"></span>Creada<span class="when2">Carolina Pérez · lun 2 mar, 09:14</span></li>
+            <li><span class="node done" aria-hidden="true"></span>Asignada a Martín Aguirre<span class="when2">lun 2 mar, 09:14</span></li>
+            <li><span class="node done" aria-hidden="true"></span>Asignación confirmada<span class="when2">Martín Aguirre · lun 2 mar, 11:02</span></li>
+            <li><span class="node" aria-hidden="true"></span>En progreso<span class="when2">Hoy</span></li>
+          </ol>
+        </div>
+      </details>
+    </div>
+  </main>
+
+  <footer class="actions">
+    <button class="primary">Finalizar</button>
+    <button class="more" aria-label="Más acciones">
+      <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
+    </button>
+  </footer>
+</div>
+</body>
+</html>

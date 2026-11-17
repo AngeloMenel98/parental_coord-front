@@ -14,6 +14,23 @@ class AuthApi(
     private val client: HttpClient,
     private val baseUrl: String,
 ) {
+    /**
+     * Mensaje de error que nunca queda vacío.
+     *
+     * Un status que Ktor no conoce (los `52x` de Cloudflare, por ejemplo) llega con
+     * `description` vacío; `ApiResult.Error` acepta el string vacío y entonces la UI
+     * dibujaba el cartel de error sin texto, imposible de diagnosticar desde el
+     * teléfono.
+     */
+    private fun httpErrorLabel(status: HttpStatusCode): String {
+        val description = status.description.trim()
+        return if (description.isNotEmpty()) description else "HTTP ${status.value}"
+    }
+
+    /** Igual que [httpErrorLabel] para el camino de excepción: `toString()` siempre trae el tipo. */
+    private fun failureLabel(e: Exception): String =
+        e.message?.trim().orEmpty().ifEmpty { e.toString() }
+
     suspend fun login(email: String, password: String): ApiResult<AuthResponse> {
         return try {
             val response = client.post("$baseUrl/auth/login") {
@@ -23,10 +40,10 @@ class AuthApi(
             if (response.status.isSuccess()) {
                 ApiResult.Success(response.body())
             } else {
-                ApiResult.Error(response.status.value, response.status.description)
+                ApiResult.Error(response.status.value, httpErrorLabel(response.status))
             }
         } catch (e: Exception) {
-            ApiResult.Error(0, e.message ?: "Network error")
+            ApiResult.Error(0, failureLabel(e))
         }
     }
 
@@ -44,10 +61,10 @@ class AuthApi(
             if (response.status.isSuccess()) {
                 ApiResult.Success(response.body())
             } else {
-                ApiResult.Error(response.status.value, response.status.description)
+                ApiResult.Error(response.status.value, httpErrorLabel(response.status))
             }
         } catch (e: Exception) {
-            ApiResult.Error(0, e.message ?: "Network error")
+            ApiResult.Error(0, failureLabel(e))
         }
     }
 
@@ -59,10 +76,10 @@ class AuthApi(
             if (response.status.isSuccess()) {
                 ApiResult.Success(response.body())
             } else {
-                ApiResult.Error(response.status.value, response.status.description)
+                ApiResult.Error(response.status.value, httpErrorLabel(response.status))
             }
         } catch (e: Exception) {
-            ApiResult.Error(0, e.message ?: "Network error")
+            ApiResult.Error(0, failureLabel(e))
         }
     }
 }

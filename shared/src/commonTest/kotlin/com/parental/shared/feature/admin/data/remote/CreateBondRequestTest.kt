@@ -3,6 +3,7 @@ package com.parental.shared.feature.admin.data.remote
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
+import kotlin.test.assertFalse
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -24,6 +25,7 @@ class CreateBondRequestTest {
             title = "Bond Test",
             agreementType = "formal",
             userIds = listOf(mariaId, testId),
+            children = listOf(CreateBondChildRequest("Mateo", "Paz", "2020-05-15")),
         )
 
         val encoded = Json.encodeToString(CreateBondRequest.serializer(), request)
@@ -41,11 +43,44 @@ class CreateBondRequestTest {
     fun `userIds stays a json array even with a single member`() {
         val encoded = Json.encodeToString(
             CreateBondRequest.serializer(),
-            CreateBondRequest(title = "Bond Test", agreementType = "informal", userIds = listOf(mariaId)),
+            CreateBondRequest(
+                title = "Bond Test",
+                agreementType = "informal",
+                userIds = listOf(mariaId),
+                children = listOf(CreateBondChildRequest("Mateo", "Paz")),
+            ),
         )
 
         val userIds = Json.parseToJsonElement(encoded).jsonObject.getValue("userIds").jsonArray
         assertEquals(1, userIds.size)
         assertEquals(mariaId, userIds.single().jsonPrimitive.content)
+    }
+
+    @Test
+    fun `children travel in the same body as the members`() {
+        val encoded = Json.encodeToString(
+            CreateBondRequest.serializer(),
+            CreateBondRequest(
+                title = "Bond Test",
+                agreementType = "formal",
+                userIds = listOf(mariaId, testId),
+                children = listOf(
+                    CreateBondChildRequest("Mateo", "Paz", "2020-05-15"),
+                    CreateBondChildRequest("Lucía", "Paz"),
+                ),
+            ),
+        )
+        val body = Json.parseToJsonElement(encoded).jsonObject
+        val children = body.getValue("children").jsonArray
+
+        assertEquals(2, children.size)
+        val first = children[0].jsonObject
+        assertEquals("Mateo", first.getValue("firstName").jsonPrimitive.content)
+        assertEquals("Paz", first.getValue("lastName").jsonPrimitive.content)
+        assertEquals("2020-05-15", first.getValue("dateOfBirth").jsonPrimitive.content)
+        // Sin fecha, el campo no viaja: el backend lo trata como opcional.
+        val second = children[1].jsonObject
+        assertFalse(second.containsKey("dateOfBirth"))
+        assertEquals(2, body.getValue("userIds").jsonArray.size)
     }
 }

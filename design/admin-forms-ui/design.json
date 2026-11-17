@@ -1,0 +1,28 @@
+{
+  "title": "Admin — alta de usuarios y de vínculos",
+  "brief": "Rediseño de los dos formularios de alta del panel admin (Kotlin Multiplatform, Android primero): hoy el de progenitor es una tarjeta con cuatro campos sin validación visible que empuja la lista fuera de pantalla, y el de vínculo pide los dos progenitores como UUID crudo — inusable. Las tres direcciones resuelven lo mismo con estructuras distintas: validación en vivo, y elegir progenitores buscando por nombre o email sobre la lista de usuarios que el panel ya carga en memoria. El backend no cambia: sigue recibiendo title, agreementType y exactamente dos userIds.",
+  "feature": "odd/tasks/admin-reports-ui.md",
+  "artboards": [
+    {
+      "file": "01-alta-guiada.html",
+      "title": "Alta guiada en dos pasos",
+      "tradeoff": "La cuenta se crea en una hoja inferior con validación por campo y el vínculo se parte en dos pasos: datos del acuerdo y después el buscador de progenitores, con los elegidos como chips removibles. El camino es explícito y no se puede llegar al paso 2 sin nombre; a cambio son dos pantallas para crear un vínculo y el paso 1 muestra 'faltan 2' como deuda.",
+      "width": 1266,
+      "height": 900
+    },
+    {
+      "file": "02-progenitores-primero.html",
+      "title": "Progenitores primero",
+      "tradeoff": "El vínculo empieza por las personas —el dato escaso— y propone el nombre a partir de los apellidos; el alta de progenitor es una pantalla completa con validación en vivo, medidor de contraseña y confirmación de éxito. Se elimina el callejón sin salida de nombrar un vínculo que no podés poblar; a cambio el acuerdo queda en segundo plano, hay una pantalla de revisión extra y el flujo es más largo de punta a punta.",
+      "width": 1266,
+      "height": 900
+    },
+    {
+      "file": "03-un-solo-panel.html",
+      "title": "Un solo panel",
+      "tradeoff": "Wizard de tres pasos en hojas encadenadas: nombre → progenitores → hijos. El buscador es un combobox con resultados en línea, los ya elegidos aparecen deshabilitados con la etiqueta 'Ya está', si nadie coincide se ofrece crear la cuenta sin salir, y el paso 3 exige al menos un hijo (el botón de crear no se habilita con cero). Es el que menos navegación tiene y el único que cubre 'esa persona todavía no existe' y 'todavía no hay hijos'; a cambio son tres pantallas antes de crear, exige un estado más rico (búsqueda, sin resultados, cuenta creada, N hijos) y es el más fácil de romper con un caso borde.",
+      "width": 1680,
+      "height": 900
+    }
+  ]
+}

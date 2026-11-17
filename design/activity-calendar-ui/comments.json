@@ -1,0 +1,60 @@
+{
+  "version": 1,
+  "comments": [
+    {
+      "id": "k7pba5ys",
+      "file": "03-riel-del-tiempo.html",
+      "selector": "body > div > header > button:nth-of-type(2)",
+      "excerpt": "",
+      "comment": "Poneme el boton de agregar en un circulo abajo.",
+      "createdAt": "2026-11-10T11:17:17.498Z",
+      "status": "resolved",
+      "sentAt": "2026-11-10T11:17:17.515Z",
+      "resolvedAt": "2026-11-10T11:38:37.560Z"
+    },
+    {
+      "id": "g05dbsu5",
+      "file": "03-riel-del-tiempo.html",
+      "selector": "#densityToggle",
+      "excerpt": "Ocultar",
+      "comment": "El boton de mostrar el calendario este que este en ell navbar",
+      "createdAt": "2026-11-10T11:18:23.258Z",
+      "status": "resolved",
+      "sentAt": "2026-11-10T11:18:23.280Z",
+      "resolvedAt": "2026-11-10T11:38:37.560Z"
+    },
+    {
+      "id": "4ssnbk19",
+      "file": "03-riel-del-tiempo.html",
+      "selector": "#navCalendar",
+      "excerpt": "Calendario",
+      "comment": "ME referia a que este arriba a la derecha, como antes.",
+      "createdAt": "2026-11-10T11:44:42.828Z",
+      "status": "resolved",
+      "sentAt": "2026-11-10T11:46:11.047Z",
+      "resolvedAt": "2026-11-10T11:52:25.799Z"
+    },
+    {
+      "id": "evah7j5c",
+      "file": "03-riel-del-tiempo.html",
+      "selector": "#day-12 > div:nth-of-type(1)",
+      "excerpt": "MAR 12 MAY 2 actividades",
+      "comment": "Me gustaba el Riel del tiempo, que te pueda llevar al Hoy",
+      "createdAt": "2026-11-10T11:45:27.995Z",
+      "status": "resolved",
+      "sentAt": "2026-11-10T11:46:11.047Z",
+      "resolvedAt": "2026-11-10T11:52:25.799Z"
+    },
+    {
+      "id": "10mf6zxd",
+      "file": "03-riel-del-tiempo.html",
+      "selector": "#day-12 > div:nth-of-type(1) > button > svg",
+      "excerpt": "",
+      "comment": "Esto me imagino que es para plegar y desplegar el dia.",
+      "createdAt": "2026-11-10T11:45:51.522Z",
+      "status": "resolved",
+      "sentAt": "2026-11-10T11:46:11.047Z",
+      "resolvedAt": "2026-11-10T11:52:25.799Z"
+    }
+  ]
+}

@@ -1,0 +1,34 @@
+{
+  "title": "Inicio — rediseño de la portada",
+  "brief": "Tres direcciones para rediseñar el Inicio de la app de coordinación parental (Kotlin Multiplatform, Android primero). Parten de la anatomía actual: saludo con fecha, tres tarjetas de métricas (Asignadas / Vencidas / Saldo), tarjeta de cumplimiento con barra por miembro, sección Familiares y nav inferior. Mismos datos reales del modelo: HomeMetrics, ComplianceResponse y children.",
+  "artboards": [
+    {
+      "file": "01-hoy-en-foco.html",
+      "title": "Hoy, en foco",
+      "tradeoff": "La agenda del día es el primer bloque y toda la tarjeta es el objetivo (sin chevrons: elevación y fondo al pasar el puntero); las métricas se funden en una franja de una sola superficie donde cada celda es una tarjeta pulsable que abre su destino (Asignadas y Vencidas → Actividades ya filtrada; Saldo gastos → Gastos) y el cumplimiento se comprime a un número grande con barra de 12 segmentos. El tema sigue al sistema y un switch sol/luna lo sobrescribe. Responde \"¿qué pasa hoy?\" de un vistazo; a cambio, prioriza el día sobre el mes y la deuda vencida sólo se ve como cifra en la franja.",
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "02-pulso-de-la-casa.html",
+      "title": "El pulso de la casa",
+      "tradeoff": "Una frase en serif resume el estado del vínculo antes de cualquier número, el anillo de 12 segmentos es la única pieza grande y su color va de rojo a verde según el avance del mes (rojo <25%, naranja <50%, ámbar <75%, verde ≥75%, siempre con tokens de status), y las métricas desaparecen como objetos. Máxima comprensión en tres segundos; a cambio, pierde la agenda del día y obliga a un toque más para llegar a cualquier acción concreta.",
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "03-triaje.html",
+      "title": "Triaje",
+      "tradeoff": "El inicio es una cola ordenada por urgencia —vencida, por verificar, asignada a vos, saldo— y cada fila trae su acción inline (Ver / Revisar / Confirmar), así que la portada sirve para resolver sin navegar. Máxima velocidad para un coordinador que entra a trabajar; a cambio, es la portada más fría de las tres, densa en estados y con menos lugar para la identidad familiar.",
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "04-hoy-con-anillo.html",
+      "title": "Hoy, con anillo",
+      "tradeoff": "La combinación que pediste: el esqueleto completo del 01 (saludo centrado con vínculo, tarjeta Hoy clickeable, franja de métricas centrada, Hijos, switch sol/luna con los íconos dentro del riel) con la card de cumplimiento del 02 en lugar de la barra: anillo de 12 segmentos que va de rojo a verde con el avance del mes (rojo <25%, naranja <50%, ámbar <75%, verde ≥75%). Dark con la paleta Material Baseline (primary #BB86FC, primaryVariant #3700B3, secondary #03DAC6, surface #121212, error #CF6679) y rol de texto propio para el ítem seleccionado del nav, que sobre el píldora violeta no llegaba a 4.5:1. Gana la lectura circular del porcentaje; a cambio, la card del anillo es la más alta de la pantalla y sólo deja lugar para un miembro del vínculo.",
+      "width": 390,
+      "height": 844
+    }
+  ]
+}

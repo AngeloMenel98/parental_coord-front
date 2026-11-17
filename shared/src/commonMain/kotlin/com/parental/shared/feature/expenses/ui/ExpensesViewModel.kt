@@ -1,10 +1,13 @@
 package com.parental.shared.feature.expenses.ui
 
 import com.parental.shared.core.error.ApiResult
+import com.parental.shared.core.files.ImageCompressor
 import com.parental.shared.core.network.CategoriesApi
 import com.parental.shared.core.network.realtime.RealtimeConnectionManager
 import com.parental.shared.core.ui.components.CategoryInfo
 import com.parental.shared.core.ui.components.CategoryResolver
+import com.parental.shared.feature.activities.domain.model.attachments.ConfirmAttachmentReq
+import com.parental.shared.feature.activities.domain.model.attachments.PresignAttachmentReq
 import com.parental.shared.feature.expenses.data.remote.ExpensesApi
 import com.parental.shared.feature.expenses.domain.model.CreateExpenseRequest
 import com.parental.shared.feature.expenses.domain.model.ExpenseResponseDto
@@ -24,6 +27,13 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import io.ktor.client.HttpClient
+import io.ktor.client.request.put
+import io.ktor.client.request.setBody
+import io.ktor.http.ContentType
+import io.ktor.http.content.ByteArrayContent
+import io.ktor.http.contentType
+import io.ktor.http.isSuccess
 
 data class ExpensesUiState(
     val isLoading: Boolean = true,
@@ -67,6 +77,8 @@ class ExpensesViewModel(
     private val dispatcher: CoroutineDispatcher = Dispatchers.Main,
     private val categoriesApi: CategoriesApi = com.parental.shared.core.network.ApiClient.categoriesApi(),
     private val realtime: RealtimeConnectionManager? = null,
+    /** Cliente HTTP para el PUT del comprobante a la URL firmada. */
+    private val httpClient: HttpClient = com.parental.shared.core.network.ApiClient.httpClient,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + dispatcher)
 
@@ -213,6 +225,57 @@ class ExpensesViewModel(
 
     fun closeDetail() {
         _uiState.update { it.copy(detail = DetailUiState.Closed) }
+    }
+
+    /**
+     * S4 · adjunta el comprobante del gasto: comprime la imagen, pide la URL firmada, sube el
+     * archivo y confirma la fila. El `hasDocument` que muestra la pantalla es DERIVADO por el
+     * servidor, así que después de confirmar se vuelve a pedir el detalle.
+     */
+    fun attachDocument(id: String, fileName: String, mimeType: String, bytes: ByteArray) {
+        scope.launch {
+            val compressed = ImageCompressor().compress(bytes, mimeType)
+            val presign = api.presignExpenseAttachment(
+                token,
+                id,
+                PresignAttachmentReq(fileName, compressed.mimeType, compressed.bytes.size.toLong()),
+            )
+            val upload = when (presign) {
+                is ApiResult.Success -> presign.data
+                is ApiResult.Error -> {
+                    _uiState.update { it.copy(snackbarMessage = presign.message) }
+                    return@launch
+                }
+            }
+
+            val put = runCatching {
+                httpClient.put(upload.uploadUrl) {
+                    contentType(ContentType.parse(compressed.mimeType))
+                    setBody(ByteArrayContent(compressed.bytes))
+                }
+            }.getOrNull()
+
+            if (put == null || !put.status.isSuccess()) {
+                _uiState.update {
+                    it.copy(snackbarMessage = "No se pudo subir el archivo (${put?.status?.value ?: 0})")
+                }
+                return@launch
+            }
+
+            when (
+                val confirm = api.confirmExpenseAttachment(
+                    token,
+                    id,
+                    ConfirmAttachmentReq(upload.path, fileName, compressed.mimeType, compressed.bytes.size.toLong()),
+                )
+            ) {
+                is ApiResult.Success -> {
+                    _uiState.update { it.copy(snackbarMessage = "Comprobante adjuntado") }
+                    refreshDetail(id)
+                }
+                is ApiResult.Error -> _uiState.update { it.copy(snackbarMessage = confirm.message) }
+            }
+        }
     }
 
     /** Aprueba un gasto y refresca detalle + resumen. */

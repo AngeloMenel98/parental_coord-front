@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "chosen": "04-bitacora-visual.html",
+  "handoffs": {
+    "04-bitacora-visual.html": {
+      "status": "implemented",
+      "queued": false,
+      "sentAt": "2026-11-09T16:43:42.187Z",
+      "startedAt": "2026-11-09T16:43:57.240Z",
+      "implementedAt": "2026-11-09T17:09:54.801Z",
+      "note": "Independently verified (two gentle-ai-verify rounds). Final: 558 unit tests / 0 failures, :androidApp:assembleDebug OK, zero deletions in the touched files. Rail now models a reached SET so a closed-but-unconfirmed activity shows the gap in \"Confirmada\" instead of faking it; `assisting` maps to En progreso. Deviations: no per-day density strip, no \"Verificación\" step, no \"Asignada\" event (DTO lacks an event stream / assignedAt / verifier); \"Cargar comprobante\" stays in the fixed footer per FR-9; no commits (tree carries unrelated changes)."
+    }
+  }
+}

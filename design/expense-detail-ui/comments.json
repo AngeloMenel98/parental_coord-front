@@ -1,0 +1,126 @@
+{
+  "version": 1,
+  "comments": [
+    {
+      "id": "1kw1vacb",
+      "file": "01-expediente.html",
+      "selector": "body > div > section > div > main > section:nth-of-type(2) > div > div:nth-of-type(6) > p:nth-of-type(2)",
+      "excerpt": "50 / 50",
+      "comment": "si ya aparece arriba el porcentaje, aca no hace falta.",
+      "createdAt": "2026-11-04T12:02:37.873Z",
+      "status": "resolved",
+      "sentAt": "2026-11-04T12:07:16.624Z",
+      "resolvedAt": "2026-11-04T12:08:54.688Z"
+    },
+    {
+      "id": "gebbn796",
+      "file": "01-expediente.html",
+      "selector": "body > div > section > div > main > section:nth-of-type(2) > div > div:nth-of-type(4) > p:nth-of-type(2)",
+      "excerpt": "Todavía no",
+      "comment": "Si no hay datos, poner un '-'",
+      "createdAt": "2026-11-04T12:03:08.201Z",
+      "status": "resolved",
+      "sentAt": "2026-11-04T12:07:16.624Z",
+      "resolvedAt": "2026-11-04T12:08:54.688Z"
+    },
+    {
+      "id": "8zi8g6f5",
+      "file": "01-expediente.html",
+      "selector": "#trace-title",
+      "excerpt": "Trazabilidad",
+      "comment": "Me gusta la trazabilidad.",
+      "createdAt": "2026-11-04T12:03:36.637Z",
+      "status": "resolved",
+      "sentAt": "2026-11-04T12:07:16.624Z",
+      "resolvedAt": "2026-11-04T12:08:54.688Z"
+    },
+    {
+      "id": "vdsqobx7",
+      "file": "01-expediente.html",
+      "selector": "body > div > section > div > main > section:nth-of-type(5)",
+      "excerpt": "Trazabilidad Gasto creado 3 nov 2026 · 10:12 · Mariana González Esperando aprobación Pendiente desde hace 2 días Pago Se habilita cuando se apruebe",
+      "comment": "que estas opciones sean desplegables.",
+      "createdAt": "2026-11-04T12:05:31.418Z",
+      "status": "resolved",
+      "sentAt": "2026-11-04T12:07:16.624Z",
+      "resolvedAt": "2026-11-04T12:08:54.688Z"
+    },
+    {
+      "id": "dsihzia5",
+      "file": "01-expediente.html",
+      "selector": "body > div > section > div > main > section:nth-of-type(4) > p",
+      "excerpt": "Sin comprobante adjunto",
+      "comment": "Agregar icono 'clip' para adjuntar archivo",
+      "createdAt": "2026-11-04T12:06:03.409Z",
+      "status": "resolved",
+      "sentAt": "2026-11-04T12:07:16.624Z",
+      "resolvedAt": "2026-11-04T12:08:54.688Z"
+    },
+    {
+      "id": "whyi48fi",
+      "file": "01-expediente.html",
+      "selector": "body > div > section > div > main > section:nth-of-type(2) > div > div:nth-of-type(5) > p:nth-of-type(1)",
+      "excerpt": "Pagado el",
+      "comment": "Que esto vaya en la trazabilidad",
+      "createdAt": "2026-11-04T12:07:03.673Z",
+      "status": "resolved",
+      "sentAt": "2026-11-04T12:07:16.624Z",
+      "resolvedAt": "2026-11-04T12:08:54.688Z"
+    },
+    {
+      "id": "5lh1axcn",
+      "file": "01-expediente.html",
+      "selector": "body > div > section > div > main > section:nth-of-type(5)",
+      "excerpt": "Trazabilidad Gasto creado 3 nov · 10:12 Mariana González registró el gasto con la categoría Salud. Esperando aprobación hace 2 días Aprobado por: —. La contraparte todavía no respondió. Pago —",
+      "comment": "quiero que sea Desplegable el Trazabilidad completo no cada instancia, me gustaba que sea un",
+      "createdAt": "2026-11-04T12:10:35.810Z",
+      "status": "resolved",
+      "sentAt": "2026-11-04T12:11:21.482Z",
+      "resolvedAt": "2026-11-04T12:15:45.400Z"
+    },
+    {
+      "id": "cobtcl4d",
+      "file": "01-expediente.html",
+      "selector": "body > div > section > div > main > section:nth-of-type(5)",
+      "excerpt": "Trazabilidad Gasto creado 3 nov · 10:12 Mariana González registró el gasto con la categoría Salud. Esperando aprobación hace 2 días Aprobado por: —. La contraparte todavía no respondió. Pago —",
+      "comment": "Me gustaba como antes. Una linea temporal",
+      "createdAt": "2026-11-04T12:11:18.064Z",
+      "status": "resolved",
+      "sentAt": "2026-11-04T12:11:21.482Z",
+      "resolvedAt": "2026-11-04T12:15:45.400Z"
+    },
+    {
+      "id": "vvnsukl1",
+      "file": "01-expediente.html",
+      "selector": "body > div > section > div > main > details",
+      "excerpt": "Trazabilidad Gasto creado 3 nov 2026 · 10:12 · Mariana González Esperando aprobación Pendiente desde hace 2 días · aprobado por: — Pago Pagado el: — · se habilita al aprobarse",
+      "comment": "Me imagino que cada instancia va apareciendo a medida que se va realizando no? No es que existe desde un primer momento",
+      "createdAt": "2026-11-04T12:17:08.349Z",
+      "status": "resolved",
+      "sentAt": "2026-11-04T12:20:17.936Z",
+      "resolvedAt": "2026-11-04T12:21:36.120Z"
+    },
+    {
+      "id": "me63ooln",
+      "file": "01-expediente.html",
+      "selector": "body > div > section > div > main > section:nth-of-type(2) > div > div:nth-of-type(4) > p:nth-of-type(1)",
+      "excerpt": "Aprobado por",
+      "comment": "En vez de este dato, que sea el nombre del hijo/hijos al que fue el gasto",
+      "createdAt": "2026-11-04T12:20:12.197Z",
+      "status": "resolved",
+      "sentAt": "2026-11-04T12:20:17.936Z",
+      "resolvedAt": "2026-11-04T12:21:36.120Z"
+    },
+    {
+      "id": "7yxer9og",
+      "file": "01-expediente.html",
+      "selector": "body > div > section > div > main > details > p",
+      "excerpt": "Los próximos pasos aparecen a medida que ocurren.",
+      "comment": "Este dato, no hace falta",
+      "createdAt": "2026-11-04T12:22:39.404Z",
+      "status": "resolved",
+      "sentAt": "2026-11-04T12:23:27.616Z",
+      "resolvedAt": "2026-11-04T12:24:22.430Z"
+    }
+  ]
+}

@@ -1,5 +1,7 @@
 package com.parental.shared.feature.home.domain.model
 
+import com.parental.shared.feature.home.domain.ChildStatus
+import com.parental.shared.feature.home.domain.TodayAgenda
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -55,4 +57,14 @@ data class HomeSummary(
     @SerialName("bondId") val bondId: String? = null,
     @SerialName("compliance") val compliance: ComplianceResponse? = null,
     @SerialName("metrics") val metrics: HomeMetrics = HomeMetrics(),
+    /**
+     * S2 · la agenda de HOY, derivada en el cliente de la lista del vínculo (ningún
+     * request extra). `null` = no se pudo cargar: la tarjeta lo dice, no finge vacío.
+     */
+    val today: TodayAgenda? = null,
+    /**
+     * S5 · la carga vencida de cada hijo. Vacía = no se pudo calcular (la sección cae a
+     * nombres sin estado); `overdue = 0` sí significa "al día".
+     */
+    val childStatuses: List<ChildStatus> = emptyList(),
 )

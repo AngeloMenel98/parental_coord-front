@@ -45,37 +45,55 @@ val LightColorScheme = androidx.compose.material3.lightColorScheme(
     inversePrimary = Color(0xFF80D4D9),
 )
 
-/** Esquema oscuro de marca (design §6). */
+/**
+ * Esquema oscuro de marca — paleta **Material Baseline** (la tabla pedida en la
+ * revisión de diseño del Home).
+ *
+ * Roles con hex de la tabla: primary `#BB86FC`, primaryVariant → `primaryContainer`
+ * `#3700B3`, secondary `#03DAC6`, secondaryVariant → `secondaryContainer` `#018786`,
+ * background/surface `#121212`, error `#CF6679`, onPrimary/onSecondary/onError
+ * `#000000`, onBackground/onSurface `#FFFFFF`.
+ *
+ * La tabla no define el resto de los roles M3, así que se derivan con la regla de
+ * elevación de Material: una superficie elevada es el surface + overlay blanco; y los
+ * textos/bordes secundarios son alfa de `onSurface` (≈70% y ≈54%). `outlineVariant` al
+ * 12% es el hairline de divisores. `tertiary*`, `inverse*`, `scrim` y `surfaceTint` no
+ * tienen consumidor hoy: quedan coherentes con la marca nueva.
+ *
+ * ⚠ El ítem seleccionado del nav NO usa `primary`: `#BB86FC` sobre `#3700B3` da
+ * 4.39:1 y no alcanza AA para 12sp. Ahí se usa `onPrimaryContainer` (8.6:1).
+ */
 val DarkColorScheme = androidx.compose.material3.darkColorScheme(
-    primary = Color(0xFF80D4D9),
-    onPrimary = Color(0xFF00373A),
-    primaryContainer = Color(0xFF004F53),
-    onPrimaryContainer = Color(0xFF9CF1F6),
-    secondary = Color(0xFFB0CCCE),
-    onSecondary = Color(0xFF1B3436),
-    secondaryContainer = Color(0xFF334D4F),
-    onSecondaryContainer = Color(0xFFCCE8EA),
-    tertiary = Color(0xFF84D2E6),
-    onTertiary = Color(0xFF00363D),
-    tertiaryContainer = Color(0xFF004F5D),
-    onTertiaryContainer = Color(0xFFB8EBFF),
-    error = Color(0xFFFFB4AB),
-    onError = Color(0xFF690005),
+    primary = Color(0xFFBB86FC),
+    onPrimary = Color(0xFF000000),
+    primaryContainer = Color(0xFF3700B3),
+    onPrimaryContainer = Color(0xFFFFFFFF),
+    secondary = Color(0xFF03DAC6),
+    onSecondary = Color(0xFF000000),
+    secondaryContainer = Color(0xFF018786),
+    onSecondaryContainer = Color(0xFF000000),
+    tertiary = Color(0xFFBB86FC),
+    onTertiary = Color(0xFF000000),
+    tertiaryContainer = Color(0xFF3700B3),
+    onTertiaryContainer = Color(0xFFFFFFFF),
+    error = Color(0xFFCF6679),
+    onError = Color(0xFF000000),
     errorContainer = Color(0xFF93000A),
     onErrorContainer = Color(0xFFFFDAD6),
-    background = Color(0xFF101415),
-    onBackground = Color(0xFFE0E3E3),
-    surface = Color(0xFF101415),
-    onSurface = Color(0xFFE0E3E3),
-    surfaceVariant = Color(0xFF3F4849),
-    onSurfaceVariant = Color(0xFFBEC8C9),
-    outline = Color(0xFF899294),
-    outlineVariant = Color(0xFF404849),
+    background = Color(0xFF121212),
+    onBackground = Color(0xFFFFFFFF),
+    surface = Color(0xFF121212),
+    onSurface = Color(0xFFFFFFFF),
+    // surface + 8% de blanco (elevación Material): el plano de tarjeta sobre #121212.
+    surfaceVariant = Color(0xFF1E1E1E),
+    onSurfaceVariant = Color(0xFFB3B3B3),
+    outline = Color(0xFF8A8A8A),
+    outlineVariant = Color(0x1FFFFFFF),
     scrim = Color(0xFF000000),
-    surfaceTint = Color(0xFF80D4D9),
-    inverseSurface = Color(0xFFE0E3E3),
-    inverseOnSurface = Color(0xFF2D3132),
-    inversePrimary = Color(0xFF00696D),
+    surfaceTint = Color(0xFFBB86FC),
+    inverseSurface = Color(0xFFE6E1E5),
+    inverseOnSurface = Color(0xFF313033),
+    inversePrimary = Color(0xFF3700B3),
 )
 
 // ── Tokens de tags (design §7 — tríadas LOCKED, AA verificadas) ───────────
