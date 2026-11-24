@@ -62,6 +62,12 @@
   .bar.warn i{background:var(--verify)}
   /* detail */
   .back{display:inline-flex;align-items:center;gap:6px;font-size:14px;color:var(--primary);text-decoration:none;font-weight:500}
+  .who-av{width:32px;height:32px;border-radius:50%;background:var(--primary-container);color:var(--on-primary-container);
+    display:grid;place-items:center;font-size:11px;font-weight:600;letter-spacing:.04em;flex:none}
+  .part{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:12px;color:var(--on-surface-variant)}
+  .part b{font-family:var(--mono);font-weight:500;color:var(--on-surface)}
+  .reportlink{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:500;color:var(--primary);
+    background:transparent;border:0;padding:0;cursor:pointer}
   .section{display:grid;gap:8px}
   .section h3{margin:0;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--on-surface-variant)}
   .row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 12px;border:1px solid var(--outline-variant);
@@ -209,20 +215,18 @@
     <nav class="seg" aria-label="Vistas del vínculo">
       <button aria-selected="true">Hijos</button>
       <button aria-selected="false">Miembros</button>
-      <button aria-selected="false">Reporte</button>
     </nav>
     <main class="content">
       <a class="back" href="#">‹ Todos los vínculos</a>
 
-      <div class="section">
-        <h3>Miembros</h3>
-        <div class="row">
-          <div class="main"><b>Mario Paz</b><span>mario.paz@mail.com · Progenitor</span></div>
-        </div>
-        <div class="row">
-          <div class="main"><b>Lucía Gómez</b><span>lucia.gomez@mail.com · Progenitora</span></div>
-        </div>
+      <!-- Salud del vínculo: lo mismo que dice la tarjeta de la lista, sin abrir Reporte -->
+      <div class="strip">
+        <div><b>74%</b><span>Cumplido</span></div>
+        <div><b>62%</b><span>Pagado</span></div>
+        <div><b>2</b><span>Hijos</span></div>
       </div>
+
+      <button class="reportlink">Ver el reporte completo de junio ›</button>
 
       <div class="section">
         <h3>Hijos · 2</h3>
@@ -241,6 +245,26 @@
           </div>
         </div>
         <button class="addbtn">+ Agregar hijo</button>
+      </div>
+
+      <div class="section">
+        <h3>Progenitores · participación</h3>
+        <div class="row">
+          <span class="who-av">MP</span>
+          <div class="main" style="flex:1">
+            <b>Mario Paz</b><span>Progenitor</span>
+            <div class="part"><span>17 de 22 actividades</span><b>77,27%</b></div>
+            <div class="bar" role="img" aria-label="Mario Paz cumplió 17 de 22 actividades"><i style="width:77.27%"></i></div>
+          </div>
+        </div>
+        <div class="row">
+          <span class="who-av">LG</span>
+          <div class="main" style="flex:1">
+            <b>Lucía Gómez</b><span>Progenitora</span>
+            <div class="part"><span>14 de 20 actividades</span><b>70,00%</b></div>
+            <div class="bar" role="img" aria-label="Lucía Gómez cumplió 14 de 20 actividades"><i style="width:70%"></i></div>
+          </div>
+        </div>
       </div>
 
       <div class="section">

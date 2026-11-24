@@ -6,7 +6,7 @@
     {
       "file": "01-consola-de-vinculos.html",
       "title": "Consola de vínculos",
-      "tradeoff": "El vínculo es la unidad: búsqueda por nombre, tarjetas con salud (cumplimiento, % pagado, hijos) y el detalle con miembros, hijos editables, tendencia de cumplimiento y distribución de actividades; el reporte muestra los gastos en porcentajes por estado y la cuarta vista es la página del PDF. Máximo foco en el trabajo real del admin y cero ceremonia de dashboard; a cambio no hay lectura agregada del sistema, así que '¿cómo está todo?' exige recorrer la lista.",
+      "tradeoff": "El vínculo es la unidad: búsqueda por nombre, tarjetas con salud (cumplimiento, % pagado, hijos) y el detalle que abre con la misma salud en la cabecera, hijos con edad y actividad, progenitores con nombre y participación, tendencia de cumplimiento y distribución de actividades; el reporte ya no vive acá — un acceso directo lleva a la pestaña Reportes con el vínculo elegido, así el período no se duplica en dos pantallas. Máximo foco en el trabajo real del admin y cero ceremonia de dashboard; a cambio no hay lectura agregada del sistema, así que '¿cómo está todo?' exige recorrer la lista.",
       "width": 1680,
       "height": 900
     },
@@ -21,6 +21,13 @@
       "file": "03-expediente-del-vinculo.html",
       "title": "Expediente del vínculo",
       "tradeoff": "El reporte ES la pantalla: tipografía serif de documento, cifras monoespaciadas, secciones separadas por hairlines y el período como control principal — el admin como auditor. La gestión (hijos, miembros, estado) vive en una hoja que sube desde abajo y no compite con la lectura. El reporte se lee como un papel y el PDF es el destino natural; a cambio hay mucho scroll y gestionar siempre cuesta un toque más.",
+      "width": 1266,
+      "height": 900
+    },
+    {
+      "file": "04-reporte-desplegable.html",
+      "title": "Reporte desplegable",
+      "tradeoff": "El vínculo deja de ser una lista apilada y pasa a un selector desplegable con búsqueda, así el reporte arranca igual con 3 o con 30 vínculos. Los contadores de actividades se unifican en una sola fuente de verdad (31 cumplidas + 11 no cumplidas = 42, y el porcentaje divide siempre por el total), la tarjeta suma el cumplimiento por progenitor y, al seleccionarla, abre una vista dedicada que reutiliza la fila de agenda de la vista de actividades (columna de fecha, línea de tiempo, punto de categoría, hora mono, chips de estado y chevron) con filtros por estado y por progenitor. Gastos separa en cuatro colores los estados reales del enum: pagados, aprobados sin pagar, pendientes de aprobación y rechazados. El período y 'Generar PDF del reporte' siguen en la pantalla. A cambio el reporte pide un toque para cambiar de vínculo y otro para ver el detalle de actividades.",
       "width": 1266,
       "height": 900
     }
