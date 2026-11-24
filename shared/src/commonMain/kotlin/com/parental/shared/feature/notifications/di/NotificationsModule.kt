@@ -1,10 +1,11 @@
 package com.parental.shared.feature.notifications.di
 
+import com.parental.shared.feature.notifications.data.remote.NotificationsApi
+import com.parental.shared.platform.Platform
 import org.koin.dsl.module
 
-// La app se compone a mano en `App.kt` (mismo criterio que `HomeModule`); este
-// módulo existe para que el registro de features de `AppModule` siga siendo
-// homogéneo y para que el cableado futuro tenga un lugar obvio.
+// NotificationsApi mantiene la forma vieja de origin/main (cliente + baseUrl por
+// instancia, token por llamada): se instancia sobre el HttpClient único de Koin.
 val notificationsModule = module {
-    // TODO: bind NotificationsViewModel, NotificationsApi
+    single { NotificationsApi(get(), Platform.baseUrl) }
 }

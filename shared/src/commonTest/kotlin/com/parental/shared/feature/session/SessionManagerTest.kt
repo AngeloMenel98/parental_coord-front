@@ -31,10 +31,23 @@ class SessionManagerTest {
             "🔴 R1-002: el rol del vínculo es del usuario anterior; si sobrevive, un tercero " +
                 "enruta la sesión que no es suya.",
         )
+        assertNull(
+            session.bondId,
+            "🔴 R1-002 (integración PR #9): el vínculo ya no viaja en la respuesta del login; " +
+                "setSession siempre lo arranca en null y lo fija la derivación " +
+                "(`GET /bonds`) después. Lo importante es el mismo: NADA del login anterior " +
+                "sobrevive.",
+        )
+        // La derivación llega después y trae el vínculo de ESTE login — sin rol heredado.
+        session.updateBondId("bond-b")
         assertEquals(
             "bond-b",
             session.bondId,
-            "🔴 R1-002: el vínculo es el que trajo ESTE login, no el que quedó guardado.",
+            "PRESERVE: el vínculo NUEVO llega por la derivación, no heredado.",
+        )
+        assertNull(
+            session.bondRole,
+            "🔴 R1-002: el rol nuevo también llega por la derivación, nunca del login anterior.",
         )
     }
 
@@ -68,7 +81,10 @@ class SessionManagerTest {
         assertNull(session.token, "PRESERVE: clear() sigue cerrando la sesión.")
         assertFalse(session.isLoggedIn, "PRESERVE: sin token no hay sesión.")
         assertFalse(session.mustChangePassword, "PRESERVE: el bloqueo tampoco sobrevive.")
-        assertFalse(session.loginPending, "PRESERVE: el login pendiente se descarta.")
+        assertFalse(
+            session.state.value.loginPending,
+            "PRESERVE: el login pendiente se descarta.",
+        )
     }
 
     @Test

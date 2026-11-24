@@ -1,12 +1,19 @@
 package com.parental.shared.feature.auth.ui
 
+import com.parental.shared.core.error.ApiResult
 import com.parental.shared.feature.auth.domain.repository.IAuthRepository
+import com.parental.shared.feature.bonds.data.remote.BondsApi
 import com.parental.shared.feature.session.data.SessionManager
+import com.parental.shared.feature.session.domain.ViewerRole
+import com.parental.shared.feature.session.domain.resolveViewerRole
+import com.parental.shared.feature.thirdparty.data.remote.ThirdPartiesApi
+import androidx.lifecycle.ViewModel
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -72,12 +79,16 @@ internal const val CHANGE_PASSWORD_CURRENT_INVALID = "La contraseña actual no e
  * La validación de cliente repite la política del back a propósito. No es desconfianza: es
  * evitar que un typo cueste un viaje de red y, sobre todo, que el bloqueo se sienta como un
  * error del servidor en vez de como un formulario que dice qué falta.
+ *
+ * Es `ViewModel` (además del plain class que era en develop) para que `App` lo tome con
+ * `koinViewModel` dentro del [androidx.lifecycle.ViewModelStoreOwner] de la sesión: la hoja
+ * sobrevive a rotaciones y se libera con la sesión (logout), no con la rama.
  */
 class ChangePasswordViewModel(
     private val authRepository: IAuthRepository,
     private val sessionManager: SessionManager,
     dispatcher: CoroutineDispatcher = Dispatchers.Default,
-) {
+) : ViewModel() {
     private val scope = CoroutineScope(SupervisorJob() + dispatcher)
 
     private val _uiState = MutableStateFlow(ChangePasswordUiState())
@@ -140,6 +151,12 @@ class ChangePasswordViewModel(
         scope.cancel()
     }
 
+    override fun onCleared() {
+        // El clear del [androidx.lifecycle.ViewModelStoreOwner] de la sesión (logout)
+        // y `destroy()` comparten un solo destino: no queda scope vivo tras la sesión.
+        destroy()
+    }
+
     /**
      * La política, en el orden en que se lee el formulario: primero la provisoria, después
      * la nueva (largo, letra, número, distinta) y al final la repetición. La repetición se
@@ -178,4 +195,103 @@ class ChangePasswordViewModel(
         /** `@MinLength(8)` del `ChangePasswordDto` del back. */
         const val MIN_PASSWORD_LENGTH = 8
     }
+}
+
+/** Cuántas veces se intenta la derivación antes de rendirse con el rol en null (R4). */
+internal const val BOND_DERIVATION_ATTEMPTS = 2
+
+/** Aire entre intentos: un fallo transitorio no se reintenta en el mismo instante. */
+internal const val BOND_DERIVATION_RETRY_DELAY_MS = 250L
+
+/**
+ * Lo que dejó UN intento de derivación.
+ *
+ * La distinción es lo que evita el bucle: «no hay vínculo» o «no hay un miembro que sea
+ * este usuario» son respuestas CONCLUYENTES —reintentar devuelve lo mismo—, mientras que un
+ * error de red o del servidor sí puede cambiar en el intento siguiente (R4, R3-003).
+ */
+internal enum class BondDerivationOutcome { Settled, Unresolved }
+
+/**
+ * Deriva el vínculo de quien está logueado — `bondId` y el rol DENTRO del vínculo — desde
+ * `GET /bonds`, en UN intento.
+ *
+ * Versión token-free del helper de develop (que tiraba de `ApiClient`): las dos APIs llegan
+ * por parámetro ya resueltas por Koin, y la autorización la inyecta el interceptor del
+ * [HttpClient] único (NetworkModule). Se comparte entre los DOS caminos que derivan:
+ * el login (cuando la contraseña no es provisoria, en [LoginViewModel]) y la salida del
+ * cambio obligatorio (coordinador de `App`). Con el flag de contraseña encendido el back
+ * responde `403 PASSWORD_CHANGE_REQUIRED` en esa ruta, así que el rol del vínculo —el que
+ * decide si la persona es un tercero— sólo se puede derivar una vez que la contraseña
+ * ya cambió.
+ *
+ * 🔴 La respuesta tardía se DESCARTA si la sesión ya no es la que la pidió (R1-002): entre
+ * el request y la respuesta pudo correr un logout —o el login de otra persona—, y escribir
+ * acá repoblaría `bondId`/`bondRole` sobre una sesión que ya no existe.
+ */
+internal suspend fun SessionManager.deriveBondFromServer(
+    bondsApi: BondsApi,
+    thirdPartiesApi: ThirdPartiesApi,
+): BondDerivationOutcome {
+    val sessionToken = token ?: return BondDerivationOutcome.Unresolved
+    val sessionUserId = userId
+    val result = bondsApi.getMyBonds()
+
+    if (token != sessionToken) return BondDerivationOutcome.Unresolved
+
+    return when (result) {
+        is ApiResult.Success -> {
+            val bond = result.data.firstOrNull { it.id == bondId } ?: result.data.firstOrNull()
+            updateBondId(bond?.id)
+            if (bond == null) {
+                updateBondRole(null)
+                return BondDerivationOutcome.Settled
+            }
+
+            val memberRole = bond.members.firstOrNull { it.user?.id == sessionUserId }?.role
+            if (memberRole != null) {
+                updateBondRole(memberRole)
+                return BondDerivationOutcome.Settled
+            }
+
+            // S5 le redacta `members` al tercero temporal: su propia fila NO viaja en
+            // `GET /bonds`, así que el rol no se puede leer de ahí (el bug que lo dejaba
+            // en el Home del progenitor). `GET /third-parties/me` sí lo identifica:
+            // 200/403 = tercero (403 es el grant revocado, y su vista muestra el corte),
+            // 404 = no tiene grant → no es tercero.
+            val ownGrant = try {
+                thirdPartiesApi.getMyGrant(sessionToken)
+            } catch (e: Exception) {
+                null
+            }
+            if (token != sessionToken) return BondDerivationOutcome.Unresolved
+
+            when (val resolved = resolveViewerRole(bond.members, sessionUserId, ownGrant)) {
+                is ViewerRole.Known -> {
+                    updateBondRole(resolved.role)
+                    BondDerivationOutcome.Settled
+                }
+                ViewerRole.Unknown -> BondDerivationOutcome.Unresolved
+            }
+        }
+        is ApiResult.Error -> BondDerivationOutcome.Unresolved
+    }
+}
+
+/**
+ * [deriveBondFromServer] con hasta [attempts] intentos, para un fallo transitorio (R4).
+ *
+ * Devuelve `true` cuando la derivación quedó resuelta (con o sin rol) y `false` cuando se
+ * agotaron los intentos sin respuesta concluyente.
+ */
+internal suspend fun SessionManager.deriveBondWithRetry(
+    bondsApi: BondsApi,
+    thirdPartiesApi: ThirdPartiesApi,
+    attempts: Int = BOND_DERIVATION_ATTEMPTS,
+): Boolean {
+    repeat(attempts) { attempt ->
+        if (deriveBondFromServer(bondsApi, thirdPartiesApi) == BondDerivationOutcome.Settled) return true
+        if (attempt < attempts - 1) delay(BOND_DERIVATION_RETRY_DELAY_MS)
+    }
+    return false
 }

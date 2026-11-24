@@ -55,8 +55,8 @@ internal fun buildSetActiveBody(isActive: Boolean): JsonObject = buildJsonObject
 }
 
 /** Una sola fuente del path, para que update y delete no se desincronicen. */
-internal fun adminChildPath(baseUrl: String, childId: String): String =
-    "$baseUrl/admin/children/$childId"
+internal fun adminChildPath(childId: String): String =
+    "admin/children/$childId"
 
 /**
  * Body of `PATCH /admin/children/:id`.
@@ -82,14 +82,12 @@ internal fun buildChildPatchBody(
 
 class AdminApi(
     private val client: io.ktor.client.HttpClient,
-    private val baseUrl: String,
 ) {
     // ── Users ────────────────────────────────────────────────────────
 
-    suspend fun listUsers(token: String): ApiResult<List<AdminUser>> {
+    suspend fun listUsers(): ApiResult<List<AdminUser>> {
         return try {
-            val response = client.get("$baseUrl/admin/users") {
-                header("Authorization", "Bearer $token")
+            val response = client.get("admin/users") {
             }
             if (response.status.isSuccess()) {
                 ApiResult.Success(response.body())
@@ -102,15 +100,13 @@ class AdminApi(
     }
 
     suspend fun createUser(
-        token: String,
         email: String,
         password: String,
         firstName: String,
         lastName: String,
     ): ApiResult<AdminUser> {
         return try {
-            val response = client.post("$baseUrl/admin/users") {
-                header("Authorization", "Bearer $token")
+            val response = client.post("admin/users") {
                 contentType(ContentType.Application.Json)
                 setBody(
                     mapOf(
@@ -133,10 +129,9 @@ class AdminApi(
 
     // ── Bonds ────────────────────────────────────────────────────────
 
-    suspend fun listBonds(token: String): ApiResult<List<AdminBond>> {
+    suspend fun listBonds(): ApiResult<List<AdminBond>> {
         return try {
-            val response = client.get("$baseUrl/admin/bonds") {
-                header("Authorization", "Bearer $token")
+            val response = client.get("admin/bonds") {
             }
             if (response.status.isSuccess()) {
                 ApiResult.Success(response.body())
@@ -149,15 +144,13 @@ class AdminApi(
     }
 
     suspend fun createBond(
-        token: String,
         title: String,
         agreementType: String,
         userIds: List<String>,
         children: List<CreateBondChildRequest>,
     ): ApiResult<AdminBond> {
         return try {
-            val response = client.post("$baseUrl/admin/bonds") {
-                header("Authorization", "Bearer $token")
+            val response = client.post("admin/bonds") {
                 contentType(ContentType.Application.Json)
                 setBody(
                     CreateBondRequest(
@@ -180,28 +173,24 @@ class AdminApi(
 
     /** F1 · S1 — activa o desactiva una cuenta. Devuelve la fila que la lista muestra. */
     suspend fun setUserActive(
-        token: String,
         userId: String,
         isActive: Boolean,
     ): ApiResult<AdminUser> =
-        patch("$baseUrl/admin/users/$userId", token, buildSetActiveBody(isActive))
+        patch("admin/users/$userId", buildSetActiveBody(isActive))
 
     /** F1 · S2 — activa o desactiva un vínculo completo. */
     suspend fun setBondActive(
-        token: String,
         bondId: String,
         isActive: Boolean,
     ): ApiResult<AdminBond> =
-        patch("$baseUrl/admin/bonds/$bondId", token, buildSetActiveBody(isActive))
+        patch("admin/bonds/$bondId", buildSetActiveBody(isActive))
 
     private suspend inline fun <reified T> patch(
         url: String,
-        token: String,
         body: JsonObject,
     ): ApiResult<T> {
         return try {
             val response = client.patch(url) {
-                header("Authorization", "Bearer $token")
                 contentType(ContentType.Application.Json)
                 setBody(body)
             }
@@ -217,10 +206,9 @@ class AdminApi(
 
     // ── Children ─────────────────────────────────────────────────────
 
-    suspend fun listBondChildren(token: String, bondId: String): ApiResult<List<AdminChild>> {
+    suspend fun listBondChildren(bondId: String): ApiResult<List<AdminChild>> {
         return try {
-            val response = client.get("$baseUrl/admin/bonds/$bondId/children") {
-                header("Authorization", "Bearer $token")
+            val response = client.get("admin/bonds/$bondId/children") {
             }
             if (response.status.isSuccess()) {
                 ApiResult.Success(response.body())
@@ -233,7 +221,6 @@ class AdminApi(
     }
 
     suspend fun addChildToBond(
-        token: String,
         bondId: String,
         firstName: String,
         lastName: String,
@@ -246,8 +233,7 @@ class AdminApi(
             )
             if (dateOfBirth != null) body["dateOfBirth"] = dateOfBirth
 
-            val response = client.post("$baseUrl/admin/bonds/$bondId/children") {
-                header("Authorization", "Bearer $token")
+            val response = client.post("admin/bonds/$bondId/children") {
                 contentType(ContentType.Application.Json)
                 setBody(body)
             }
@@ -263,23 +249,20 @@ class AdminApi(
 
     /** F1 · S3 — edición parcial de un hijo; `clearDateOfBirth` manda `null`. */
     suspend fun updateChild(
-        token: String,
         childId: String,
         firstName: String? = null,
         lastName: String? = null,
         dateOfBirth: String? = null,
         clearDateOfBirth: Boolean = false,
     ): ApiResult<AdminChild> = patch(
-        adminChildPath(baseUrl, childId),
-        token,
+        adminChildPath( childId),
         buildChildPatchBody(firstName, lastName, dateOfBirth, clearDateOfBirth),
     )
 
     /** F1 · S3 — 204 sin cuerpo. */
-    suspend fun deleteChild(token: String, childId: String): ApiResult<Unit> {
+    suspend fun deleteChild(childId: String): ApiResult<Unit> {
         return try {
-            val response = client.delete(adminChildPath(baseUrl, childId)) {
-                header("Authorization", "Bearer $token")
+            val response = client.delete(adminChildPath( childId)) {
             }
             if (response.status.isSuccess()) {
                 ApiResult.Success(Unit)
@@ -295,14 +278,12 @@ class AdminApi(
 
     /** S5 — el reporte JSON del período. */
     suspend fun getBondReport(
-        token: String,
         bondId: String,
         dateFrom: String,
         dateTo: String,
     ): ApiResult<AdminBondReport> {
         return try {
-            val response = client.get("$baseUrl/admin/bonds/$bondId/report") {
-                header("Authorization", "Bearer $token")
+            val response = client.get("admin/bonds/$bondId/report") {
                 parameter("dateFrom", dateFrom)
                 parameter("dateTo", dateTo)
             }
@@ -329,7 +310,7 @@ class AdminApi(
         dateTo: String,
     ): ApiResult<AdminBondActivities> {
         return try {
-            val response = client.get("$baseUrl/admin/bonds/$bondId/activities") {
+            val response = client.get("admin/bonds/$bondId/activities") {
                 header("Authorization", "Bearer $token")
                 parameter("dateFrom", dateFrom)
                 parameter("dateTo", dateTo)
@@ -346,14 +327,12 @@ class AdminApi(
 
     /** S7 — encola el PDF; el backend responde 202 con la fila en `requested`. */
     suspend fun requestReportPdf(
-        token: String,
         bondId: String,
         dateFrom: String,
         dateTo: String,
     ): ApiResult<AdminReportRequest> {
         return try {
-            val response = client.post("$baseUrl/admin/bonds/$bondId/reports") {
-                header("Authorization", "Bearer $token")
+            val response = client.post("admin/bonds/$bondId/reports") {
                 contentType(ContentType.Application.Json)
                 setBody(buildJsonObject {
                     put("dateFrom", dateFrom)
@@ -371,10 +350,9 @@ class AdminApi(
     }
 
     /** S7 — estado del PDF; `fileUrl` viene firmada sólo cuando está completado. */
-    suspend fun getReport(token: String, reportId: String): ApiResult<AdminReport> {
+    suspend fun getReport(reportId: String): ApiResult<AdminReport> {
         return try {
-            val response = client.get("$baseUrl/admin/reports/$reportId") {
-                header("Authorization", "Bearer $token")
+            val response = client.get("admin/reports/$reportId") {
             }
             if (response.status.isSuccess()) {
                 ApiResult.Success(response.body())
@@ -393,13 +371,11 @@ class AdminApi(
      * cambiar el rango del reporte no altera lo que dice la lista.
      */
     suspend fun getBondsHealth(
-        token: String,
         dateFrom: String,
         dateTo: String,
     ): ApiResult<List<AdminBondHealth>> {
         return try {
-            val response = client.get("$baseUrl/admin/bonds/health") {
-                header("Authorization", "Bearer $token")
+            val response = client.get("admin/bonds/health") {
                 parameter("dateFrom", dateFrom)
                 parameter("dateTo", dateTo)
             }
@@ -415,13 +391,11 @@ class AdminApi(
 
     /** F3 · serie de cumplimiento del detalle del vínculo. */
     suspend fun getBondTrend(
-        token: String,
         bondId: String,
         months: Int = 6,
     ): ApiResult<AdminBondTrend> {
         return try {
-            val response = client.get("$baseUrl/admin/bonds/$bondId/trend") {
-                header("Authorization", "Bearer $token")
+            val response = client.get("admin/bonds/$bondId/trend") {
                 parameter("months", months)
             }
             if (response.status.isSuccess()) {

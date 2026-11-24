@@ -250,42 +250,40 @@ class ThirdPartyViewModelTest {
         override suspend fun getMyGrant(token: String): ApiResult<ThirdPartyGrant> = result
     }
 
-    private class FakeActivitiesApi : ActivitiesApi(UNUSED_CLIENT, "http://unused") {
+    private class FakeActivitiesApi : ActivitiesApi(UNUSED_CLIENT,) {
         var activities: ApiResult<List<Actividad>> = ApiResult.Success(emptyList())
         var listCalls = 0
         var completeCalls = 0
         var completeResult: ApiResult<CompleteActivityResponse> =
             ApiResult.Success(CompleteActivityResponse(id = "a-1", status = "verify"))
 
-        override suspend fun listActividades(token: String, bondId: String): ApiResult<List<Actividad>> {
+        override suspend fun listActividades(bondId: String): ApiResult<List<Actividad>> {
             listCalls++
             return activities
         }
 
         override suspend fun completeActivity(
-            token: String,
             id: String,
         ): ApiResult<CompleteActivityResponse> {
             completeCalls++
             return completeResult
         }
 
-        override suspend fun getActividad(token: String, id: String): ApiResult<ActividadDetalle> =
+        override suspend fun getActividad(id: String): ApiResult<ActividadDetalle> =
             ApiResult.Error(404, "no usado")
 
         override suspend fun listAttachments(
-            token: String,
             activityId: String,
         ): ApiResult<List<ActivityAttachmentDto>> = ApiResult.Success(emptyList())
     }
 
-    private class FakeCategoriesApi : CategoriesApi(UNUSED_CLIENT, "http://unused") {
+    private class FakeCategoriesApi : CategoriesApi(UNUSED_CLIENT,) {
         override suspend fun getCategories(): ApiResult<List<CategoryDto>> =
             ApiResult.Success(emptyList())
     }
 
-    private class FakeBondsApi : BondsApi(UNUSED_CLIENT, "http://unused") {
+    private class FakeBondsApi : BondsApi(UNUSED_CLIENT) {
         var result: ApiResult<List<Vinculo>> = ApiResult.Success(emptyList())
-        override suspend fun getMyBonds(token: String): ApiResult<List<Vinculo>> = result
+        override suspend fun getMyBonds(): ApiResult<List<Vinculo>> = result
     }
 }

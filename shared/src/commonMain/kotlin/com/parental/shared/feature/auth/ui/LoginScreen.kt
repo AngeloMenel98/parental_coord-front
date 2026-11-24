@@ -13,6 +13,7 @@ import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusDirection
@@ -22,27 +23,22 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.*
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.unit.dp
-import com.parental.shared.feature.auth.domain.model.AuthResponse
 
 /**
  * Pantalla de inicio de sesión: hero de marca sobre primaryContainer, formulario
  * M3 con toggle de visibilidad de contraseña, contenedor de error accesible y
- * CTA de 56dp. El contrato con el VM se preserva intacto: el flujo de
- * loginSuccess sigue disparando la navegación vía [onLoginSuccess].
+ * CTA de 56dp. El login completo vive en [LoginViewModel]; la navegación ocurre
+ * sola cuando cambia la sesión (App observa SessionManager.state).
  */
 @Composable
 fun LoginScreen(
     viewModel: LoginViewModel,
-    onLoginSuccess: suspend (AuthResponse) -> Unit,
 ) {
-    val uiState by viewModel.uiState.collectAsState()
-    val loginSuccess by viewModel.loginSuccess.collectAsState()
-    var passwordVisible by remember { mutableStateOf(false) }
-
-    LaunchedEffect(loginSuccess) {
-        loginSuccess?.let { onLoginSuccess(it) }
-    }
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    // Saveable: el toggle sobrevive a rotación / cambio de tema.
+    var passwordVisible by rememberSaveable { mutableStateOf(false) }
 
     Scaffold { innerPadding ->
         Column(

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- Solo debug: permite HTTP al backend local (10.0.2.2 = host desde el emulador). -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">10.0.2.2</domain>
+        <domain includeSubdomains="true">localhost</domain>
+        <domain includeSubdomains="true">127.0.0.1</domain>
+        <!-- Teléfono físico en la LAN del host: ver 01-consola de la sesión de diseño; sin esta línea el cleartext HTTP está bloqueado -->
+        <domain includeSubdomains="true">192.168.0.17</domain>
+    </domain-config>
+</network-security-config>

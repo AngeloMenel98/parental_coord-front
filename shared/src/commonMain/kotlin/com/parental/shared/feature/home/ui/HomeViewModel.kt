@@ -1,17 +1,17 @@
 package com.parental.shared.feature.home.ui
 
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import com.parental.shared.core.error.onFailure
 import com.parental.shared.core.error.onSuccess
 import com.parental.shared.feature.home.data.remote.HomeApi
 import com.parental.shared.feature.home.domain.model.HomeSummary
-import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
+import com.parental.shared.feature.session.data.SessionManager
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 data class HomeUiState(
@@ -19,56 +19,59 @@ data class HomeUiState(
     val error: String? = null,
     val summary: HomeSummary? = null,
     val userName: String = "",
-    val complianceLoading: Boolean = false,
     val complianceError: String? = null,
 )
 
 class HomeViewModel(
     private val homeApi: HomeApi,
-    private val token: String,
-    private val userName: String,
-    /**
-     * El usuario que pregunta. Lo necesita la métrica "Asignadas" (T20): sin él no
-     * se puede contar lo que es de uno y la tarjeta queda sin dato, no en cero.
-     */
-    private val currentUserId: String? = null,
-    private val dispatcher: CoroutineDispatcher = Dispatchers.Default,
-) {
-    private val scope = CoroutineScope(SupervisorJob() + dispatcher)
-
-    private val _uiState = MutableStateFlow(HomeUiState(userName = userName))
+    private val sessionManager: SessionManager,
+) : ViewModel() {
+    private val _uiState = MutableStateFlow(HomeUiState(userName = sessionManager.userName.orEmpty()))
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
+
+    /** Carga en curso: un nuevo "Reintentar" la cancela en vez de correr en paralelo. */
+    private var loadJob: Job? = null
 
     init {
         loadHomeData()
     }
 
     fun loadHomeData() {
-        scope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true, error = null)
+        loadJob?.cancel()
+        loadJob = viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true, error = null) }
 
-            homeApi.getHomeSummary(token, currentUserId)
+            homeApi.getHomeSummary(currentUserId = sessionManager.userId)
                 .onSuccess { summary ->
-                    _uiState.value = _uiState.value.copy(
-                        isLoading = false,
-                        summary = summary,
-                        complianceError = if (summary.bondId != null && summary.compliance == null) {
-                            "No se pudo cargar el cumplimiento"
-                        } else {
-                            null
-                        },
-                    )
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            summary = summary,
+                            // El compliance viaja DENTRO del summary (main): si el vínculo
+                            // existe pero el cumplimiento no vino, es un fallo parcial y la
+                            // tarjeta de cumplimiento muestra su propio error.
+                            complianceError = if (summary.bondId != null && summary.compliance == null) {
+                                "No se pudo cargar el cumplimiento"
+                            } else {
+                                null
+                            },
+                        )
+                    }
                 }
-                .onFailure { e ->
-                    _uiState.value = _uiState.value.copy(
-                        isLoading = false,
-                        error = e.message ?: "Failed to load home data",
-                    )
+                .onFailure { error ->
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            // El error es el RuntimeException del onFailure (HTTP <code>:
+                            // <mensaje>); su message ya es apto para el usuario.
+                            error = error.message?.ifBlank { null } ?: "No se pudo cargar el resumen",
+                        )
+                    }
                 }
         }
     }
 
-    fun destroy() {
-        scope.cancel()
+    fun refresh() {
+        loadHomeData()
     }
 }

@@ -73,6 +73,6 @@ class AdminPatchBodiesTest {
 
     @Test
     fun `update and delete share the same child path`() {
-        assertEquals("$baseUrl/admin/children/$childId", adminChildPath(baseUrl, childId))
+        assertEquals("admin/children/$childId", adminChildPath(childId))
     }
 }

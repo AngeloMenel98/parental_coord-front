@@ -1,14 +1,28 @@
 package com.parental.shared.feature.home.ui
 
 import com.parental.shared.core.error.ApiResult
+import com.parental.shared.core.network.CategoriesApi
+import com.parental.shared.core.network.CategoryDto
+import com.parental.shared.feature.activities.data.remote.ActivitiesApi
+import com.parental.shared.feature.activities.domain.model.Actividad
+import com.parental.shared.feature.bonds.data.remote.BondsApi
+import com.parental.shared.feature.expenses.data.remote.ExpensesApi
+import com.parental.shared.feature.expenses.domain.model.ExpenseSummaryCountsDto
+import com.parental.shared.feature.expenses.domain.model.ExpenseSummaryDto
 import com.parental.shared.feature.home.data.remote.HomeApi
+import com.parental.shared.feature.bonds.domain.model.Vinculo
+import com.parental.shared.feature.session.data.SessionManager
 import com.parental.shared.feature.home.domain.model.ChildProfile
 import com.parental.shared.feature.home.domain.model.ComplianceMember
 import com.parental.shared.feature.home.domain.model.ComplianceResponse
 import com.parental.shared.feature.home.domain.model.HomeSummary
 import io.ktor.client.HttpClient
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.setMain
 import kotlin.test.AfterTest
+import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -24,6 +38,14 @@ import kotlin.test.assertTrue
  */
 class HomeViewModelTest {
 
+    private val testDispatcher = UnconfinedTestDispatcher()
+
+    @BeforeTest
+    fun setUp() {
+        Dispatchers.setMain(testDispatcher)
+    }
+
+
     private val token = "t-1"
     private val userName = "Juan"
     private val viewModels = mutableListOf<HomeViewModel>()
@@ -32,13 +54,33 @@ class HomeViewModelTest {
         val UNUSED_CLIENT = HttpClient { }
     }
 
-    private class FakeHomeApi : HomeApi(UNUSED_CLIENT, "http://unused") {
+
+    private class FakeBondsApi(var result: ApiResult<List<Vinculo>> = ApiResult.Success(emptyList())) : BondsApi(UNUSED_CLIENT)
+    private class FakeActivitiesApi : ActivitiesApi(UNUSED_CLIENT) {
+        override suspend fun listActividades(bondId: String): ApiResult<List<Actividad>> =
+            ApiResult.Success(emptyList())
+    }
+    private class FakeExpensesApi : ExpensesApi(UNUSED_CLIENT, "http://unused") {
+        override suspend fun getSummary(token: String, bondId: String): ApiResult<ExpenseSummaryDto> =
+            ApiResult.Success(ExpenseSummaryDto(saldo = 0.0, porPagar = 0.0, porCobrar = 0.0, counts = ExpenseSummaryCountsDto(pendientes = 0, aprobados = 0, pagados = 0, rechazados = 0)))
+    }
+    private class FakeCategoriesApi : CategoriesApi(UNUSED_CLIENT) {
+        override suspend fun getCategories(): ApiResult<List<CategoryDto>> =
+            ApiResult.Success(emptyList())
+    }
+
+    private class FakeHomeApi : HomeApi(
+        FakeBondsApi(ApiResult.Success(emptyList())),
+        FakeActivitiesApi(),
+        FakeExpensesApi(),
+        FakeCategoriesApi(),
+    ) {
         var calls = 0
         var result: ApiResult<HomeSummary> = ApiResult.Success(
             HomeSummary(children = emptyList())
         )
 
-        override suspend fun getHomeSummary(token: String, currentUserId: String?): ApiResult<HomeSummary> {
+        override suspend fun getHomeSummary(currentUserId: String?): ApiResult<HomeSummary> {
             calls++
             return result
         }
@@ -46,16 +88,17 @@ class HomeViewModelTest {
 
     @AfterTest
     fun tearDown() {
-        viewModels.forEach { it.destroy() }
         viewModels.clear()
     }
 
     private fun build(api: FakeHomeApi): HomeViewModel {
+        val sessionManager = SessionManager().apply {
+            setSession(token = "t-1", userName = this@HomeViewModelTest.userName, role = "user")
+            updateUserId("u1")
+        }
         val viewModel = HomeViewModel(
             homeApi = api,
-            token = token,
-            userName = userName,
-            dispatcher = UnconfinedTestDispatcher(),
+            sessionManager = sessionManager,
         )
         viewModels += viewModel
         return viewModel

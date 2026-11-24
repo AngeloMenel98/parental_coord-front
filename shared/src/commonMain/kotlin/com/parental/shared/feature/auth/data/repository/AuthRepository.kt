@@ -1,13 +1,14 @@
 package com.parental.shared.feature.auth.data.repository
 
 import com.parental.shared.core.error.ApiResult
-import com.parental.shared.core.network.ApiClient
+import com.parental.shared.feature.auth.data.remote.AuthApi
 import com.parental.shared.feature.auth.domain.model.AuthResponse
 import com.parental.shared.feature.auth.domain.model.User
 import com.parental.shared.feature.auth.domain.repository.IAuthRepository
 
-class AuthRepository : IAuthRepository {
-    private val authApi = ApiClient.authApi()
+class AuthRepository(
+    private val authApi: AuthApi,
+) : IAuthRepository {
     private var cachedToken: String? = null
     private var cachedUser: User? = null
 
@@ -46,8 +47,9 @@ class AuthRepository : IAuthRepository {
     }
 
     override suspend fun getProfile(): Result<User> {
-        val token = cachedToken ?: return Result.failure(Exception("Not authenticated"))
-        return when (val result = authApi.me(token)) {
+        if (cachedToken == null) return Result.failure(Exception("Not authenticated"))
+        // El token lo agrega el plugin SessionAuth del HttpClient.
+        return when (val result = authApi.me()) {
             is ApiResult.Success -> Result.success(result.data)
             is ApiResult.Error -> Result.failure(Exception(result.message))
         }
@@ -64,7 +66,9 @@ class AuthRepository : IAuthRepository {
         newPassword: String,
     ): Result<AuthResponse> {
         val token = cachedToken ?: return Result.failure(Exception("Not authenticated"))
-        return when (val result = authApi.changePassword(token, currentPassword, newPassword)) {
+        // Token-free (PR #5): la autorización viaja por el interceptor del HttpClient único,
+        // no por parámetro; `token` arriba sólo define que hay sesión.
+        return when (val result = authApi.changePassword(currentPassword, newPassword)) {
             is ApiResult.Success -> {
                 cachedToken = result.data.access_token
                 cachedUser = result.data.user
