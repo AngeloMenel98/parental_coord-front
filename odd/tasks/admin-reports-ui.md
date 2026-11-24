@@ -85,6 +85,32 @@ through the existing Gradle setup.
   generated stamp) and "Abrir PDF" opens the signed URL. Without a generated PDF the
   action is disabled and the screen explains why.
 
+- **S19 — Vínculo as a dropdown.** QUOTE: "cuando se seleccione un vinculo sea desde un
+  dropdown asi si hay muchos vinculos no se stackea". The Reports tab picks the bond from one
+  dropdown with a search field instead of a stack of chips; the closed control shows the chosen
+  bond and its members, and the list scrolls when it does not fit.
+- **S20 — One set of activity counters.** QUOTE: "la card de actividades muestra cumplidas (1)
+  vencidas (3) y su porcentaje de cumplimiento(20%), pero luego dice overdue 4 y done 1" and
+  "quiero ver un resumen del porcentaje de actividades cumplidas, no cumplidas y por cual
+  usuario". Every number on the card comes from `activities.byStatus` only: the legend rows sum
+  to `total`, the rate always divides by `total`, and no second counter with a different rule
+  is shown. The card adds the per-progenitor breakdown from `members`
+  (`completed` of `assigned`, with its percentage).
+- **S21 — Activity drill-down.** QUOTE: "quiero clickear sobre la card de actividades y me
+  muestre que actividades se cumplieron y cuales no" and "trata de reutilizar componentes de la
+  vista de actividades para mostrarlas". Tapping the activities card opens a detail screen that
+  lists the activities of the period through `GET /admin/bonds/:bondId/activities` (backend
+  S16), rendered with the activities view row (date column, timeline line, category dot,
+  monospace time, status tag, chevron), grouped as cumplidas / no cumplidas, with filters by
+  status and by progenitor.
+- **S22 — Expenses by status colour.** QUOTE: "quiero que se diferencien los colores en Gastos
+  entre Pagados, aprobados pendientes y rechazados". The four expense statuses are labelled
+  Pagados / Aprobados sin pagar / Pendientes de aprobación / Rechazados, each with its own
+  token colour, count and percentage.
+- **S23 — The period and the report stay.** QUOTE: "me imagino que sigue estando la opcion de
+  generar el reporte". The date range pickers and the "Generar PDF del reporte" action remain
+  on the screen.
+
 ## Tasks
 
 | ID | Specs | Route | Status | Commit |
@@ -95,6 +121,7 @@ through the existing Gradle setup.
 | F4 | S13-S14 | inline | done | (single commit) |
 | F5 | S15-S17 | inline | done | e14c1a9, c1e6079 |
 | F6 | S9, S13, S18 | inline | done | (single commit) |
+| F7 | S19-S23 | inline (front) + delegated (backend S16) | done | (uncommitted on branch) |
 
 ## Log
 
@@ -241,3 +268,51 @@ divergan.
 **L18 — evidencia.** `./gradlew :shared:testDebugUnitTest` → 56 suites / **518 tests**, 0
 fallos, incluidos los 5 nuevos de `AdminUserSearchTest` (nombre con acento, mayúsculas,
 apellido, email, consulta vacía y no-coincidencia). APK reinstalado en el dispositivo.
+
+**L19 — handoff `admin-ui/04-reporte-desplegable.html` (F7).** El artboard nació de cuatro
+pedidos del usuario sobre el reporte de vínculo, más dos comentarios de canvas aplicados:
+selector desplegable, contadores unificados con desglose por progenitor, detalle de
+actividades al tocar la tarjeta y colores de gastos por estado. Decisiones:
+- El contador se compone **sólo** desde `activities.byStatus`. El campo derivado `overdue` del
+  backend (predicado por deadline sobre estados no terminales) y el estado `overdue` eran dos
+  conjuntos distintos con el mismo nombre: por eso la app mostraba "vencidas 3" y "overdue 4" a
+  la vez. La UI ya no lo lee; el PDF del backend sigue usándolo.
+- El detalle necesita filas de actividad que el reporte no trae y que `GET /activities/bond`
+  no puede servir a un admin que no es miembro: se delegó el endpoint admin (S16 del feature
+  del backend) y la UI consume esa ruta.
+- La fila del detalle reutiliza `AgendaTimelineRow`/`ActivityBody` en vez de un layout nuevo.
+- Este handoff no commitea: los cambios quedan sin commitear en `ft/third-party-access`, que ya
+  tenía trabajo de diseño encima.
+
+**L20 — F7 evidence.** `./gradlew :shared:testDebugUnitTest` → BUILD SUCCESSFUL, **724 tests,
+0 fallos**, incluidos los 10 nuevos de `AdminReportCountsTest` (el bug reportado pineado: la
+tarjeta no puede decir 4 vencidas cuando el estado dice 3, y la leyenda siempre suma el total).
+Backend: 106 suites / 1243 tests, `tsc` y `eslint` limpios. El detalle no reusa
+`AgendaTimelineRow` literal — su firma exige un `Actividad` completo, callbacks de confirmación y
+hueco de swipe que una vista de lectura no tiene — sino el lenguaje visual que define el sistema:
+columna de fecha de 48 dp, línea de 1 dp, hora mono, `StatusTag` y `StatusTokens`. Hallazgo de
+color: `Status.Paid` y `Status.Assigned` son el mismo #1E88E5, así que Pagados toma `Done` para
+que los cuatro estados de Gastos se distingan.
+
+**L21 — iteración del frame 2 de `admin-ui/01` (detalle del vínculo).** QUOTE del usuario: "sacar
+la parte de reportes ya que sino esta duplicado", más salud en cabecera, miembros con nombre y
+participación, e hijos con su actividad. El frame 2 del artboard elegido quedó: strip de salud
+(cumplido/pagado/hijos, los mismos datos de `GET /admin/bonds/health`), acceso directo al
+reporte en la pestaña Reportes (sin período duplicado), hijos con edad y `N actividades`, y
+progenitores con iniciales, rol y barra de participación (`x de y · %`). Ojo para implementar:
+`BondMemberInfo` del cliente no trae nombre (sólo email/rol) ni participación — el nombre está
+en `AdminReportMember` del reporte; para pintar esa sección hace falta que la fuente de
+participación llegue sin renderizar el reporte entero.
+
+**L22 — F8 · implementación del detalle (S24).** El reporte se carga en background al abrir el
+detalle (`openBond` llama `loadReportIfNeeded`), así que la participación y la actividad por hijo
+llegan sin renderizar la sección de Reporte acá — los DATOS siguen viniendo del reporte, sólo la
+UI duplicada se fue. La solapa Reporte del detalle desapareció (Hijos · Miembros), con el acceso
+directo "Ver el reporte completo ›" a la pestaña Reportes. Cabecera con strip de salud desde
+`healthByBond` (cumplido/pagado/hijos), hijos con edad calculada y `N actividades`, progenitores
+con avatar de iniciales, rol legible (`parent`→Progenitor) y barra de participación; sin reporte
+la fila cae al prefijo del email con números en cero. Merge en `AdminDetail.kt` (puro) + 10 tests
+en `AdminDetailTest.kt`. RED primero: 20+ unresolved references.
+
+**L23 — evidencia F8.** `./gradlew :shared:testDebugUnitTest` → BUILD SUCCESSFUL, **734 tests,
+0 fallos** (10 nuevos de `AdminDetailTest`).

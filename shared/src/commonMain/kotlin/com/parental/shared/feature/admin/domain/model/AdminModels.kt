@@ -166,3 +166,32 @@ data class AdminBondTrend(
     val bondId: String,
     val months: List<AdminBondTrendPoint> = emptyList(),
 )
+
+// ── F7 · Detalle de actividades (artboard admin-ui/04) ───────────────
+// `GET /admin/bonds/:id/activities` (S16 del feature del backend). Nombres calcados
+// del JSON y con default para que un backend viejo no rompa el parseo.
+
+/** Una actividad del período, con lo justo para leerla en una fila de agenda. */
+@Serializable
+data class AdminBondActivity(
+    val id: String,
+    val title: String,
+    val status: String,
+    val categoryId: String? = null,
+    val categoryName: String? = null,
+    val assignedTo: String? = null,
+    val assigneeName: String? = null,
+    val scheduledStart: String? = null,
+    val deadline: String? = null,
+    val completedAt: String? = null,
+)
+
+/** `total` cuenta la ventana entera; `activities` viene acotada. */
+@Serializable
+data class AdminBondActivities(
+    val bondId: String,
+    val dateFrom: String,
+    val dateTo: String,
+    val total: Int = 0,
+    val activities: List<AdminBondActivity> = emptyList(),
+)
