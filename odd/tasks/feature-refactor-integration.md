@@ -24,3 +24,10 @@
 | CP2 | S6 | inline | done | (stageado en merge) |
 | CP3 | S8 | delegated | pending | - |
 | CP4 | S6-S8 | inline | pending | - |
+- L6 (2026-11-24, cierre fase 2): Merge ffd13f7 fix/pr9-change-password-port → develop.
+  8 conflictos de App.kt resueltos (frame main + port change-password), ChangePasswordViewModel
+  como ViewModel Koin, LoginViewModel con mustChangePassword + deriveBondWithRetry token-free,
+  AuthModule registra el VM. Alineaciones de tests documentadas por el worker (4, escenarios
+  preservados). Verificación: 745 tests / 0 fallos + assembleDebug. PR #9 MERGEABLE/CLEAN.
+  Autorización de desviaciones del parent: LoginViewModel (exigida por CP3 bullet 3) y
+  derive-then-release en onSuccess (S8 manda sobre el shorthand literal).
