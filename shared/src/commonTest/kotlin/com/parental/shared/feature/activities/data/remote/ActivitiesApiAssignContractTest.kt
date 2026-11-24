@@ -16,7 +16,6 @@ class ActivitiesApiAssignContractTest {
 
     private val api = ActivitiesApi(
         client = io.ktor.client.HttpClient { },
-        baseUrl = "http://unused",
     )
 
     @Test

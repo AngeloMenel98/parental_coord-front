@@ -1,6 +1,8 @@
 package com.parental.shared.feature.home.data.remote
 
 import com.parental.shared.core.error.ApiResult
+import com.parental.shared.core.network.CategoriesApi
+import com.parental.shared.core.network.CategoryDto
 import com.parental.shared.feature.activities.data.remote.ActivitiesApi
 import com.parental.shared.feature.activities.domain.model.Actividad
 import com.parental.shared.feature.bonds.data.remote.BondsApi
@@ -31,9 +33,15 @@ class HomeApiTest {
         val UNUSED_CLIENT = HttpClient { }
     }
 
-    private class FakeBondsApi(var result: ApiResult<List<Vinculo>>) : BondsApi(UNUSED_CLIENT, "http://unused") {
+    private class FakeCategoriesApi :
+        CategoriesApi(UNUSED_CLIENT) {
+        override suspend fun getCategories(): ApiResult<List<CategoryDto>> =
+            ApiResult.Success(emptyList())
+    }
+
+    private class FakeBondsApi(var result: ApiResult<List<Vinculo>>) : BondsApi(UNUSED_CLIENT) {
         var calls = 0
-        override suspend fun getMyBonds(token: String): ApiResult<List<Vinculo>> {
+        override suspend fun getMyBonds(): ApiResult<List<Vinculo>> {
             calls++
             return result
         }
@@ -119,15 +127,14 @@ class HomeApiTest {
     fun `getHomeSummary puebla compliance desde el primer vinculo`() = runTest {
         val bondsApi = FakeBondsApi(ApiResult.Success(listOf(bond())))
         val compliance = complianceResponse()
-        val homeApi = object : HomeApi(UNUSED_CLIENT, "http://unused", bondsApi) {
-            override suspend fun getCompliance(bondId: String, token: String): ApiResult<ComplianceResponse> {
+        val homeApi = object : HomeApi(bondsApi, FakeActivitiesApi(), FakeExpensesApi(), FakeCategoriesApi()) {
+            override suspend fun getCompliance(bondId: String): ApiResult<ComplianceResponse> {
                 assertEquals("b1", bondId)
-                assertEquals("t-1", token)
                 return ApiResult.Success(compliance)
             }
         }
 
-        val result = homeApi.getHomeSummary("t-1")
+        val result = homeApi.getHomeSummary()
 
         assertEquals(1, bondsApi.calls)
         assertTrue(result is ApiResult.Success)
@@ -139,14 +146,14 @@ class HomeApiTest {
     fun `getHomeSummary devuelve el error de bonds sin llamar a compliance`() = runTest {
         val bondsApi = FakeBondsApi(ApiResult.Error(500, " bonds down"))
         var complianceCalled = false
-        val homeApi = object : HomeApi(UNUSED_CLIENT, "http://unused", bondsApi) {
-            override suspend fun getCompliance(bondId: String, token: String): ApiResult<ComplianceResponse> {
+        val homeApi = object : HomeApi(bondsApi, FakeActivitiesApi(ApiResult.Success(emptyList())), FakeExpensesApi(ApiResult.Success(expenseSummary())), FakeCategoriesApi()) {
+            override suspend fun getCompliance(bondId: String): ApiResult<ComplianceResponse> {
                 complianceCalled = true
                 return ApiResult.Success(complianceResponse())
             }
         }
 
-        val result = homeApi.getHomeSummary("t-1")
+        val result = homeApi.getHomeSummary()
 
         assertEquals(1, bondsApi.calls)
         assertTrue(!complianceCalled)
@@ -158,14 +165,14 @@ class HomeApiTest {
     fun `getHomeSummary no llama a compliance si no hay vinculos`() = runTest {
         val bondsApi = FakeBondsApi(ApiResult.Success(emptyList()))
         var complianceCalled = false
-        val homeApi = object : HomeApi(UNUSED_CLIENT, "http://unused", bondsApi) {
-            override suspend fun getCompliance(bondId: String, token: String): ApiResult<ComplianceResponse> {
+        val homeApi = object : HomeApi(bondsApi, FakeActivitiesApi(ApiResult.Success(emptyList())), FakeExpensesApi(ApiResult.Success(expenseSummary())), FakeCategoriesApi()) {
+            override suspend fun getCompliance(bondId: String): ApiResult<ComplianceResponse> {
                 complianceCalled = true
                 return ApiResult.Success(complianceResponse())
             }
         }
 
-        val result = homeApi.getHomeSummary("t-1")
+        val result = homeApi.getHomeSummary()
 
         assertEquals(1, bondsApi.calls)
         assertTrue(!complianceCalled)
@@ -176,20 +183,21 @@ class HomeApiTest {
 
     // ── T20 · Las tres métricas del Home ────────────────────────────────────
 
-    private class FakeActivitiesApi(var result: ApiResult<List<Actividad>>) :
-        ActivitiesApi(UNUSED_CLIENT, "http://unused") {
+    private class FakeActivitiesApi(var result: ApiResult<List<Actividad>> = ApiResult.Success(emptyList())) :
+        ActivitiesApi(UNUSED_CLIENT) {
         var calls = 0
-        override suspend fun listActividades(token: String, bondId: String): ApiResult<List<Actividad>> {
+        override suspend fun listActividades(bondId: String): ApiResult<List<Actividad>> {
             calls++
             return result
         }
     }
 
-    private class FakeExpensesApi(var result: ApiResult<ExpenseSummaryDto>) :
+    private class FakeExpensesApi(var result: ApiResult<ExpenseSummaryDto> = ApiResult.Error(0, "unused expenses fake")) :
         ExpensesApi(UNUSED_CLIENT, "http://unused") {
         var calls = 0
         override suspend fun getSummary(token: String, bondId: String): ApiResult<ExpenseSummaryDto> {
             calls++
+            @Suppress("UNCHECKED_CAST")
             return result
         }
     }
@@ -204,7 +212,7 @@ class HomeApiTest {
         assignedTo = assignedTo,
     )
 
-    private fun expenseSummary(saldo: Double) = ExpenseSummaryDto(
+    private fun expenseSummary(saldo: Double = 0.0) = ExpenseSummaryDto(
         saldo = saldo,
         porPagar = 0.0,
         porCobrar = 0.0,
@@ -223,9 +231,9 @@ class HomeApiTest {
             )
         )
         val expensesApi = FakeExpensesApi(ApiResult.Success(expenseSummary(saldo = -120.5)))
-        val homeApi = HomeApi(UNUSED_CLIENT, "http://unused", FakeBondsApi(ApiResult.Success(listOf(bond()))), activitiesApi, expensesApi)
+        val homeApi = HomeApi(FakeBondsApi(ApiResult.Success(listOf(bond()))), activitiesApi, expensesApi, FakeCategoriesApi())
 
-        val result = homeApi.getHomeSummary("t-1", currentUserId = "u1")
+        val result = homeApi.getHomeSummary(currentUserId = "u1")
 
         assertTrue(result is ApiResult.Success)
         assertEquals(2, result.data.metrics.assignedToMe)
@@ -239,9 +247,9 @@ class HomeApiTest {
     fun `si la lista falla los conteos quedan sin dato y el saldo sigue`() = runTest {
         val activitiesApi = FakeActivitiesApi(ApiResult.Error(500, "activities down"))
         val expensesApi = FakeExpensesApi(ApiResult.Success(expenseSummary(saldo = 30.0)))
-        val homeApi = HomeApi(UNUSED_CLIENT, "http://unused", FakeBondsApi(ApiResult.Success(listOf(bond()))), activitiesApi, expensesApi)
+        val homeApi = HomeApi(FakeBondsApi(ApiResult.Success(listOf(bond()))), activitiesApi, expensesApi, FakeCategoriesApi())
 
-        val result = homeApi.getHomeSummary("t-1", currentUserId = "u1")
+        val result = homeApi.getHomeSummary(currentUserId = "u1")
 
         assertTrue(result is ApiResult.Success)
         assertNull(result.data.metrics.assignedToMe)
@@ -253,9 +261,9 @@ class HomeApiTest {
     fun `si el resumen de gastos falla el saldo queda sin dato y los conteos siguen`() = runTest {
         val activitiesApi = FakeActivitiesApi(ApiResult.Success(listOf(activity("assigned"))))
         val expensesApi = FakeExpensesApi(ApiResult.Error(503, "expenses down"))
-        val homeApi = HomeApi(UNUSED_CLIENT, "http://unused", FakeBondsApi(ApiResult.Success(listOf(bond()))), activitiesApi, expensesApi)
+        val homeApi = HomeApi(FakeBondsApi(ApiResult.Success(listOf(bond()))), activitiesApi, expensesApi, FakeCategoriesApi())
 
-        val result = homeApi.getHomeSummary("t-1", currentUserId = "u1")
+        val result = homeApi.getHomeSummary(currentUserId = "u1")
 
         assertTrue(result is ApiResult.Success)
         assertNull(result.data.metrics.balance)
@@ -266,9 +274,9 @@ class HomeApiTest {
     fun `sin vinculo no hay metricas y no se llama a la lista ni al resumen`() = runTest {
         val activitiesApi = FakeActivitiesApi(ApiResult.Success(emptyList()))
         val expensesApi = FakeExpensesApi(ApiResult.Success(expenseSummary(saldo = 0.0)))
-        val homeApi = HomeApi(UNUSED_CLIENT, "http://unused", FakeBondsApi(ApiResult.Success(emptyList())), activitiesApi, expensesApi)
+        val homeApi = HomeApi(FakeBondsApi(ApiResult.Success(emptyList())), activitiesApi, expensesApi, FakeCategoriesApi())
 
-        val result = homeApi.getHomeSummary("t-1", currentUserId = "u1")
+        val result = homeApi.getHomeSummary(currentUserId = "u1")
 
         assertTrue(result is ApiResult.Success)
         assertEquals(0, activitiesApi.calls)

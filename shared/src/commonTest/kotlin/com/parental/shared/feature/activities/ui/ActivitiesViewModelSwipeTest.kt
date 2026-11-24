@@ -48,7 +48,7 @@ class ActivitiesViewModelSwipeTest {
     /** Reloj controlable. `now` avanza a mano; los 5000 ms son datos, no esperas. */
     private var now = 0L
 
-    private class FakeActivitiesApi : ActivitiesApi(UNUSED_CLIENT, "http://unused") {
+    private class FakeActivitiesApi : ActivitiesApi(UNUSED_CLIENT) {
         var listCalls = 0
         var deleteCalls = 0
         var restoreCalls = 0
@@ -75,9 +75,7 @@ class ActivitiesViewModelSwipeTest {
         var undoDeclineResult: ApiResult<UndoDeclineResponse> =
             ApiResult.Success(UndoDeclineResponse(id = "act-1", status = "assigned"))
 
-        override suspend fun listActividades(
-            token: String,
-            bondId: String,
+        override suspend fun listActividades(bondId: String,
         ): ApiResult<List<Actividad>> {
             listCalls++
             return ApiResult.Success(actividadesSnapshot)
@@ -86,27 +84,21 @@ class ActivitiesViewModelSwipeTest {
         /** Lo que el refetch devuelve: por defecto ya sin la fila borrada. */
         var actividadesSnapshot: List<Actividad> = emptyList()
 
-        override suspend fun deleteActivity(
-            token: String,
-            id: String,
+        override suspend fun deleteActivity(id: String,
         ): ApiResult<DeleteActivityResponse> {
             deleteCalls++
             actionGate?.await()
             return deleteResult
         }
 
-        override suspend fun restoreActivity(
-            token: String,
-            id: String,
+        override suspend fun restoreActivity(id: String,
         ): ApiResult<RestoreActivityResponse> {
             restoreCalls++
             actionGate?.await()
             return restoreResult
         }
 
-        override suspend fun cancelActivity(
-            token: String,
-            id: String,
+        override suspend fun cancelActivity(id: String,
             request: ActivityReasonRequest,
         ): ApiResult<CancelActivityResponse> {
             cancelCalls++
@@ -115,9 +107,7 @@ class ActivitiesViewModelSwipeTest {
             return cancelResult
         }
 
-        override suspend fun declineActivity(
-            token: String,
-            id: String,
+        override suspend fun declineActivity(id: String,
             request: ActivityReasonRequest,
         ): ApiResult<DeclineActivityResponse> {
             declineCalls++
@@ -127,7 +117,6 @@ class ActivitiesViewModelSwipeTest {
         }
 
         override suspend fun undoDeclineActivity(
-            token: String,
             id: String,
         ): ApiResult<UndoDeclineResponse> {
             undoDeclineCalls++
@@ -136,13 +125,13 @@ class ActivitiesViewModelSwipeTest {
         }
     }
 
-    private class FakeCategoriesApi : CategoriesApi(UNUSED_CLIENT, "http://unused") {
+    private class FakeCategoriesApi : CategoriesApi(UNUSED_CLIENT) {
         override suspend fun getCategories(): ApiResult<List<CategoryDto>> =
             ApiResult.Success(listOf(CategoryDto(id = "cat", name = "Salud", criticality = "medium")))
     }
 
-    private class FakeBondsApi : BondsApi(UNUSED_CLIENT, "http://unused") {
-        override suspend fun getMyBonds(token: String): ApiResult<List<Vinculo>> =
+    private class FakeBondsApi : BondsApi(UNUSED_CLIENT) {
+        override suspend fun getMyBonds(): ApiResult<List<Vinculo>> =
             ApiResult.Success(
                 listOf(
                     Vinculo(

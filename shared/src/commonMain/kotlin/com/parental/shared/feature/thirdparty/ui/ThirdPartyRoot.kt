@@ -21,16 +21,21 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
-import com.parental.shared.core.network.ApiClient
+import com.parental.shared.core.network.CategoriesApi
 import com.parental.shared.core.ui.components.BottomNavItem
 import com.parental.shared.core.ui.components.CategoryInfo
 import com.parental.shared.core.ui.components.EmptyContentState
 import com.parental.shared.core.ui.theme.Spacing
+import com.parental.shared.feature.activities.data.remote.ActivitiesApi
+import com.parental.shared.feature.bonds.data.remote.BondsApi
+import com.parental.shared.feature.notifications.data.remote.NotificationsApi
 import com.parental.shared.feature.notifications.ui.NotificationsScreen
 import com.parental.shared.feature.notifications.ui.NotificationsViewModel
 import com.parental.shared.feature.notifications.ui.UnreadBadge
 import com.parental.shared.feature.notifications.ui.UnreadCountPoller
+import com.parental.shared.feature.thirdparty.data.remote.ThirdPartiesApi
 import kotlinx.datetime.TimeZone
+import org.koin.compose.koinInject
 
 /**
  * El árbol de navegación del terciario temporal: **dos destinos y nada más**.
@@ -55,7 +60,7 @@ fun ThirdPartyRoot(
 
     // La campana existe en las dos pantallas, así que el contador vive acá (una sola
     // fuente) con el mismo patrón que el Home de los progenitores: badge + poller.
-    val notificationsApi = remember { ApiClient.notificationsApi() }
+    val notificationsApi = koinInject<NotificationsApi>()
     val unreadBadge = remember(token) { UnreadBadge() }
     val unreadCount by unreadBadge.count.collectAsState()
     val unreadPoller = remember(token) {
@@ -87,12 +92,16 @@ fun ThirdPartyRoot(
         return
     }
 
+    val thirdPartiesApi = koinInject<ThirdPartiesApi>()
+    val activitiesApi = koinInject<ActivitiesApi>()
+    val categoriesApi = koinInject<CategoriesApi>()
+    val bondsApi = koinInject<BondsApi>()
     val viewModel = remember(currentUserId, bondId) {
         ThirdPartyViewModel(
-            thirdPartiesApi = ApiClient.thirdPartiesApi(),
-            activitiesApi = ApiClient.activitiesApi(),
-            categoriesApi = ApiClient.categoriesApi(),
-            bondsApi = ApiClient.bondsApi(),
+            thirdPartiesApi = thirdPartiesApi,
+            activitiesApi = activitiesApi,
+            categoriesApi = categoriesApi,
+            bondsApi = bondsApi,
             token = token,
             bondId = bondId,
             currentUserId = currentUserId,

@@ -2,6 +2,8 @@ package com.parental.shared.feature.home.data.remote
 
 import com.parental.shared.core.error.ApiResult
 import com.parental.shared.core.network.CategoriesApi
+import com.parental.shared.core.network.safeApiCall
+import com.parental.shared.platform.Platform
 import com.parental.shared.core.ui.components.CategoryInfo
 import com.parental.shared.core.ui.components.CategoryResolver
 import com.parental.shared.feature.activities.data.remote.ActivitiesApi
@@ -22,6 +24,7 @@ import com.parental.shared.feature.home.domain.model.HomeSummary
 import io.ktor.client.call.*
 import io.ktor.client.call.body
 import io.ktor.client.request.*
+import com.parental.shared.core.network.safeApiCall
 import io.ktor.http.*
 import kotlinx.datetime.Clock
 import kotlinx.datetime.TimeZone
@@ -36,13 +39,25 @@ internal data class ApiErrorBody(
 )
 
 open class HomeApi(
-    private val client: io.ktor.client.HttpClient,
-    private val baseUrl: String,
-    private val bondsApi: BondsApi = BondsApi(client, baseUrl),
-    private val activitiesApi: ActivitiesApi = ActivitiesApi(client, baseUrl),
-    private val expensesApi: ExpensesApi = ExpensesApi(client, baseUrl),
-    private val categoriesApi: CategoriesApi = CategoriesApi(client, baseUrl),
+    private val bondsApi: BondsApi,
+    private val activitiesApi: ActivitiesApi,
+    private val expensesApi: ExpensesApi,
+    private val categoriesApi: CategoriesApi,
+    /**
+     * ExpensesApi y el fetch de compliance mantienen por ahora la forma vieja de
+     * origin/main (token por llamada): HomeApi no lleva token (viaja en el bearer
+     * del shared HttpClient), así que lo consulta por acá en cada request.
+     */
+    private val tokenProvider: () -> String? = { null },
 ) {
+    /**
+     * Cliente dedicado para compliance (viene de origin/main): NO lleva el plugin
+     * SessionAuth del shared HttpClient; el bearer va por header por llamada. Lazy:
+     * HomeApi puede vivir sin engine hasta que se pida compliance.
+     */
+    private val complianceClient: io.ktor.client.HttpClient by lazy {
+        io.ktor.client.HttpClient(Platform.createHttpEngine())
+    }
 
     /**
      * El resumen del Home: los vínculos, el cumplimiento y las tres métricas.
@@ -52,16 +67,15 @@ open class HomeApi(
      * cumplimiento no hay tarjeta de cumplimiento. El Home aparece igual.
      */
     open suspend fun getHomeSummary(
-        token: String,
         currentUserId: String? = null,
     ): ApiResult<HomeSummary> {
         return try {
-            when (val bondsResult = bondsApi.getMyBonds(token)) {
+            when (val bondsResult = bondsApi.getMyBonds()) {
                 is ApiResult.Success -> {
                     val bonds = bondsResult.data
                     val firstBond = bonds.firstOrNull()
                     val compliance = firstBond?.let {
-                        when (val complianceResult = getCompliance(it.id, token)) {
+                        when (val complianceResult = getCompliance(it.id)) {
                             is ApiResult.Success -> complianceResult.data
                             is ApiResult.Error -> null
                         }
@@ -70,7 +84,7 @@ open class HomeApi(
                     // MISMA lista alimenta la agenda de hoy (S2) y el estado por hijo (S5):
                     // ninguna de las dos pide un request propio.
                     val activities: List<Actividad>? = firstBond?.let { bond ->
-                        when (val listResult = activitiesApi.listActividades(token, bond.id)) {
+                        when (val listResult = activitiesApi.listActividades(bond.id)) {
                             is ApiResult.Success -> listResult.data
                             is ApiResult.Error -> null
                         }
@@ -78,7 +92,7 @@ open class HomeApi(
                     val counts = computeHomeCounts(activities, currentUserId)
                     // R1: el saldo lo manda el servidor, con signo. El cliente no lo recalcula.
                     val balance = firstBond?.let { bond ->
-                        when (val summaryResult = expensesApi.getSummary(token, bond.id)) {
+                        when (val summaryResult = expensesApi.getSummary(token = tokenProvider().orEmpty(), bondId = bond.id)) {
                             is ApiResult.Success -> summaryResult.data.saldo
                             is ApiResult.Error -> null
                         }
@@ -123,22 +137,18 @@ open class HomeApi(
             is ApiResult.Error -> emptyMap()
         }
 
-    open suspend fun getCompliance(bondId: String, token: String): ApiResult<ComplianceResponse> {
+    open suspend fun getCompliance(bondId: String): ApiResult<ComplianceResponse> {
         return try {
-            val response = client.get("$baseUrl/activities/$bondId/compliance") {
-                header("Authorization", "Bearer $token")
+            val response = complianceClient.get("${Platform.baseUrl.trimEnd('/')}/activities/$bondId/compliance") {
+                tokenProvider()?.let { header("Authorization", "Bearer $it") }
             }
             if (response.status.isSuccess()) {
                 ApiResult.Success(response.body())
             } else {
-                val message = runCatching { response.body<ApiErrorBody>() }
-                    .getOrNull()
-                    ?.let { it.message ?: it.error }
-                    ?: response.status.description
-                ApiResult.Error(response.status.value, message)
+                ApiResult.Error(response.status.value, response.status.description)
             }
         } catch (e: Exception) {
-            ApiResult.Error(0, "GET $baseUrl/activities/$bondId/compliance failed: ${e.message}")
+            ApiResult.Error(0, e.message ?: "Network error")
         }
     }
 }

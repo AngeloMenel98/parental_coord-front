@@ -2,7 +2,6 @@ package com.parental.shared.feature.thirdparty.ui
 
 import com.parental.shared.core.error.ApiResult
 import com.parental.shared.core.files.ImageCompressor
-import com.parental.shared.core.network.ApiClient
 import com.parental.shared.core.network.CategoriesApi
 import com.parental.shared.core.ui.components.CategoryInfo
 import com.parental.shared.feature.activities.data.remote.ActivitiesApi
@@ -18,6 +17,7 @@ import com.parental.shared.feature.thirdparty.data.remote.ThirdPartiesApi
 import com.parental.shared.feature.thirdparty.domain.model.ThirdPartyGrant
 import com.parental.shared.feature.thirdparty.domain.model.relationshipLabel
 import com.parental.shared.platform.Platform
+import io.ktor.client.HttpClient
 import io.ktor.client.request.put
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
@@ -38,6 +38,11 @@ import kotlinx.coroutines.withContext
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
+
+// Upload a URLs presignadas de S3: NO lleva Authorization (la firma del PUT es el
+// permiso), así que usa un cliente dedicado sin el plugin SessionAuth del shared
+// HttpClient. Lazy: el VM puede vivir sin engine hasta que haya un upload.
+private val standaloneHttpClient: HttpClient by lazy { HttpClient(Platform.createHttpEngine()) }
 
 /**
  * La hoja de detalle de una actividad del terciario.
@@ -145,7 +150,7 @@ class ThirdPartyViewModel(
         scope.launch {
             _state.value = _state.value.copy(isLoading = true, error = null)
 
-            val activitiesResult = activitiesApi.listActividades(token, bondId)
+            val activitiesResult = activitiesApi.listActividades(bondId)
             val categoriesResult = categoriesApi.getCategories()
             val grantResult = thirdPartiesApi.getMyGrant(token)
 
@@ -199,9 +204,9 @@ class ThirdPartyViewModel(
         if (_state.value.detail is ThirdPartyDetail.Loading) return
         _state.value = _state.value.copy(detail = ThirdPartyDetail.Loading(id))
         scope.launch {
-            when (val res = activitiesApi.getActividad(token, id)) {
+            when (val res = activitiesApi.getActividad(id)) {
                 is ApiResult.Success -> {
-                    val attachments = when (val list = activitiesApi.listAttachments(token, id)) {
+                    val attachments = when (val list = activitiesApi.listAttachments(id)) {
                         is ApiResult.Success -> list.data
                         is ApiResult.Error -> emptyList()
                     }
@@ -241,7 +246,7 @@ class ThirdPartyViewModel(
         if (_state.value.isCompleting) return
         _state.value = _state.value.copy(isCompleting = true)
         scope.launch {
-            when (val res = activitiesApi.completeActivity(token, id)) {
+            when (val res = activitiesApi.completeActivity(id)) {
                 is ApiResult.Success -> {
                     _state.value = _state.value.copy(
                         isCompleting = false,
@@ -269,7 +274,6 @@ class ThirdPartyViewModel(
                 val compressed = withContext(dispatcher) { ImageCompressor().compress(bytes, mimeType) }
                 val presign = when (
                     val res = activitiesApi.presignAttachment(
-                        token,
                         activityId,
                         PresignAttachmentReq(fileName, compressed.mimeType, compressed.bytes.size.toLong()),
                     )
@@ -287,7 +291,6 @@ class ThirdPartyViewModel(
                 }
                 when (
                     val confirm = activitiesApi.confirmAttachment(
-                        token,
                         activityId,
                         ConfirmAttachmentReq(
                             presign.path,
@@ -321,7 +324,7 @@ class ThirdPartyViewModel(
         bytes: ByteArray,
         mimeType: String,
     ): PresignAttachmentRes? {
-        val res = ApiClient.httpClient.put(presign.uploadUrl) {
+        val res = standaloneHttpClient.put(presign.uploadUrl) {
             contentType(ContentType.parse(mimeType))
             setBody(ByteArrayContent(bytes))
         }
@@ -329,7 +332,7 @@ class ThirdPartyViewModel(
     }
 
     private suspend fun refreshActivities() {
-        when (val res = activitiesApi.listActividades(token, bondId)) {
+        when (val res = activitiesApi.listActividades(bondId)) {
             is ApiResult.Success -> _state.value = _state.value.copy(
                 activities = thirdPartySorted(
                     thirdPartyVisibleActivities(res.data, currentUserId),
@@ -388,7 +391,7 @@ class ThirdPartyViewModel(
      * tarjeta se pinta sin vigencia.
      */
     private suspend fun ownerFallbackPermit(): ThirdPartyPermitUi? {
-        return when (val res = bondsApi.getMyBonds(token)) {
+        return when (val res = bondsApi.getMyBonds()) {
             is ApiResult.Success -> {
                 val bond = res.data.firstOrNull { it.id == bondId }
                 val progenitors = bond?.members
