@@ -132,3 +132,26 @@ Evidence: `./gradlew :shared:testDebugUnitTest` → 154 tests, 0 failures (18 su
 Not executed: verificación on-device (sin emulador conectado) — falta ver el badge saltar sin
 esperar el poll. El wiring de `App.kt` no tiene cobertura automática (no hay test de
 composición en este repo) ⇒ `Risk: item 6`.
+
+## Log (append-only)
+### L9 — Slice 3: tap→detalle, swipe-para-eliminar, pull-to-refresh (2026-11-24)
+Pedido (verbatim): "ok quiero mejorar la view de notificaciones d eparental-coord-front,
+ahora lo que sucede es que apenas toco una notificiacion se elimina y yo quiero que si lo
+selecciono me rediriga al detalle de actividad en la parte de activides. por lo que eliminar
+pasaria de ser un icono a que si swipeo a la izquierda se elimina directamente. Tambien
+quiero que todo lo que sea actualizar la vista no sea un boton sino que sea swipeanod para
+abajo y aparezca un loading".
+
+- Tap fila → si `refEntityType == "activity"` con `refEntityId`, marca leída y navega a
+  la pestaña Activities con el sheet de detalle abierto (`pendingActivityDetailId` en
+  `App.kt`, mismo patrón que `pendingActivityAttachmentId` + consumo 1-vez en
+  `ActividadesScreen`). Otros tipos: sólo marcan leída.
+- Swipe izquierda → `SwipeToDismissBox` (M3), elimina = `markRead` (mismo backend);
+  si la request falla la fila vuelve a su lugar (`snapTo(Settled)`). Se quita el icono
+  de tacho de la fila.
+- Pull-to-refresh → `PullToRefreshBox` con `isRefreshing` nuevo en el VM; sin contenido
+  sigue habiendo skeleton (`isLoading`); se quita el icono Refresh de la top bar.
+- Verificación: `:shared:testDebugUnitTest` verde (nuevos tests S8); compila
+  `compileKotlinIosArm64` y `:androidApp:assembleDebug`. Gestos sin cobertura automática
+  en el repo (no hay test de composición para esta pantalla) ⇒ `Risk: item 6`, queda
+  pendiente verificación en dispositivo.

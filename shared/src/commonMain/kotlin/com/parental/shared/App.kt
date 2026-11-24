@@ -314,6 +314,10 @@ private fun AppContent(
             var bottomRoute by remember { mutableStateOf("home") }
             var showNotifications by remember { mutableStateOf(false) }
             var expenseAttachmentDraft by remember { mutableStateOf<Pair<String, String>?>(null) }
+            // Deep-link de notificaciones (slice 3): el tap en una notificación de
+            // actividad deja el refEntityId acá, cambia a la pestaña de actividades
+            // y ActividadesScreen lo consume abriendo el sheet de detalle.
+            var pendingActivityDetailId by remember { mutableStateOf<String?>(null) }
             val token = sessionManager.token
             val userName = sessionManager.userName.orEmpty()
 
@@ -410,6 +414,11 @@ private fun AppContent(
                 NotificationsScreen(
                     viewModel = notificationsViewModel,
                     onBack = { showNotifications = false },
+                    onOpenActivity = { activityId ->
+                        pendingActivityDetailId = activityId
+                        showNotifications = false
+                        bottomRoute = "activities"
+                    },
                     onLogout = logout,
                 )
             } else if (bottomRoute == "activities") {
@@ -450,6 +459,8 @@ private fun AppContent(
                             unreadCount = unreadCount,
                             onOpenNotifications = { showNotifications = true },
                             onLogout = logout,
+                            pendingActivityDetailId = pendingActivityDetailId,
+                            onPendingActivityDetailConsumed = { pendingActivityDetailId = null },
                         )
                     }
                 }

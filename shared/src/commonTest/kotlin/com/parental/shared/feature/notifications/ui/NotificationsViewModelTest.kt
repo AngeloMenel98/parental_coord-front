@@ -48,6 +48,9 @@ class NotificationsViewModelTest {
         /** Si está presente, "Marcar todas" queda suspendida hasta completarla. */
         var markAllGate: CompletableDeferred<Unit>? = null
 
+        /** Si está presente, `list` queda suspendida hasta completarla (S8). */
+        var listGate: CompletableDeferred<Unit>? = null
+
         override suspend fun list(
             token: String,
             limit: Int,
@@ -57,6 +60,7 @@ class NotificationsViewModelTest {
             listCalls++
             requestedOffsets += offset
             requestedUnreadOnly += unreadOnly
+            listGate?.await()
             return listResult ?: ApiResult.Success(page)
         }
 
@@ -314,6 +318,46 @@ class NotificationsViewModelTest {
 
         assertEquals(1, api.markAllCalls)
         assertFalse(viewModel.uiState.value.isMarkingAll)
+    }
+
+    // ── S8 · pull-to-refresh refresca sin apagar el contenido ─────────────
+
+    @Test
+    fun `S8 refrescar con contenido muestra isRefreshing y NO vuelve al skeleton`() {
+        val api = FakeNotificationsApi().apply {
+            page = NotificationsPage(listOf(item("n-1")), total = 1, limit = 20, offset = 0)
+        }
+        val viewModel = build(api)
+        assertFalse(viewModel.uiState.value.isLoading)
+
+        // Request EN VUELO real: la compuerta suelta después de los asserts.
+        val gate = CompletableDeferred<Unit>()
+        api.listGate = gate
+        viewModel.refresh()
+
+        // Con contenido cargado, un refresh NO vuelve al skeleton: el spinner
+        // del pull-to-refresh es `isRefreshing`, no `isLoading`.
+        assertFalse(viewModel.uiState.value.isLoading)
+        assertTrue(viewModel.uiState.value.isRefreshing)
+        assertEquals(1, viewModel.uiState.value.items.size)
+
+        gate.complete(Unit)
+
+        // Al resolver, la bandeja se reemplaza y el spinner se apaga.
+        assertFalse(viewModel.uiState.value.isRefreshing)
+        assertFalse(viewModel.uiState.value.isLoading)
+        assertEquals(1, viewModel.uiState.value.items.size)
+    }
+
+    @Test
+    fun `S8 el primer refresh carga con isLoading mientras isRefreshing queda en false`() {
+        val api = FakeNotificationsApi().apply {
+            page = NotificationsPage(listOf(item("n-1"), item("n-2")), total = 2, limit = 20, offset = 0)
+        }
+        val viewModel = build(api)
+
+        assertFalse(viewModel.uiState.value.isRefreshing)
+        assertEquals(2, viewModel.uiState.value.items.size)
     }
 
     // ── S7 · estados ───────────────────────────────────────────────────────
