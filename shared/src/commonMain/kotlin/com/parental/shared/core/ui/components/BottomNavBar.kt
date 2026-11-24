@@ -19,7 +19,7 @@ sealed class BottomNavItem(
     data object Home : BottomNavItem("home", "Inicio", Icons.Default.Home)
     data object Actividades : BottomNavItem("activities", "Actividades", Icons.Default.Event)
     data object Gastos : BottomNavItem("expenses", "Gastos", Icons.Default.AccountBalanceWallet)
-    data object Terceros : BottomNavItem("third_parties", "Terceros", Icons.Default.People)
+    data object Terceros : BottomNavItem("thirdparty", "Terceros", Icons.Default.People)
 }
 
 /** El juego completo de los progenitores, en el orden en que se muestran. */

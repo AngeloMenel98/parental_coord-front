@@ -1,0 +1,25 @@
+{
+  "arrangement": "free",
+  "positions": {
+    "system": {
+      "x": 0,
+      "y": 1355
+    },
+    "01-consola-de-vinculos.html": {
+      "x": 1528,
+      "y": 0
+    },
+    "02-radar-del-sistema.html": {
+      "x": 1710,
+      "y": 1215
+    },
+    "03-expediente-del-vinculo.html": {
+      "x": 1676,
+      "y": 2427
+    },
+    "04-reporte-desplegable.html": {
+      "x": 5403,
+      "y": 1811
+    }
+  }
+}

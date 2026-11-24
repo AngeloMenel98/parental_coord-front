@@ -1,0 +1,77 @@
+{
+  "version": 1,
+  "comments": [
+    {
+      "id": "39268qk7",
+      "file": "01-accesos-a-la-vista.html",
+      "selector": "body > div > div:nth-of-type(2) > div:nth-of-type(1) > div > main > article:nth-of-type(1) > div:nth-of-type(2)",
+      "excerpt": "Hasta el 12 dic 2026 quedan 26 días",
+      "comment": "Me gusta este resumen de vencimiento.",
+      "createdAt": "2026-11-16T14:29:58.559Z",
+      "status": "resolved",
+      "sentAt": "2026-11-16T14:32:27.927Z",
+      "resolvedAt": "2026-11-16T14:38:09.712Z",
+      "resolution": "Artboard 04: resumen de vigencia y tipo de relación del 01, matriz del 03 como hoja de información detrás del icono ⓘ, sobre el asistente del 02."
+    },
+    {
+      "id": "u4x23hxl",
+      "file": "01-accesos-a-la-vista.html",
+      "selector": "body > div > div:nth-of-type(2) > div:nth-of-type(2) > div > main > form > div:nth-of-type(2) > span",
+      "excerpt": "Relación",
+      "comment": "El tipo de relacion suma bien.",
+      "createdAt": "2026-11-16T14:30:23.652Z",
+      "status": "resolved",
+      "sentAt": "2026-11-16T14:32:27.927Z",
+      "resolvedAt": "2026-11-16T14:38:09.713Z",
+      "resolution": "Artboard 04: resumen de vigencia y tipo de relación del 01, matriz del 03 como hoja de información detrás del icono ⓘ, sobre el asistente del 02."
+    },
+    {
+      "id": "oemtbkb0",
+      "file": "03-expediente-del-acceso.html",
+      "selector": "body > div > div:nth-of-type(2) > div:nth-of-type(2) > div > main > div > section:nth-of-type(2)",
+      "excerpt": "Qué puede y qué no ✓ Ver las actividades que le asignes ✓ Finalizarlas y adjuntar archivos — Crear, reasignar o cancelar — Ver el cumplimiento o los gastos — Ver a los otros miembros o a los hijos",
+      "comment": "Esto como un dato de informacion tipo dejarlo con icono arriba a la derecha",
+      "createdAt": "2026-11-16T14:31:17.673Z",
+      "status": "resolved",
+      "sentAt": "2026-11-16T14:32:27.927Z",
+      "resolvedAt": "2026-11-16T14:38:09.713Z",
+      "resolution": "Artboard 04: resumen de vigencia y tipo de relación del 01, matriz del 03 como hoja de información detrás del icono ⓘ, sobre el asistente del 02."
+    },
+    {
+      "id": "i1pg6gai",
+      "file": "01-accesos-a-la-vista.html",
+      "selector": "body > div > div:nth-of-type(2) > div:nth-of-type(1) > div > main > article:nth-of-type(1) > p",
+      "excerpt": "Puede: ver sus actividades asignadas, finalizarlas y adjuntar archivos. No puede crear, reasignar ni cancelar.",
+      "comment": "Podes hacer un 4 con todos estos cambios?",
+      "createdAt": "2026-11-16T14:32:26.732Z",
+      "status": "resolved",
+      "sentAt": "2026-11-16T14:32:27.927Z",
+      "resolvedAt": "2026-11-16T14:38:09.713Z",
+      "resolution": "Artboard 04: resumen de vigencia y tipo de relación del 01, matriz del 03 como hoja de información detrás del icono ⓘ, sobre el asistente del 02."
+    },
+    {
+      "id": "6tkxx8rg",
+      "file": "04-vigencia-a-la-vista.html",
+      "selector": "body > div > div:nth-of-type(2) > div:nth-of-type(1) > div > main > article:nth-of-type(1) > p",
+      "excerpt": "Puede: ver sus actividades asignadas, finalizarlas y adjuntar archivos. No puede crear, reasignar ni cancelar.",
+      "comment": "Esto sacalo.",
+      "createdAt": "2026-11-16T14:39:27.033Z",
+      "status": "resolved",
+      "sentAt": "2026-11-16T14:40:44.483Z",
+      "resolvedAt": "2026-11-16T14:41:43.302Z",
+      "resolution": "04: la tarjeta ya no muestra la línea de permisos (queda sólo en el paso 2) y las acciones Editar/Revocar viven en un rail que se descubre con swipe izquierdo."
+    },
+    {
+      "id": "ex5w9v96",
+      "file": "04-vigencia-a-la-vista.html",
+      "selector": "body > div > div:nth-of-type(2) > div:nth-of-type(1) > div > main",
+      "excerpt": "Accesos que otorgaste Sólo vos ves y administrás los que autorizaste. MG Marta Gómez Abuela · Familiar Activo Hasta el 12 dic 2026 quedan 26 días Puede: ver sus actividades asignadas, finalizarlas y adjuntar archivos. No puede crear, reasignar ni cancelar. Editar Revocar SR Sofía Ruiz Niñera · Cuida",
+      "comment": "Que aparezcan como una lista que puedas swipear left y editar o revocar.",
+      "createdAt": "2026-11-16T14:40:42.903Z",
+      "status": "resolved",
+      "sentAt": "2026-11-16T14:40:44.483Z",
+      "resolvedAt": "2026-11-16T14:41:43.302Z",
+      "resolution": "04: la tarjeta ya no muestra la línea de permisos (queda sólo en el paso 2) y las acciones Editar/Revocar viven en un rail que se descubre con swipe izquierdo."
+    }
+  ]
+}

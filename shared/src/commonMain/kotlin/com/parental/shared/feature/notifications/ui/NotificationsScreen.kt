@@ -20,7 +20,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -28,12 +28,16 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -44,6 +48,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
@@ -82,6 +87,13 @@ fun NotificationsScreen(
      * es una sub-vista de Home, así que la recibe desde `App.kt` igual que las demás.
      */
     onLogout: () -> Unit = {},
+    /**
+     * Slice 3: deep-link de una notificación de actividad. Con `refEntityType ==
+     * "activity"` y `refEntityId` presente, el toque de la fila navega a ese id;
+     * `App.kt` lo traduce a pestaña Activities + sheet de detalle. Para notificaciones
+     * de otro tipo el toque sólo las marca leídas (no hay a dónde ir).
+     */
+    onOpenActivity: (String) -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -151,15 +163,8 @@ fun NotificationsScreen(
                             contentDescription = "Borrar todas las notificaciones",
                         )
                     }
-                    IconButton(
-                        onClick = { viewModel.refresh() },
-                        enabled = !uiState.isLoading,
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Refresh,
-                            contentDescription = "Actualizar",
-                        )
-                    }
+                    // Sin botón de refrescar: el pull-to-refresh de la lista cubre esa
+                    // acción (slice 3) y un ícono que duplica un gesto de sobra se va.
                 },
             )
         },
@@ -189,25 +194,44 @@ fun NotificationsScreen(
                     modifier = Modifier.fillMaxSize(),
                 )
 
-                else -> LazyColumn(
+                else -> PullToRefreshBox(
+                    isRefreshing = uiState.isRefreshing,
+                    onRefresh = { viewModel.refresh() },
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(Spacing.lg),
-                    verticalArrangement = Arrangement.spacedBy(Spacing.sm),
                 ) {
-                    items(uiState.items, key = { it.id }) { item ->
-                        NotificationRow(
-                            item = item,
-                            isMarking = item.id in uiState.readingIds,
-                            onDelete = { viewModel.markRead(item.id) },
-                        )
-                    }
-
-                    if (uiState.canLoadMore) {
-                        item(key = "load-more") {
-                            LoadMoreRow(
-                                isLoading = uiState.isLoadingMore,
-                                onLoadMore = { viewModel.loadMore() },
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(Spacing.lg),
+                        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+                    ) {
+                        items(uiState.items, key = { it.id }) { item ->
+                            NotificationRow(
+                                item = item,
+                                isMarking = item.id in uiState.readingIds,
+                                onDelete = { viewModel.markRead(item.id) },
+                                onOpen = {
+                                    if (
+                                        item.refEntityType == "activity" &&
+                                        item.refEntityId != null
+                                    ) {
+                                        onOpenActivity(item.refEntityId!!)
+                                        viewModel.markRead(item.id)
+                                    } else {
+                                        // Sin destino de actividad: el toque conserva el
+                                        // comportamiento previo de marcar leída.
+                                        viewModel.markRead(item.id)
+                                    }
+                                },
                             )
+                        }
+
+                        if (uiState.canLoadMore) {
+                            item(key = "load-more") {
+                                LoadMoreRow(
+                                    isLoading = uiState.isLoadingMore,
+                                    onLoadMore = { viewModel.loadMore() },
+                                )
+                            }
                         }
                     }
                 }
@@ -217,54 +241,103 @@ fun NotificationsScreen(
 }
 
 /**
- * Una fila de la bandeja. Toda fila que llega acá está SIN leer (`unreadOnly=true`),
- * así que no hay estilo "leída": el toque en la fila, o el tacho del extremo, la
- * elimina de la vista.
+ * Una fila de la bandeja. Toda fila que llega acá está SIN leer (`unreadOnly=true`).
+ *
+ * Slice 3: el TOQUE abre el destino de la actividad y el swipe a la IZQUIERDA elimina
+ * (marca leída) — el ícono de tacho fijo de la fila ya no existe. El fondo rojo con el
+ * tacho es la accion de confirmación del `SwipeToDismissBox`; si la request falla, el
+ * VM mantiene la fila y el `LaunchedEffect` la devuelve a su lugar.
  */
 @Composable
 private fun NotificationRow(
     item: NotificationItem,
     isMarking: Boolean,
+    onOpen: () -> Unit,
     onDelete: () -> Unit,
 ) {
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(MaterialTheme.shapes.medium)
-            .semantics { stateDescription = "Sin leer" }
-            .clickable(enabled = !isMarking, onClick = onDelete),
-        color = MaterialTheme.colorScheme.surfaceVariant,
-        shape = MaterialTheme.shapes.medium,
-    ) {
-        Row(modifier = Modifier.padding(Spacing.md)) {
-            UnreadDot(isUnread = true)
-            Spacer(modifier = Modifier.width(Spacing.md))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = item.title,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                )
-                Spacer(modifier = Modifier.height(Spacing.xs))
-                Text(
-                    text = item.body,
-                    style = MaterialTheme.typography.bodyMedium,
-                    maxLines = 3,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Spacer(modifier = Modifier.height(Spacing.xxs))
-                Text(
-                    text = formatRelativeTime(item.createdAt),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+    val dismissState = rememberSwipeToDismissBoxState(
+        confirmValueChange = { value ->
+            // Sólo la izq → der es dismiss; el gesto opuesto rebota.
+            if (value == SwipeToDismissBoxValue.EndToStart) {
+                onDelete()
+                true
+            } else {
+                false
+            }
+        },
+    )
+
+    // Si la request falló, la fila sigue en la lista pero quedó deslizada a un lado:
+    // al terminar el vuelo (isMarking vuelve a false) la devolvemos a su lugar.
+    LaunchedEffect(item.id, isMarking) {
+        if (!isMarking && dismissState.currentValue == SwipeToDismissBoxValue.EndToStart) {
+            dismissState.snapTo(SwipeToDismissBoxValue.Settled)
+        }
+    }
+
+    SwipeToDismissBox(
+        state = dismissState,
+        enableDismissFromStartToEnd = false,
+        backgroundContent = {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(MaterialTheme.shapes.medium)
+                    .background(MaterialTheme.colorScheme.errorContainer),
+                contentAlignment = Alignment.CenterEnd,
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Delete,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onErrorContainer,
+                    modifier = Modifier
+                        .padding(end = Spacing.lg)
+                        // El tacho se hace visible proporcional al deslizamiento y se
+                        // desvanece durante el vuelo de la request (la fila va a salir).
+                        .graphicsLayer {
+                            val maxOffset = size.width.takeIf { it > 0f } ?: 1f
+                            val fraction = (dismissState.requireOffset() / maxOffset)
+                                .coerceIn(0f, 1f)
+                            alpha = if (isMarking) 1f - fraction else fraction
+                            scaleX = 0.6f + (0.4f * fraction)
+                            scaleY = scaleX
+                        },
                 )
             }
-            Spacer(modifier = Modifier.width(Spacing.sm))
-            IconButton(onClick = onDelete, enabled = !isMarking) {
-                Icon(
-                    imageVector = Icons.Default.Delete,
-                    contentDescription = "Eliminar notificación",
-                )
+        },
+    ) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(MaterialTheme.shapes.medium)
+                .semantics { stateDescription = if (isMarking) "Abriendo" else "Sin leer" }
+                .clickable(enabled = !isMarking, onClick = onOpen),
+            color = MaterialTheme.colorScheme.surfaceVariant,
+            shape = MaterialTheme.shapes.medium,
+        ) {
+            Row(modifier = Modifier.padding(Spacing.md)) {
+                UnreadDot(isUnread = true)
+                Spacer(modifier = Modifier.width(Spacing.md))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = item.title,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Spacer(modifier = Modifier.height(Spacing.xs))
+                    Text(
+                        text = item.body,
+                        style = MaterialTheme.typography.bodyMedium,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Spacer(modifier = Modifier.height(Spacing.xxs))
+                    Text(
+                        text = formatRelativeTime(item.createdAt),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
         }
     }

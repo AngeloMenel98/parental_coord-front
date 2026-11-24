@@ -44,6 +44,30 @@
       "status": "resolved",
       "sentAt": "2026-11-05T11:23:20.813Z",
       "resolvedAt": "2026-11-05T11:24:12.712Z"
+    },
+    {
+      "id": "yswa2zvp",
+      "file": "04-reporte-desplegable.html",
+      "selector": "#f1-list",
+      "excerpt": "CUMPLIDAS · 31 Llevar a Mateo al pediatra Mateo Paz · 12/06 · Salud 12/06 Cumplida Reunión de padres en la escuela Lucía Paz · 09/06 · Educación 09/06 Cumplida Compra de útiles Mateo Paz · 05/06 · Educación 05/06 Cumplida NO CUMPLIDAS · 11 Excursión al zoo Lucía Paz · venció 18/06 · Recreación 18/06",
+      "comment": "Yo quiero ver un resumen del porcentaje de actividades cumplidas, no cumplidas y por cual usuario .. pero si selecciono esta card me abre una vista en donde detalla que activdades se cumplieron, trata de reutlizar componentes de la vista de actividades para mostrarlas",
+      "createdAt": "2026-11-23T12:11:34.182Z",
+      "status": "resolved",
+      "sentAt": "2026-11-23T12:12:30.436Z",
+      "resolvedAt": "2026-11-23T12:13:47.938Z",
+      "resolution": "La card ahora resume cumplidas vs no cumplidas (31/11 de 42) y el cumplimiento por progenitor (Mario 17/22, Lucía 14/20); seleccionarla abre una tercera pantalla \"Actividades del reporte\" que reutiliza la fila de agenda (fecha, línea de tiempo, punto de categoría, hora mono, chips de estado, chevron) con filtros por estado y por progenitor. Además volvieron el período (Desde/Hasta) y el CTA \"Generar PDF del reporte\"."
+    },
+    {
+      "id": "4tuke8nl",
+      "file": "04-reporte-desplegable.html",
+      "selector": "body > div > section:nth-of-type(1) > main",
+      "excerpt": "VÍNCULO Benítez–Aguirre Acuerdo formal · Sol Benítez · Ramiro Aguirre Actividades 31 de 42 cumplidas · el % se calcula sobre el total 73,81% Cumplidas 31 · 73,81% En curso 8 · 19,05% Vencidas 3 · 7,14% Total del período 31 + 8 + 3 = 42 Una actividad está en una sola columna: los tres números suman e",
+      "comment": "me imagino que sigue estando la opcion de generar el reporte",
+      "createdAt": "2026-11-23T12:12:28.309Z",
+      "status": "resolved",
+      "sentAt": "2026-11-23T12:12:30.437Z",
+      "resolvedAt": "2026-11-23T12:13:47.938Z",
+      "resolution": "La card ahora resume cumplidas vs no cumplidas (31/11 de 42) y el cumplimiento por progenitor (Mario 17/22, Lucía 14/20); seleccionarla abre una tercera pantalla \"Actividades del reporte\" que reutiliza la fila de agenda (fecha, línea de tiempo, punto de categoría, hora mono, chips de estado, chevron) con filtros por estado y por progenitor. Además volvieron el período (Desde/Hasta) y el CTA \"Generar PDF del reporte\"."
     }
   ]
 }

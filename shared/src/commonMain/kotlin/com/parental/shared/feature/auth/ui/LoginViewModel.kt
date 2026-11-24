@@ -2,6 +2,7 @@ package com.parental.shared.feature.auth.ui
 
 import com.parental.shared.feature.auth.domain.model.AuthResponse
 import com.parental.shared.feature.auth.domain.repository.IAuthRepository
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -20,8 +21,9 @@ data class LoginUiState(
 
 class LoginViewModel(
     private val authRepository: IAuthRepository,
+    dispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private val scope = CoroutineScope(SupervisorJob() + dispatcher)
 
     private val _uiState = MutableStateFlow(LoginUiState())
     val uiState: StateFlow<LoginUiState> = _uiState.asStateFlow()

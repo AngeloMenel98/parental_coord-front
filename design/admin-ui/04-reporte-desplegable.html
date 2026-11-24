@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Admin — Reporte del vínculo, desplegable</title>
+<style>
+  :root{
+    --primary:#00696D;--on-primary:#FFFFFF;--primary-container:#9CF1F6;--on-primary-container:#002022;
+    --secondary:#4A6365;--secondary-container:#CCE8EA;--on-secondary-container:#051F21;
+    --surface:#FAFDFC;--on-surface:#191C1D;--surface-variant:#DAE4E5;--on-surface-variant:#3F4849;
+    --outline:#6F797A;--outline-variant:#BEC8C9;--error:#BA1A1A;--error-container:#FFDAD6;
+    --done:#43A047;--overdue:#E53935;--assigned:#1E88E5;--verify:#B26A00;--created:#757575;--progress:#E65100;
+    --cat-salud:#D81B60;--cat-educacion:#3F51B5;--cat-familiar:#8E24AA;--cat-social:#00897B;--cat-recreacion:#F4511E;--cat-otros:#8D6E63;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    --serif:Georgia,"Times New Roman",Times,serif;
+    --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+    --r4:4px;--r8:8px;--r12:12px;--r16:16px;--r24:24px;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--surface-variant);font-family:var(--sans);color:var(--on-surface);-webkit-font-smoothing:antialiased}
+  .board{display:flex;gap:24px;padding:28px 24px;align-items:flex-start}
+  .caption{position:absolute;left:24px;top:6px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--on-surface-variant)}
+  .phone{width:390px;height:844px;background:var(--surface);border-radius:var(--r24);overflow:hidden;
+    box-shadow:0 1px 2px rgba(0,0,0,.08),0 12px 32px rgba(0,0,0,.10);display:flex;flex-direction:column;position:relative}
+  .topbar{display:flex;align-items:center;justify-content:space-between;padding:14px 16px 12px;background:var(--surface);
+    border-bottom:1px solid var(--outline-variant);flex:none}
+  .topbar h1{margin:0;font-family:var(--serif);font-size:20px;line-height:28px;font-weight:600}
+  .topbar .agr{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--on-surface-variant)}
+  .content{flex:1;overflow-y:auto;padding:12px 16px 20px;display:flex;flex-direction:column;gap:10px;scrollbar-width:thin}
+  .content > *{flex:none}
+
+  /* --- vínculo selector ------------------------------------------------ */
+  .field{position:relative}
+  .fieldlabel{display:block;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--on-surface-variant);
+    margin-bottom:6px}
+  .selector{display:flex;align-items:center;gap:12px;width:100%;font:inherit;text-align:left;padding:12px 14px;
+    border:1px solid var(--outline);border-radius:var(--r12);background:var(--surface);color:var(--on-surface);cursor:pointer;
+    min-height:56px}
+  .selector[aria-expanded="true"]{border-color:var(--primary);box-shadow:inset 0 0 0 1px var(--primary)}
+  .selector .txt{display:grid;gap:2px;flex:1;min-width:0}
+  .selector .txt b{font-size:15px;line-height:20px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .selector .txt span{font-size:11px;line-height:16px;color:var(--on-surface-variant)}
+  .selector .caret{flex:none;color:var(--on-surface-variant)}
+  .menu{position:absolute;left:0;right:0;top:calc(100% + 6px);z-index:6;background:var(--surface);
+    border:1px solid var(--outline);border-radius:var(--r12);box-shadow:0 8px 24px rgba(25,28,29,.16);
+    display:none;flex-direction:column;overflow:hidden;max-height:352px}
+  .field.open .menu{display:flex}
+  .menu .searchwrap{padding:8px;border-bottom:1px solid var(--outline-variant);flex:none}
+  .search{font:inherit;font-size:13px;padding:9px 10px;border-radius:var(--r8);border:1px solid var(--outline-variant);
+    background:var(--surface);color:var(--on-surface);width:100%}
+  .menu ul{list-style:none;margin:0;padding:4px 4px 10px;overflow-y:auto;flex:1;scrollbar-width:thin;
+    -webkit-mask-image:linear-gradient(to bottom,#000 calc(100% - 18px),transparent 100%);
+    mask-image:linear-gradient(to bottom,#000 calc(100% - 18px),transparent 100%)}
+  .menu li{margin:0}
+  .opt{display:flex;align-items:center;gap:10px;width:100%;font:inherit;text-align:left;padding:9px 10px;border:0;
+    border-radius:var(--r8);background:transparent;color:var(--on-surface);cursor:pointer;min-height:48px}
+  .opt:hover{background:var(--surface-variant)}
+  .opt .txt{display:grid;gap:1px;flex:1;min-width:0}
+  .opt .txt b{font-size:14px;line-height:20px;font-weight:500}
+  .opt .txt span{font-size:11px;line-height:16px;color:var(--on-surface-variant);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .opt[aria-selected="true"]{background:var(--secondary-container);color:var(--on-secondary-container)}
+  .opt[aria-selected="true"] .txt span{color:var(--on-secondary-container)}
+  .opt .tick{flex:none;color:var(--primary);font-weight:700}
+  .menufoot{flex:none;padding:8px 12px;border-top:1px solid var(--outline-variant);font-size:11px;
+    color:var(--on-surface-variant);display:flex;justify-content:space-between;gap:8px;background:var(--surface)}
+
+  /* --- period ---------------------------------------------------------- */
+  .range{display:flex;gap:8px}
+  .range button{flex:1;font:inherit;font-size:13px;padding:10px;border-radius:var(--r12);border:1px solid var(--outline);
+    background:transparent;color:var(--on-surface);cursor:pointer;min-height:44px}
+
+  /* --- shared card ----------------------------------------------------- */
+  .card{border:1px solid var(--outline-variant);border-radius:var(--r12);background:var(--surface);overflow:hidden}
+  .cardhead{display:flex;align-items:center;gap:8px;width:100%;font:inherit;text-align:left;padding:12px;
+    border:0;background:transparent;color:inherit;cursor:pointer;min-height:48px}
+  .cardhead.static{cursor:default}
+  .cardhead .h{display:grid;gap:2px;flex:1;min-width:0}
+  .cardhead h3{margin:0;font-size:14px;line-height:20px;font-weight:500}
+  .cardhead .sub{font-size:11px;line-height:16px;color:var(--on-surface-variant)}
+  .cardhead .num{font-family:var(--mono);font-size:13px;letter-spacing:.3px;color:var(--on-surface);white-space:nowrap}
+  .cardhead .go{font-size:11px;color:var(--primary);flex:none;font-weight:500}
+  .cardbody{padding:0 12px 12px;display:grid;gap:8px}
+  .hint{font-size:11px;line-height:16px;color:var(--on-surface-variant);margin:0}
+
+  /* --- bars and legends ------------------------------------------------ */
+  .stack{display:flex;height:14px;border-radius:var(--r4);overflow:hidden;background:var(--surface-variant)}
+  .stack i{display:block;height:100%}
+  .legend ul{margin:0;padding:0;list-style:none}
+  .legend li{display:flex;align-items:center;gap:6px;font-size:11px;line-height:16px;color:var(--on-surface-variant)}
+  .legend .dot{width:8px;height:8px;border-radius:50%;flex:none}
+  .legend .label{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .legend .val{font-family:var(--mono);font-size:11px;letter-spacing:.2px;color:var(--on-surface)}
+  .total-line{display:flex;justify-content:space-between;align-items:baseline;gap:8px;border-top:1px solid var(--outline-variant);
+    padding-top:8px;font-size:12px;line-height:16px;color:var(--on-surface-variant)}
+  .total-line b{font-family:var(--mono);font-size:12px;color:var(--on-surface);font-weight:500}
+
+  /* --- per-user summary ------------------------------------------------ */
+  .users{display:grid;gap:8px;border-top:1px solid var(--outline-variant);padding-top:8px}
+  .users h4{margin:0;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--on-surface-variant);font-weight:500}
+  .user{display:grid;gap:3px}
+  .user .line1{display:flex;align-items:baseline;gap:6px;font-size:12px;line-height:16px}
+  .user .line1 b{font-weight:500;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .user .line1 .pct{font-family:var(--mono);font-size:11px;color:var(--on-surface)}
+  .user .line1 .frac{font-size:11px;color:var(--on-surface-variant)}
+  .user .track{display:flex;height:6px;border-radius:var(--r4);overflow:hidden;background:var(--surface-variant)}
+  .user .track i{display:block;height:100%}
+  .more{width:100%;font:inherit;font-size:12px;font-weight:500;padding:10px 0;border:0;background:transparent;
+    color:var(--primary);cursor:pointer;text-align:center;min-height:44px;border-top:1px solid var(--outline-variant)}
+  .footnote{margin:0;font-size:11px;line-height:16px;color:var(--on-surface-variant);
+    border-left:2px solid var(--outline-variant);padding-left:8px}
+  .checkrow{display:flex;align-items:center;gap:8px;font-size:12px;line-height:16px;color:var(--on-surface-variant)}
+  .checkrow input{width:18px;height:18px;accent-color:var(--primary)}
+
+  /* --- CTA ------------------------------------------------------------- */
+  .primary-cta{font:inherit;font-size:14px;font-weight:500;padding:14px;border:0;border-radius:var(--r12);background:var(--primary);
+    color:var(--on-primary);cursor:pointer;width:100%;min-height:48px}
+
+  /* --- agenda rows: the activities-view component ---------------------- */
+  .back{display:inline-flex;align-items:center;gap:6px;font-size:14px;color:var(--primary);text-decoration:none;
+    font-weight:500;min-height:44px;align-self:flex-start}
+  .filters{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;scrollbar-width:none}
+  .filters::-webkit-scrollbar{display:none}
+  .fchip{font:inherit;font-size:12px;line-height:16px;font-weight:500;padding:7px 11px;border-radius:var(--r12);
+    border:1px solid var(--outline-variant);background:transparent;color:var(--on-surface-variant);cursor:pointer;
+    white-space:nowrap;flex:none;min-height:36px}
+  .fchip[aria-pressed="true"]{background:var(--secondary-container);color:var(--on-secondary-container);border-color:transparent}
+  .userfilters{display:flex;gap:6px;font-size:11px;color:var(--on-surface-variant);align-items:center;flex-wrap:wrap}
+  .userfilters button{font:inherit;font-size:11px;padding:4px 9px;border-radius:var(--r8);border:1px solid var(--outline-variant);
+    background:transparent;color:var(--on-surface-variant);cursor:pointer;min-height:28px}
+  .userfilters button[aria-pressed="true"]{border-color:var(--primary);color:var(--primary);font-weight:500}
+  .grouphead{display:flex;align-items:center;gap:6px;padding:6px 0 0;font-size:11px;letter-spacing:.08em;
+    text-transform:uppercase;color:var(--on-surface-variant)}
+  .grouphead .n{font-family:var(--mono);letter-spacing:0;color:var(--on-surface)}
+  .agenda{display:grid}
+  .agrow{display:grid;grid-template-columns:48px 1px 1fr 12px;gap:12px;align-items:stretch;padding:8px 0;
+    border-bottom:1px solid var(--outline-variant);text-align:left;width:100%;font:inherit;background:transparent;
+    border-left:0;border-right:0;border-top:0;color:inherit;cursor:pointer}
+  .agrow:last-of-type{border-bottom:0}
+  .agrow .date{display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding-top:1px}
+  .agrow .date b{font-size:16px;line-height:20px;font-weight:600;letter-spacing:.01em}
+  .agrow .date span{font-size:10px;line-height:14px;letter-spacing:.06em;text-transform:uppercase;color:var(--on-surface-variant)}
+  .agrow .line{background:var(--outline);width:1px;position:relative}
+  .agrow .line i{position:absolute;left:50%;top:6px;transform:translate(-50%,0);width:14px;height:14px;border-radius:50%;
+    border:2px solid var(--surface)}
+  .agrow .body{display:grid;gap:3px;min-width:0}
+  .agrow .top{display:flex;align-items:center;gap:6px;min-width:0}
+  .agrow .time{font-family:var(--mono);font-size:12px;line-height:16px;letter-spacing:.5px;color:var(--on-surface-variant);flex:none}
+  .agrow .title{font-size:15px;line-height:21px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .agrow.done .title{color:var(--on-surface-variant)}
+  .agrow .meta{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+  .agrow .who{font-size:11px;line-height:16px;color:var(--on-surface-variant);white-space:nowrap;overflow:hidden;
+    text-overflow:ellipsis;max-width:150px}
+  .agrow .deadline{font-size:11px;line-height:16px;color:var(--overdue)}
+  .agrow .chev{align-self:center;color:var(--on-surface-variant);font-size:16px}
+  .chip{display:inline-flex;align-items:center;gap:5px;padding:3px 8px;border-radius:var(--r12);font-size:10px;
+    line-height:16px;font-weight:500;letter-spacing:.04em;flex:none;color:var(--on-surface)}
+  .chip .dot{width:7px;height:7px;border-radius:50%}
+  .chip.ok{background:rgba(67,160,71,.15)}
+  .chip.ko{background:rgba(229,57,53,.15)}
+  .chip.blue{background:rgba(30,136,229,.15)}
+  .chip.orange{background:rgba(230,81,0,.15)}
+  .chip.amber{background:rgba(178,106,0,.15)}
+  .chip.grey{background:rgba(117,117,117,.15)}
+  .catdot{width:14px;height:14px;border-radius:50%;flex:none;display:inline-block}
+
+  /* --- open-menu frame ------------------------------------------------- */
+  .openframe .topbar{position:relative;z-index:8}
+  .openframe .content{position:relative;z-index:6;overflow:visible}
+  .openframe .field{position:relative;z-index:7}
+  :focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+  @media (prefers-reduced-motion:no-preference){.menu{animation:pop 120ms ease-out}@keyframes pop{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}}
+</style>
+</head>
+<body>
+<p class="caption">04 · Reporte del vínculo — selector desplegable, resumen por progenitor y detalle de actividades</p>
+<div class="board">
+
+  <!-- ============ Frame 1: reporte ============ -->
+  <section class="phone" id="frame-reporte" aria-label="Pantalla 1: reporte con selector de vínculo">
+    <header class="topbar">
+      <h1>Reporte</h1>
+      <span class="agr">Junio 2026</span>
+    </header>
+    <main class="content">
+
+      <div class="field" id="f1-field">
+        <span class="fieldlabel" id="f1-vinc-label">Vínculo</span>
+        <button class="selector" id="f1-vinc" aria-haspopup="listbox" aria-expanded="false"
+                aria-labelledby="f1-vinc-label" aria-controls="f1-menu">
+          <span class="txt">
+            <b>Paz–Gómez</b>
+            <span>Acuerdo formal · 2 hijos · 2 progenitores</span>
+          </span>
+          <svg class="caret" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+        </button>
+        <div class="menu" id="f1-menu">
+          <div class="searchwrap">
+            <input class="search" type="search" placeholder="Buscar vínculo…" aria-label="Buscar vínculo por nombre">
+          </div>
+          <ul role="listbox" aria-label="Vínculos" tabindex="-1">
+            <li><button class="opt" role="option" aria-selected="true">
+              <span class="txt"><b>Paz–Gómez</b><span>Mario Paz · Lucía Gómez</span></span><span class="tick" aria-hidden="true">✓</span>
+            </button></li>
+            <li><button class="opt" role="option" aria-selected="false">
+              <span class="txt"><b>Ruiz–Sosa</b><span>Caro Ruiz · Iván Sosa</span></span></button></li>
+            <li><button class="opt" role="option" aria-selected="false">
+              <span class="txt"><b>Ferreyra–Duarte</b><span>Ana Ferreyra · Julián Duarte</span></span></button></li>
+            <li><button class="opt" role="option" aria-selected="false">
+              <span class="txt"><b>Benítez–Aguirre</b><span>Sol Benítez · Ramiro Aguirre</span></span></button></li>
+            <li><button class="opt" role="option" aria-selected="false">
+              <span class="txt"><b>Cabrera–Núñez</b><span>Inés Cabrera · Tomás Núñez</span></span></button></li>
+            <li><button class="opt" role="option" aria-selected="false">
+              <span class="txt"><b>Medina–Ríos</b><span>Paula Medina · Ezequiel Ríos</span></span></button></li>
+            <li><button class="opt" role="option" aria-selected="false">
+              <span class="txt"><b>Quiroga–Salas</b><span>Vera Quiroga · Hernán Salas</span></span></button></li>
+            <li><button class="opt" role="option" aria-selected="false">
+              <span class="txt"><b>Ledesma–Peralta</b><span>Noelia Ledesma · Bruno Peralta</span></span></button></li>
+            <li><button class="opt" role="option" aria-selected="false">
+              <span class="txt"><b>Ojeda–Cardozo</b><span>Marina Ojeda · Diego Cardozo</span></span></button></li>
+            <li><button class="opt" role="option" aria-selected="false">
+              <span class="txt"><b>Vidal–Molina</b><span>Rocío Vidal · Facundo Molina</span></span></button></li>
+            <li><button class="opt" role="option" aria-selected="false">
+              <span class="txt"><b>Álvarez–Ponce</b><span>Silvia Álvarez · Marcelo Ponce</span></span></button></li>
+            <li><button class="opt" role="option" aria-selected="false">
+              <span class="txt"><b>Suárez–Ibarra</b><span>Cecilia Suárez · Nicolás Ibarra</span></span></button></li>
+          </ul>
+          <div class="menufoot"><span>12 vínculos activos</span><span>Inactivos: mostrar</span></div>
+        </div>
+      </div>
+
+      <div class="range">
+        <button>Desde 01/06/2026</button>
+        <button>Hasta 30/06/2026</button>
+      </div>
+
+      <!-- Actividades: resumen global + por progenitor; abre la vista de detalle -->
+      <article class="card">
+        <button class="cardhead" id="f1-acts-btn" aria-controls="f1-list">
+          <span class="h">
+            <h3>Actividades</h3>
+            <span class="sub">31 de 42 cumplidas</span>
+          </span>
+          <span class="num">73,81%</span>
+          <span class="go">Ver detalle ›</span>
+        </button>
+        <div class="cardbody">
+          <div class="stack" role="img" aria-label="42 actividades: 31 cumplidas, 8 en curso, 3 vencidas">
+            <i style="width:73.81%;background:var(--done)"></i>
+            <i style="width:19.05%;background:var(--assigned)"></i>
+            <i style="width:7.14%;background:var(--overdue)"></i>
+          </div>
+          <div class="legend">
+            <ul>
+              <li><i class="dot" style="background:var(--done)"></i><span class="label">Cumplidas</span><span class="val">31 · 73,81%</span></li>
+              <li><i class="dot" style="background:var(--assigned)"></i><span class="label">En curso</span><span class="val">8 · 19,05%</span></li>
+              <li><i class="dot" style="background:var(--overdue)"></i><span class="label">Vencidas</span><span class="val">3 · 7,14%</span></li>
+            </ul>
+          </div>
+          <div class="total-line"><span>Cumplidas / no cumplidas</span><b>73,81% / 26,19%</b></div>
+
+          <div class="users">
+            <h4>Cumplimiento por progenitor</h4>
+            <div class="user">
+              <div class="line1"><b>Mario Paz</b><span class="frac">17 de 22</span><span class="pct">77,27%</span></div>
+              <div class="track" role="img" aria-label="Mario Paz: 17 cumplidas de 22, 5 no cumplidas">
+                <i style="width:77.27%;background:var(--done)"></i><i style="width:22.73%;background:var(--overdue)"></i>
+              </div>
+            </div>
+            <div class="user">
+              <div class="line1"><b>Lucía Gómez</b><span class="frac">14 de 20</span><span class="pct">70,00%</span></div>
+              <div class="track" role="img" aria-label="Lucía Gómez: 14 cumplidas de 20, 6 no cumplidas">
+                <i style="width:70%;background:var(--done)"></i><i style="width:30%;background:var(--overdue)"></i>
+              </div>
+            </div>
+          </div>
+
+          <p class="hint" style="margin:0">31 + 8 + 3 = 42: una actividad está en una sola columna y el % divide
+            siempre por el total.</p>
+        </div>
+      </article>
+
+      <!-- Gastos: cuatro estados, cuatro colores -->
+      <article class="card">
+        <div class="cardhead static">
+          <span class="h"><h3>Gastos</h3><span class="sub">12 gastos · por cantidad</span></span>
+        </div>
+        <div class="cardbody">
+          <div class="stack" role="img" aria-label="12 gastos: 7 pagados, 2 aprobados sin pagar, 2 pendientes de aprobación, 1 rechazado">
+            <i style="width:58.33%;background:var(--done)"></i>
+            <i style="width:16.67%;background:var(--assigned)"></i>
+            <i style="width:16.67%;background:var(--verify)"></i>
+            <i style="width:8.33%;background:var(--error)"></i>
+          </div>
+          <div class="legend">
+            <ul>
+              <li><i class="dot" style="background:var(--done)"></i><span class="label">Pagados</span><span class="val">7 · 58,33%</span></li>
+              <li><i class="dot" style="background:var(--assigned)"></i><span class="label">Aprobados sin pagar</span><span class="val">2 · 16,67%</span></li>
+              <li><i class="dot" style="background:var(--verify)"></i><span class="label">Pendientes de aprobación</span><span class="val">2 · 16,67%</span></li>
+              <li><i class="dot" style="background:var(--error)"></i><span class="label">Rechazados</span><span class="val">1 · 8,33%</span></li>
+            </ul>
+          </div>
+          <div class="total-line"><span>Pagado por monto / pendiente</span><b>62,00% / 38,00%</b></div>
+        </div>
+      </article>
+
+      <button class="primary-cta" id="f1-generate">Generar PDF del reporte</button>
+      <p class="hint">El PDF se arma en el servidor y se abre desde acá cuando está listo.</p>
+
+    </main>
+  </section>
+
+  <!-- ============ Frame 2: selector abierto ============ -->
+  <section class="phone openframe" aria-label="Pantalla 2: selector de vínculo abierto con doce vínculos">
+    <header class="topbar">
+      <h1>Reporte</h1>
+      <span class="agr">Junio 2026</span>
+    </header>
+    <main class="content">
+      <div class="field open">
+        <span class="fieldlabel">Vínculo</span>
+        <button class="selector" aria-haspopup="listbox" aria-expanded="true">
+          <span class="txt"><b>Paz–Gómez</b><span>Acuerdo formal · 2 hijos · 2 progenitores</span></span>
+          <svg class="caret" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+        </button>
+        <div class="menu" style="max-height:472px">
+          <div class="searchwrap">
+            <input class="search" type="search" placeholder="Buscar vínculo…" aria-label="Buscar vínculo por nombre">
+          </div>
+          <ul role="listbox" aria-label="Vínculos">
+            <li><button class="opt" role="option" aria-selected="true">
+              <span class="txt"><b>Paz–Gómez</b><span>Mario Paz · Lucía Gómez</span></span><span class="tick" aria-hidden="true">✓</span></button></li>
+            <li><button class="opt" role="option" aria-selected="false">
+              <span class="txt"><b>Ruiz–Sosa</b><span>Caro Ruiz · Iván Sosa</span></span></button></li>
+            <li><button class="opt" role="option" aria-selected="false">
+              <span class="txt"><b>Ferreyra–Duarte</b><span>Ana Ferreyra · Julián Duarte</span></span></button></li>
+            <li><button class="opt" role="option" aria-selected="false">
+              <span class="txt"><b>Benítez–Aguirre</b><span>Sol Benítez · Ramiro Aguirre</span></span></button></li>
+            <li><button class="opt" role="option" aria-selected="false">
+              <span class="txt"><b>Cabrera–Núñez</b><span>Inés Cabrera · Tomás Núñez</span></span></button></li>
+            <li><button class="opt" role="option" aria-selected="false">
+              <span class="txt"><b>Medina–Ríos</b><span>Paula Medina · Ezequiel Ríos</span></span></button></li>
+            <li><button class="opt" role="option" aria-selected="false">
+              <span class="txt"><b>Quiroga–Salas</b><span>Vera Quiroga · Hernán Salas</span></span></button></li>
+            <li><button class="opt" role="option" aria-selected="false">
+              <span class="txt"><b>Ledesma–Peralta</b><span>Noelia Ledesma · Bruno Peralta</span></span></button></li>
+            <li><button class="opt" role="option" aria-selected="false">
+              <span class="txt"><b>Ojeda–Cardozo</b><span>Marina Ojeda · Diego Cardozo</span></span></button></li>
+            <li><button class="opt" role="option" aria-selected="false">
+              <span class="txt"><b>Vidal–Molina</b><span>Rocío Vidal · Facundo Molina</span></span></button></li>
+            <li><button class="opt" role="option" aria-selected="false">
+              <span class="txt"><b>Álvarez–Ponce</b><span>Silvia Álvarez · Marcelo Ponce</span></span></button></li>
+            <li><button class="opt" role="option" aria-selected="false">
+              <span class="txt"><b>Suárez–Ibarra</b><span>Cecilia Suárez · Nicolás Ibarra</span></span></button></li>
+          </ul>
+          <div class="menufoot">
+            <label class="checkrow"><input type="checkbox" aria-label="Mostrar vínculos inactivos">Mostrar inactivos</label>
+            <span>12 de 15</span>
+          </div>
+        </div>
+      </div>
+    </main>
+  </section>
+
+  <!-- ============ Frame 3: actividades del reporte ============ -->
+  <section class="phone" id="frame-actividades" aria-label="Pantalla 3: detalle de las actividades del reporte">
+    <header class="topbar">
+      <h1 style="font-size:18px">Actividades</h1>
+      <span class="agr">Paz–Gómez</span>
+    </header>
+    <main class="content" id="f1-list">
+
+      <a class="back" href="#frame-reporte">‹ Reporte</a>
+
+      <div class="stack" role="img" aria-label="42 actividades: 31 cumplidas 73,81 por ciento, 11 no cumplidas 26,19 por ciento">
+        <i style="width:73.81%;background:var(--done)"></i>
+        <i style="width:26.19%;background:var(--overdue)"></i>
+      </div>
+      <div class="legend">
+        <ul>
+          <li><i class="dot" style="background:var(--done)"></i><span class="label">Cumplidas</span><span class="val">31 · 73,81%</span></li>
+          <li><i class="dot" style="background:var(--overdue)"></i><span class="label">No cumplidas</span><span class="val">11 · 26,19%</span></li>
+        </ul>
+      </div>
+
+      <div class="filters" role="group" aria-label="Filtrar por estado">
+        <button class="fchip" aria-pressed="true">Todas · 42</button>
+        <button class="fchip" aria-pressed="false">Cumplidas · 31</button>
+        <button class="fchip" aria-pressed="false">No cumplidas · 11</button>
+        <button class="fchip" aria-pressed="false">Vencidas · 3</button>
+        <button class="fchip" aria-pressed="false">En curso · 8</button>
+      </div>
+      <div class="userfilters">
+        <span>Progenitor</span>
+        <button aria-pressed="true">Todos</button>
+        <button aria-pressed="false">Mario · 22</button>
+        <button aria-pressed="false">Lucía · 20</button>
+      </div>
+
+      <div class="grouphead"><i class="dot" style="background:var(--done);width:7px;height:7px;border-radius:50%"></i>
+        Cumplidas <span class="n">· 31</span></div>
+      <div class="agenda">
+        <button class="agrow done" aria-label="Llevar a Mateo al pediatra, 12 de junio, cumplida, Mario Paz">
+          <span class="date"><b>12</b><span>Jun</span></span>
+          <span class="line"><i style="background:var(--cat-salud)"></i></span>
+          <span class="body">
+            <span class="top"><span class="time">09:30</span><span class="title">Llevar a Mateo al pediatra</span></span>
+            <span class="meta"><span class="who">Mario Paz · Salud</span>
+              <span class="chip ok"><i class="dot" style="background:var(--done)"></i>Cumplida</span></span>
+          </span>
+          <span class="chev" aria-hidden="true">›</span>
+        </button>
+        <button class="agrow done" aria-label="Reunión de padres en la escuela, 9 de junio, cumplida, Lucía Gómez">
+          <span class="date"><b>09</b><span>Jun</span></span>
+          <span class="line"><i style="background:var(--cat-educacion)"></i></span>
+          <span class="body">
+            <span class="top"><span class="time">17:00</span><span class="title">Reunión de padres en la escuela</span></span>
+            <span class="meta"><span class="who">Lucía Gómez · Educación</span>
+              <span class="chip ok"><i class="dot" style="background:var(--done)"></i>Cumplida</span></span>
+          </span>
+          <span class="chev" aria-hidden="true">›</span>
+        </button>
+        <button class="agrow done" aria-label="Compra de útiles, 5 de junio, cumplida, Mario Paz">
+          <span class="date"><b>05</b><span>Jun</span></span>
+          <span class="line"><i style="background:var(--cat-educacion)"></i></span>
+          <span class="body">
+            <span class="top"><span class="time">11:00</span><span class="title">Compra de útiles</span></span>
+            <span class="meta"><span class="who">Mario Paz · Educación</span>
+              <span class="chip ok"><i class="dot" style="background:var(--done)"></i>Cumplida</span></span>
+          </span>
+          <span class="chev" aria-hidden="true">›</span>
+        </button>
+      </div>
+
+      <div class="grouphead"><i class="dot" style="background:var(--overdue);width:7px;height:7px;border-radius:50%"></i>
+        No cumplidas <span class="n">· 11</span></div>
+      <div class="agenda">
+        <button class="agrow" aria-label="Excursión al zoo, venció el 18 de junio, vencida, Lucía Gómez">
+          <span class="date"><b>18</b><span>Jun</span></span>
+          <span class="line"><i style="background:var(--cat-recreacion)"></i></span>
+          <span class="body">
+            <span class="top"><span class="time">16:00</span><span class="title">Excursión al zoo</span></span>
+            <span class="meta"><span class="who">Lucía Gómez · Recreación</span>
+              <span class="chip ko"><i class="dot" style="background:var(--overdue)"></i>Vencida</span>
+              <span class="deadline">venció 18/06</span></span>
+          </span>
+          <span class="chev" aria-hidden="true">›</span>
+        </button>
+        <button class="agrow" aria-label="Clase de natación, venció el 20 de junio, vencida, Mario Paz">
+          <span class="date"><b>20</b><span>Jun</span></span>
+          <span class="line"><i style="background:var(--cat-recreacion)"></i></span>
+          <span class="body">
+            <span class="top"><span class="time">18:00</span><span class="title">Clase de natación</span></span>
+            <span class="meta"><span class="who">Mario Paz · Recreación</span>
+              <span class="chip ko"><i class="dot" style="background:var(--overdue)"></i>Vencida</span>
+              <span class="deadline">venció 20/06</span></span>
+          </span>
+          <span class="chev" aria-hidden="true">›</span>
+        </button>
+        <button class="agrow" aria-label="Turno odontológico, 26 de junio, en progreso, Lucía Gómez">
+          <span class="date"><b>26</b><span>Jun</span></span>
+          <span class="line"><i style="background:var(--cat-salud)"></i></span>
+          <span class="body">
+            <span class="top"><span class="time">08:30</span><span class="title">Turno odontológico</span></span>
+            <span class="meta"><span class="who">Lucía Gómez · Salud</span>
+              <span class="chip orange"><i class="dot" style="background:var(--progress)"></i>En progreso</span>
+              <span class="deadline" style="color:var(--on-surface-variant)">vence 02/07</span></span>
+          </span>
+          <span class="chev" aria-hidden="true">›</span>
+        </button>
+        <button class="agrow" aria-label="Entrega de carpeta, 28 de junio, asignada, Mario Paz">
+          <span class="date"><b>28</b><span>Jun</span></span>
+          <span class="line"><i style="background:var(--cat-educacion)"></i></span>
+          <span class="body">
+            <span class="top"><span class="time">13:00</span><span class="title">Entrega de carpeta</span></span>
+            <span class="meta"><span class="who">Mario Paz · Educación</span>
+              <span class="chip blue"><i class="dot" style="background:var(--assigned)"></i>Asignada</span>
+              <span class="deadline" style="color:var(--on-surface-variant)">vence 05/07</span></span>
+          </span>
+          <span class="chev" aria-hidden="true">›</span>
+        </button>
+      </div>
+      <button class="more">Ver las 42 actividades</button>
+
+    </main>
+  </section>
+
+</div>
+
+<script>
+(function () {
+  "use strict";
+  var reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  // Frame 1: selector de vínculo
+  var field = document.getElementById("f1-field");
+  var vinc = document.getElementById("f1-vinc");
+  var options = field.querySelectorAll(".opt");
+
+  function setMenu(open) {
+    field.classList.toggle("open", open);
+    vinc.setAttribute("aria-expanded", String(open));
+    if (open) { field.querySelector(".search").focus(); }
+  }
+
+  vinc.addEventListener("click", function () {
+    setMenu(vinc.getAttribute("aria-expanded") !== "true");
+  });
+
+  options.forEach(function (opt) {
+    opt.addEventListener("click", function () {
+      options.forEach(function (o) {
+        o.setAttribute("aria-selected", "false");
+        var t = o.querySelector(".tick");
+        if (t) { t.remove(); }
+      });
+      opt.setAttribute("aria-selected", "true");
+      var tick = document.createElement("span");
+      tick.className = "tick"; tick.setAttribute("aria-hidden", "true"); tick.textContent = "✓";
+      opt.appendChild(tick);
+      vinc.querySelector("b").textContent = opt.querySelector("b").textContent;
+      vinc.querySelector(".txt span").textContent =
+        "Acuerdo formal · " + opt.querySelector(".txt span").textContent;
+      setMenu(false);
+    });
+  });
+
+  document.addEventListener("click", function (e) {
+    if (!field.contains(e.target)) { setMenu(false); }
+  });
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape") { setMenu(false); }
+  });
+
+  // Frame 1: la card de actividades lleva a la vista de detalle
+  function goToActivities() {
+    var target = document.getElementById("frame-actividades");
+    if (!target) { return; }
+    target.scrollIntoView({ behavior: reduced ? "auto" : "smooth", inline: "center", block: "nearest" });
+    var list = document.getElementById("f1-list");
+    if (list) { list.scrollTop = 0; }
+  }
+  document.getElementById("f1-acts-btn").addEventListener("click", goToActivities);
+
+  // Frame 3: filtros (uno activo por grupo)
+  document.querySelectorAll("#frame-actividades .filters").forEach(function (group) {
+    group.querySelectorAll(".fchip").forEach(function (chip) {
+      chip.addEventListener("click", function () {
+        group.querySelectorAll(".fchip").forEach(function (c) { c.setAttribute("aria-pressed", "false"); });
+        chip.setAttribute("aria-pressed", "true");
+      });
+    });
+  });
+  document.querySelectorAll("#frame-actividades .userfilters button").forEach(function (chip) {
+    chip.addEventListener("click", function () {
+      document.querySelectorAll("#frame-actividades .userfilters button").forEach(function (c) {
+        c.setAttribute("aria-pressed", "false");
+      });
+      chip.setAttribute("aria-pressed", "true");
+    });
+  });
+})();
+</script>
+</body>
+</html>

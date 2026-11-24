@@ -1,15 +1,24 @@
 {
   "version": 1,
-  "chosen": "01-consola-de-vinculos.html",
+  "chosen": "04-reporte-desplegable.html",
   "handoffs": {
     "01-consola-de-vinculos.html": {
       "status": "implemented",
       "queued": false,
       "sentAt": "2026-11-05T11:36:34.392Z",
       "startedAt": "2026-11-05T11:37:01.272Z",
-      "implementedAt": "2026-11-05T11:43:23.077Z",
+      "implementedAt": "2026-11-23T12:58:10.522Z",
       "feature": "odd/tasks/admin-reports-ui.md",
-      "note": "Implemented in Compose: bond console with search + health cards, detail with children/members/report + 6-month trend, report with expense percentages, and the PDF page preview. Backend gained /admin/bonds/health and /admin/bonds/:id/trend (S13-S14) since the artboard's numbers did not exist in the API. 512 shared tests green."
+      "note": "Implementado en Compose el frame 2 rehecho: strip de salud en la cabecera (healthByBond), solapas Hijos/Miembros sin Reporte (acceso directo a la pestaña Reportes), hijos con edad y N actividades del reporte en background, progenitores con avatar, rol y barra de participación. 734 tests, 0 fallos."
+    },
+    "04-reporte-desplegable.html": {
+      "status": "implemented",
+      "queued": true,
+      "sentAt": "2026-11-23T12:15:32.003Z",
+      "startedAt": "2026-11-23T12:16:55.457Z",
+      "implementedAt": "2026-11-23T12:27:11.534Z",
+      "feature": "odd/tasks/admin-reports-ui.md",
+      "note": "Implementado en Compose: dropdown de vínculo con búsqueda, contadores unificados desde byStatus (el bug \"vencidas 3 vs overdue 4\" pineado con tests), desglose por progenitor, pantalla de detalle de actividades con filtros por estado y progenitor, y Gastos con 4 estados distinguibles. Nuevo backend GET /admin/bonds/:id/activities. 724 tests shared + 1243 jest, todo verde."
     }
   }
 }

@@ -34,20 +34,79 @@ class SessionManager {
     var loginPending: Boolean by mutableStateOf(false)
         internal set
 
+    /**
+     * La contraseña con la que se entró la generó el sistema y todavía no se cambió (S2).
+     *
+     * Mientras esté en `true`, `App` no monta ninguna vista de la app: el único destino es
+     * la pantalla de cambio. Se persiste porque el bloqueo no puede evaporarse al cerrar y
+     * volver a abrir: el back responde 403 en el resto de las rutas de todos modos, pero la
+     * app no tiene por qué descubrirlo con un error.
+     */
+    var mustChangePassword: Boolean by mutableStateOf(false)
+        private set
+
     val isLoggedIn: Boolean get() = token != null
 
-    fun setSession(token: String, userName: String, role: String?, bondId: String? = null, userId: String? = null) {
+    /**
+     * Abre una sesión NUEVA.
+     *
+     * 🔴 El vínculo no se hereda: [bondId] y [bondRole] se escriben con lo que recibe la
+     * llamada —o `null`—, nunca con lo que dejó la sesión anterior. Si no se resetearan, un
+     * logout seguido del login de otra persona podría enrutar al nuevo usuario con el rol
+     * del vínculo del anterior ([bondRole] es lo que decide si la app monta la vista de
+     * terceros). El rol del vínculo se deriva DESPUÉS del login —o al salir del cambio
+     * obligatorio de contraseña—, así que acá siempre arranca vacío.
+     */
+    fun setSession(
+        token: String,
+        userName: String,
+        role: String?,
+        bondId: String? = null,
+        userId: String? = null,
+        mustChangePassword: Boolean = false,
+    ) {
         this.token = token
         this.userName = userName
         this.role = role
         this.bondId = bondId
+        this.bondRole = null
         this.userId = userId
+        this.mustChangePassword = mustChangePassword
         // Persist to storage
         Platform.saveString(KEY_TOKEN, token)
         Platform.saveString(KEY_USER_NAME, userName)
         role?.let { Platform.saveString(KEY_ROLE, it) }
-        bondId?.let { Platform.saveString(KEY_BOND_ID, it) }
+        saveOrClear(KEY_BOND_ID, bondId)
+        // Una sesión nueva no puede dejar el rol del vínculo de la anterior en disco.
+        Platform.remove(KEY_BOND_ROLE)
         userId?.let { Platform.saveString(KEY_USER_ID, it) }
+        Platform.saveString(KEY_MUST_CHANGE_PASSWORD, mustChangePassword.toString())
+    }
+
+    /** Escribe el valor en el almacenamiento o borra la clave: un `null` no deja residuo. */
+    private fun saveOrClear(key: String, value: String?) {
+        if (value != null) {
+            Platform.saveString(key, value)
+        } else {
+            Platform.remove(key)
+        }
+    }
+
+    /**
+     * Reemplaza el token vigente por el que emitió el cambio de contraseña.
+     *
+     * Existe como operación propia —y no como un `setSession` completo— porque el cambio
+     * de contraseña no toca nombre, rol ni vínculo: sólo la credencial.
+     */
+    fun updateToken(newToken: String) {
+        this.token = newToken
+        Platform.saveString(KEY_TOKEN, newToken)
+    }
+
+    /** Apaga (o vuelve a poner) el bloqueo por contraseña provisoria, y lo persiste. */
+    fun updateMustChangePassword(mustChangePassword: Boolean) {
+        this.mustChangePassword = mustChangePassword
+        Platform.saveString(KEY_MUST_CHANGE_PASSWORD, mustChangePassword.toString())
     }
 
     /** Mark login as in-progress so UI stays on Login screen during bonds fetch. */
@@ -62,11 +121,7 @@ class SessionManager {
 
     fun updateBondId(bondId: String?) {
         this.bondId = bondId
-        if (bondId != null) {
-            Platform.saveString(KEY_BOND_ID, bondId)
-        } else {
-            Platform.remove(KEY_BOND_ID)
-        }
+        saveOrClear(KEY_BOND_ID, bondId)
     }
 
     /** Backfill userId for legacy sessions restored without one (via GET /auth/me). */
@@ -82,13 +137,10 @@ class SessionManager {
      */
     fun updateBondRole(bondRole: String?) {
         this.bondRole = bondRole
-        if (bondRole != null) {
-            Platform.saveString(KEY_BOND_ROLE, bondRole)
-        } else {
-            Platform.remove(KEY_BOND_ROLE)
-        }
+        saveOrClear(KEY_BOND_ROLE, bondRole)
     }
 
+    /** Cierra la sesión: no sobrevive NADA del usuario anterior, ni en memoria ni en disco. */
     fun clear() {
         token = null
         userName = null
@@ -96,6 +148,7 @@ class SessionManager {
         bondId = null
         userId = null
         bondRole = null
+        mustChangePassword = false
         loginPending = false
         // Clear from storage
         Platform.remove(KEY_TOKEN)
@@ -104,6 +157,7 @@ class SessionManager {
         Platform.remove(KEY_BOND_ID)
         Platform.remove(KEY_USER_ID)
         Platform.remove(KEY_BOND_ROLE)
+        Platform.remove(KEY_MUST_CHANGE_PASSWORD)
     }
 
     /**
@@ -123,6 +177,7 @@ class SessionManager {
         bondId = savedBondId
         userId = savedUserId
         bondRole = savedBondRole
+        mustChangePassword = Platform.loadString(KEY_MUST_CHANGE_PASSWORD) == "true"
         return true
     }
 
@@ -133,5 +188,6 @@ class SessionManager {
         private const val KEY_BOND_ID = "session_bond_id"
         private const val KEY_USER_ID = "session_user_id"
         private const val KEY_BOND_ROLE = "session_bond_role"
+        private const val KEY_MUST_CHANGE_PASSWORD = "session_must_change_password"
     }
 }
