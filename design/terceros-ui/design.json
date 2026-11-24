@@ -1,0 +1,35 @@
+{
+  "title": "Terceros del progenitor — gestión de accesos",
+  "brief": "Tres direcciones para que un progenitor vea, otorgue, edite y revoque los accesos temporales que él autorizó: vigencia explícita, relación, alcance acotado y revocación inmediata. Sólo ve los accesos propios y el alta exige que la persona ya tenga cuenta en la app.",
+  "feature": "odd/tasks/terciarios-temporales.md",
+  "artboards": [
+    {
+      "file": "01-accesos-a-la-vista.html",
+      "title": "Accesos a la vista",
+      "tradeoff": "La tarjeta concentra vigencia, permisos y acciones: revisar y revocar es rápido, y el alta vive en una sola pantalla con el error de email sin cuenta visible. La más directa; con muchos accesos la lista se vuelve larga y el alta castiga el error recién al enviar.",
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "02-en-dos-pasos.html",
+      "title": "En dos pasos",
+      "tradeoff": "El asistente hace el alta la más segura —resumen del alcance antes de otorgar— y la lista la más escaneable. Gestionar un acceso existente cuesta un tap más y la vigencia exacta queda menos visible en la lista.",
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "03-expediente-del-acceso.html",
+      "title": "Expediente del acceso",
+      "tradeoff": "Máxima claridad y trazabilidad: historia del acceso, matriz de qué puede y qué no, nota del progenitor y revocación al final, lejos del toque accidental. Es la más densa y la más lenta para el uso diario.",
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "04-vigencia-a-la-vista.html",
+      "title": "Vigencia a la vista",
+      "tradeoff": "Fusiona lo elegido: el asistente del 02, el resumen de vencimiento y el tipo de relación del 01, y la matriz de permisos del 03 como dato de consulta detrás de un icono ⓘ. Las acciones viven en un rail que se descubre con swipe izquierdo. Menos carga permanente en la lista; el detalle del alcance queda a un toque de distancia.",
+      "width": 1440,
+      "height": 1000
+    }
+  ]
+}

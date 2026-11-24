@@ -18,6 +18,12 @@ data class NotificationsUiState(
     val isLoading: Boolean = true,
     val isLoadingMore: Boolean = false,
     val isMarkingAll: Boolean = false,
+    /**
+     * S8: swipe-to-refresh con contenido ya cargado. Es el estado que consume
+     * `PullToRefreshBox` — mientras `items` no esté vacío el skeleton NO
+     * vuelve a aparecer (`isLoading` queda false) y el spinner es este.
+     */
+    val isRefreshing: Boolean = false,
     val error: String? = null,
     val items: List<NotificationItem> = emptyList(),
     val total: Int = 0,
@@ -62,17 +68,29 @@ class NotificationsViewModel(
         refresh()
     }
 
-    /** Recarga desde la primera página. Un fallo conserva lo ya cargado (S7). */
+    /**
+     * Recarga desde la primera página. Un fallo conserva lo ya cargado (S7).
+     *
+     * S8: cuando ya hay contenido, un refresco NO baja al skeleton — pinta
+     * `isRefreshing` (spinner del pull-to-refresh) y `isLoading` queda false.
+     * El refresco entra por el pull de la vista (o al abrirse la pantalla),
+     * no por un botón.
+     */
     fun refresh() {
         scope.launch {
             _uiState.update {
-                it.copy(isLoading = it.items.isEmpty(), error = null)
+                it.copy(
+                    isLoading = it.items.isEmpty(),
+                    isRefreshing = it.items.isNotEmpty(),
+                    error = null,
+                )
             }
 
             when (val result = api.list(token, pageSize, 0, unreadOnly = true)) {
                 is ApiResult.Success -> _uiState.update {
                     it.copy(
                         isLoading = false,
+                        isRefreshing = false,
                         error = null,
                         items = result.data.items,
                         total = result.data.total,
@@ -81,6 +99,7 @@ class NotificationsViewModel(
                 is ApiResult.Error -> _uiState.update {
                     it.copy(
                         isLoading = false,
+                        isRefreshing = false,
                         error = result.message,
                     )
                 }

@@ -5,7 +5,7 @@ asignadas por un progenitor concreto dentro de un Bond, con acceso con fecha de 
 revocación anticipada, y una vista reducida: Home propio y sólo sus actividades asignadas, sin
 capacidad de crear, rechazar ni cancelar, pudiendo únicamente finalizar.
 
-**Estado:** L30. Back: T1–T6, T12 y T14 cerrados (T12 verificado de forma independiente); front: T7, T8, T9, T10 y T13 hechos. T11 queda parcial (e2e y tests de sesión sin infraestructura). Sólo siguen abiertas las decisiones de producto de `## Decisiones abiertas`.
+**Estado:** L32. Back: T1–T6, T12 y T14 cerrados (T12 verificado de forma independiente); front: T7, T8, T9, T10 y T13 hechos. T11 queda parcial (e2e y tests de sesión sin infraestructura). Sólo siguen abiertas las decisiones de producto de `## Decisiones abiertas`.
 **Ramas:** back `parental_coordination_back` · front `parental_coord-front` (hoy en `ft/activity-stage-rail`, con cambios sin commitear en `Bitacora*`).
 **Entrega:** por definir (ver `## Tasks`); unidades de ~400 líneas, tests junto al comportamiento, Conventional Commits, sin push ni PR.
 **Runners:** front `./gradlew :shared:testDebugUnitTest` + `./gradlew :androidApp:assembleDebug` · back `pnpm test` + `pnpm build`.
@@ -199,6 +199,7 @@ Todas pendientes. Cada una se aprueba antes de arrancar (D1).
 | T12 | S12 | Identidad del terciario: el otro progenitor ve "Autorizado por <progenitor>", sin nombre ni perfil, en DTO de Bond, de actividad y en notificaciones | back | inline | hecho (L28) |
 | T13 | S1, S2, S9 | Diálogos de permiso del artboard 03: onboarding "Tu permiso, en concreto" en el primer ingreso + "Lo que no podés hacer acá" en el detalle, abiertos desde iconos de información; sin notas explicativas dentro del producto | front | inline | hecho (L8) |
 | T14 | S14, S5, S12 | El trabajo del tercero no suma al porcentaje de cumplimiento del vínculo: excluirlo de `findActiveMembersWithActStats` (A2 de L29) | back | delegado | hecho (L30) |
+| T15 | S1, S2, S7 | Front del progenitor: lista, alta, edición y revocación de los accesos que él otorgó, con vigencia explícita y alcance acotado | front | delegado | hecho (L32) |
 
 ## Decisiones abiertas
 
@@ -383,3 +384,32 @@ Antes de tocar nada se verificó que el rol **sí** se persiste (`1793664000000`
 Evidencia: RED real (2 de 11 tests fallan pidiendo `bm.role <> :thirdPartyRole` y recibiendo `bm.left_at IS NULL`) → GREEN 11/11. `pnpm build` OK; `pnpm test` → **100 suites, 1193 tests, 0 fallas**. La única deuda es de entorno: el SQL no se ejecutó contra Postgres real (la suite mockea el QueryBuilder), igual que el resto de las specs estructurales del repo; `bm.role` es NOT NULL, así que `<>` no pierde filas.
 
 Aparte, A4 quedó corregido: el comentario de `bond-member.entity.ts` ya no dice que `third_party` no se persiste (commit cosmético separado).
+
+**L31 (T15 — el progenitor no tenía dónde otorgar el acceso).** Pregunta del humano: "puede ser que la implemetacion de la vista de agregar terceros desde un usuario progenitor no lo hicimos?". La respuesta era sí: `App.kt` seguía tratando **Terceros** como placeholder, `ThirdPartiesApi` sólo tenía `getMyGrant()` y no existía ningún `TercerosScreen`/`ThirdPartiesScreen`. El back ya tenía el CRUD completo del dueño (T2) y el front sólo la vista del tercero (T7–T13): faltaba el lado que **da** el acceso. Decisión del humano: "vamos al diseno y luego implementacion".
+
+Se diseñaron tres direcciones en `design/terceros-ui/` sobre `design/system.md`, cada una con una estrategia distinta (no sólo color):
+- `01-accesos-a-la-vista.html` — tarjeta por acceso con vigencia, permisos y acciones; alta en una pantalla con el error 422 de email sin cuenta. Tradeoff: la más directa y rápida de revisar; lista larga con muchos accesos.
+- `02-en-dos-pasos.html` — lista compacta + asistente de dos pasos con resumen del alcance antes de otorgar. Tradeoff: el alta más segura y la lista más escaneable; gestionar cuesta un tap más.
+- `03-expediente-del-acceso.html` — lista mínima + expediente con historia, matriz de qué puede y qué no, nota y revocación al final. Tradeoff: máxima trazabilidad; la más densa y lenta.
+
+Restricciones que el diseño respeta del contrato real: cada progenitor ve sólo los accesos que él autorizó; el alta exige una cuenta existente (`email`), `relationship` (`family|caregiver|medical|educational`), `accessEnd` obligatorio y `note` opcional; vigencia y estado salen del servidor.
+
+Comentarios del canvas (todos resueltos): el resumen de vencimiento y el tipo de relación del 01 suman; la matriz de permisos del 03 tiene que ser un dato de consulta detrás de un icono arriba a la derecha. Se agregó `04-vigencia-a-la-vista.html`, que fusiona todo eso sobre el asistente del 02, y **es el artboard elegido para implementar**.
+
+**L32 (T15 — el progenitor ya puede otorgar y revocar).** Implementado sobre el artboard `04-vigencia-a-la-vista` con los dos deltas finales del canvas (sin resumen de permisos en la tarjeta; acciones por swipe con vías alternativas). Piezas: `ThirdPartyAccess` + requests en `ThirdPartyModels.kt` (con `relationshipLabel` congelado y tests que lo fijan), `listForBond/create/update/revoke` en `ThirdPartiesApi.kt`, `ThirdPartiesViewModel.kt` (asistente, presets de 30 días/3 meses con `kotlinx-datetime`, validación de calendario real y fecha no pasada, edición, revocación) y `ThirdPartiesScreen.kt` (tarjetas con vigencia y barra, rail por swipe + menú ⋮ + `CustomAccessibilityAction`, hojas de edición y de matriz ⓘ, estados loading/vacío/error). Navegación real del tab `thirdparty` en `BottomNavBar` y `App.kt`, con `token`/`bondId` de la sesión y `destroy()` del VM.
+
+Verificación: `:shared:testDebugUnitTest` → **690 tests, 0 fallas** (67 reportes; 13 nuevos) y `:androidApp:assembleDebug` OK. Diseño commiteado aparte (`59d331c`).
+
+Límites declarados: no se implementó "Renovar"/"Quitar" porque el back responde **409** (`Sólo se puede editar un acceso vigente` / `El acceso ya venció: no hay nada que revocar`); la palabra "Abuela"/"Niñera" del artboard no existe en el contrato (`displayName` + `relationship`), así que no se inventó; la nota de 500 caracteres la valida el back; no hay refresh por realtime de la lista (se recarga al entrar y después de cada escritura); y sigue sin haber Compose UI tests, así que la pantalla no tiene verificación de UI ejecutable — la misma limitación del resto del front. El estado "sin vínculo" mantiene la navegación previa (sólo Inicio desde la barra).
+
+
+**L32 (bug de integración S5↔T7: el tercero caía en el Home del progenitor).** Reporte del humano tras crear un tercero en "Familia Perez": la app decía que no pertenecía a ningún vínculo y no mostraba la vista del tercero. Causa raíz: T5/S5 **redacta `members` para el tercero** (el `GET /bonds` del tercero devuelve `members: []`, verificado con un JWT local), pero T7 derivaba `bondRole` de `members[].user.id`; sin fila, el rol quedaba `null` y el routing caía en el Home de los progenitores. El back estaba bien: `bond_member.role = third_party` y el grant `active`; `GET /third-parties/me` responde 200 al tercero y 404 al progenitor.
+
+Fix: `resolveViewerRole` (`feature/session/domain/BondRoleResolver.kt`) combina las dos fuentes: la fila del miembro manda cuando existe; si no, el grant propio resuelve (200 → `third_party`; 403 → `third_party`, para que su vista muestre "Tu acceso temporal terminó"; 404 → no es tercero; red/5xx → indeterminado y se reintenta). Se usa en la derivación de login/cambio y también en la **restauración de sesión**, así el tercero no retrocede a Home al reabrir la app. Verificación: 6 tests nuevos del resolver, **714 tests, 0 fallas**, `assembleDebug` OK.
+
+Nota aparte: las cuentas invitadas quedan con `displayName: null` (el alta sólo tiene email y no crea `personal_data`), así que la lista del progenitor muestra el email/iniciales en vez de un nombre. Queda como follow-up de producto (pedir nombre en el alta o completarlo en el primer ingreso).
+
+
+**L33 (bug del chokepoint: `date` como `Date` dejaba al tercero fuera de todas las rutas).** Tras el fix del routing, el Home del tercero mostraba "No pudimos cargar tu inicio" con `404 Bond not found or you are not a member` en `GET /activities/bond/:bondId`. El grant estaba `active` y vencía 2027-02-16. Causa: `findAccessRow` usa `getRawOne`, y el driver `pg` devuelve las columnas `date` como **Date** (medianoche local); `resolveUncached` comparaba `grantEnd >= "YYYY-MM-DD"`, y `Date >= string` coerciona el string a `NaN` → siempre `false` → `grant: undefined` → `isActiveBondForMember` false en todo el backend (actividades, gastos, adjuntos, notificaciones). Reproducido en el runtime: `typeof end_date = object`, `instanceof Date = true`, `v >= '2026-11-16' = false`.
+
+Fix: `dateOnly()` en `BondAccessService` arma `YYYY-MM-DD` con componentes **locales** (no `toISOString`, que puede correr el día en husos positivos) y normaliza `startDate`/`endDate` del grant; el tipo de `BondAccessRow` se corrigió a `Date | string | null` para que el compilador no vuelva a mentir. Dos tests nuevos: un grant futuro que llega como `Date` sigue vigente (y devuelve `YYYY-MM-DD`), y uno vencido como `Date` también se detecta. Verificación: **104 suites, 1235 tests, 0 fallas**; build OK.

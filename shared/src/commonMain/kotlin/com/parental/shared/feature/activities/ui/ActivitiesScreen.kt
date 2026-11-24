@@ -88,6 +88,14 @@ fun ActividadesScreen(
     onOpenNotifications: (() -> Unit)? = null,
     /** S12 · G-3 — salida con confirmación, igual que en el resto de las vistas. */
     onLogout: () -> Unit = {},
+    /**
+     * Deep-link desde notificaciones (slice 3): id de actividad a abrir en el
+     * sheet de detalle apenas la pantalla entre en composición (o mientras ya
+     * está compuesta). La pantalla lo consume UNA vez y avisa por callback.
+     * Mismo patrón que `pendingActivityAttachmentId` en Expenses.
+     */
+    pendingActivityDetailId: String? = null,
+    onPendingActivityDetailConsumed: () -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -148,6 +156,18 @@ fun ActividadesScreen(
             originId = null
             if (returning != null) returnFocus(returning)
         }
+    }
+
+    // Deep-link desde notificaciones: abrir el detalle de UNA actividad apenas
+    // llega el id pendiente. Se consume UNA vez para que un re-compose o el
+    // cierre de la hoja no reabran el sheet sin pedido del usuario. Fijado al
+    // id (no a la referencia) para que un null→id→null re-dispare el efecto si
+    // vuelve a llegar OTRO id, sin reabrir el mismo dos veces.
+    LaunchedEffect(pendingActivityDetailId) {
+        val id = pendingActivityDetailId ?: return@LaunchedEffect
+        originId = id
+        viewModel.selectActividad(id)
+        onPendingActivityDetailConsumed()
     }
 
     LaunchedEffect(uiState.snackbarMessage, uiState.undoOffer) {

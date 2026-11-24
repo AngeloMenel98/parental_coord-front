@@ -47,6 +47,8 @@ private const val REPORTS_TAB = 2
 
 private const val CHILDREN_SECTION = 0
 private const val MEMBERS_SECTION = 1
+// El detalle ya no tiene solapa Reporte: el período y el PDF viven sólo en la pestaña
+// Reportes (L21, "sacar la parte de reportes ya que sino esta duplicado").
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -68,6 +70,29 @@ fun AdminScreen(
             onClose = { viewModel.closePdfPreview() },
             uriHandler = uriHandler,
         )
+        return
+    }
+
+    if (state.showReportActivities) {
+        // El overlay es un early return ANTES del Scaffold de abajo: sin Scaffold no hay
+        // fondo `surface` (en dark mode se ve el fondo claro de la ventana y "pasa a light")
+        // ni barra superior. El Scaffold repone ambos; el back «‹ Reporte» vive en el
+        // contenido, como en el artboard 04.
+        Scaffold(
+            topBar = {
+                AppTopBar(title = "Actividades", onLogout = onLogout)
+            },
+        ) { padding ->
+            Box(modifier = Modifier.fillMaxSize().padding(padding)) {
+                AdminActivitiesDetailScreen(
+                    state = state,
+                    onBack = { viewModel.closeReportActivities() },
+                    onStatusFilter = { viewModel.selectActivityStatusFilter(it) },
+                    onAssigneeFilter = { viewModel.selectActivityAssigneeFilter(it) },
+                    onRetry = { viewModel.retryReportActivities() },
+                )
+            }
+        }
         return
     }
 
@@ -536,6 +561,102 @@ private fun StatusChip(label: String, color: Color) {
     }
 }
 
+/** L21 · salud del vínculo en la cabecera del detalle: lo mismo que dice la tarjeta de la lista. */
+@Composable
+private fun BondHealthStrip(health: com.parental.shared.feature.admin.domain.model.AdminBondHealth?, childrenCount: Int) {
+    Surface(
+        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.surface,
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(vertical = Spacing.sm),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            StripCell(health?.let { adminFormatPercent(it.completionRate) } ?: "—", "Cumplido", Modifier.weight(1f))
+            StripDivider()
+            StripCell(health?.let { adminFormatPercent(it.paidAmountPercentage) } ?: "—", "Pagado", Modifier.weight(1f))
+            StripDivider()
+            StripCell((health?.childrenCount ?: childrenCount).toString(), "Hijos", Modifier.weight(1f))
+        }
+    }
+}
+
+/** L21 · progenitor del detalle: avatar de iniciales, rol legible y barra de participación. */
+@Composable
+private fun DetailMemberCard(member: DetailMember, hasReport: Boolean) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.small,
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+    ) {
+        Row(
+            modifier = Modifier.padding(Spacing.md),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(32.dp)
+                    .clip(androidx.compose.foundation.shape.CircleShape)
+                    .background(MaterialTheme.colorScheme.primaryContainer),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = initialsOf(member.name),
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                )
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = member.name,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Medium,
+                )
+                Text(
+                    text = member.roleLabel,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                if (member.assigned > 0) {
+                    Spacer(modifier = Modifier.height(Spacing.xxs))
+                    Row(modifier = Modifier.fillMaxWidth()) {
+                        Text(
+                            text = "${member.completed} de ${member.assigned} actividades",
+                            modifier = Modifier.weight(1f),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Text(
+                            text = adminFormatPercent(member.percentage),
+                            style = MaterialTheme.typography.bodySmall,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Medium,
+                        )
+                    }
+                    LinearProgressIndicator(
+                        progress = { (member.percentage / 100.0).toFloat() },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = Spacing.xxs)
+                            .height(6.dp)
+                            .clip(RoundedCornerShape(4.dp)),
+                    )
+                } else if (hasReport) {
+                    Text(
+                        text = "Sin actividades en el período",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+    }
+}
+
 // ── Vínculos · detalle ──────────────────────────────────────────────
 
 @Composable
@@ -546,6 +667,10 @@ private fun BondDetail(
 ) {
     val bond = state.bonds.firstOrNull { it.id == state.openBondId } ?: return
     val darkTheme = isSystemInDarkTheme()
+    // L21 · el reporte se carga en background al abrir el detalle (openBond ya setea
+    // reportBondId y llama loadReportIfNeeded): alimenta la participación y la actividad
+    // por hijo sin renderizar la sección de Reporte acá.
+    val report = state.report?.takeIf { it.bondId == bond.id }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(horizontal = Spacing.lg),
@@ -580,12 +705,20 @@ private fun BondDetail(
                         enabled = bond.id !in state.bondsInFlight,
                     )
                 }
-                if (bond.members.isNotEmpty()) {
-                    Text(
-                        text = bond.members.joinToString(" · ") { it.email ?: it.id },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+
+                // Salud del vínculo: los mismos números de la tarjeta de la lista, sin abrir Reporte.
+                Spacer(modifier = Modifier.height(Spacing.sm))
+                BondHealthStrip(health = state.healthByBond[bond.id], childrenCount = bond.childrenCount)
+
+                TextButton(
+                    onClick = {
+                        viewModel.selectReportBond(bond.id)
+                        viewModel.selectTab(REPORTS_TAB)
+                        viewModel.loadReportIfNeeded()
+                    },
+                    contentPadding = PaddingValues(0.dp),
+                ) {
+                    Text("Ver el reporte completo ›")
                 }
             }
         }
@@ -593,7 +726,7 @@ private fun BondDetail(
         item {
             SecondaryTabs(
                 selected = state.bondDetailTab,
-                labels = listOf("Hijos", "Miembros", "Reporte"),
+                labels = listOf("Hijos", "Miembros"),
                 onSelect = { viewModel.setBondDetailTab(it) },
             )
         }
@@ -606,6 +739,7 @@ private fun BondDetail(
                 items(state.bondChildren, key = { it.id }) { child ->
                     ChildCard(
                         child = child,
+                        activities = childActivityCount(report, child.id),
                         isEditing = state.editingChildId == child.id,
                         onEdit = { viewModel.startEditingChild(child) },
                         onDelete = { viewModel.requestDeleteChild(child.id) },
@@ -621,39 +755,14 @@ private fun BondDetail(
                 }
             }
 
-            MEMBERS_SECTION -> {
-                if (bond.members.isEmpty()) {
+            else -> {
+                val members = buildDetailMembers(bond, report)
+                if (members.isEmpty()) {
                     item { EmptyHint("Sin progenitores cargados.") }
                 }
-                items(bond.members, key = { it.id }) { member ->
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = MaterialTheme.shapes.small,
-                        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-                    ) {
-                        Column(modifier = Modifier.padding(Spacing.md)) {
-                            Text(
-                                text = member.email ?: member.id,
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.Medium,
-                            )
-                            Text(
-                                text = member.role,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
+                items(members, key = { it.userId }) { member ->
+                    DetailMemberCard(member, hasReport = report != null)
                 }
-            }
-
-            else -> item {
-                ReportContent(
-                    state = state,
-                    viewModel = viewModel,
-                    uriHandler = uriHandler,
-                    showPeriod = true,
-                )
             }
         }
 
@@ -783,12 +892,79 @@ private fun ReportsTab(
                         )
                     }
 
-                    state.bonds.forEach { bond ->
-                        FilterChip(
-                            selected = state.reportBondId == bond.id,
-                            onClick = { viewModel.selectReportBond(bond.id) },
-                            label = { Text(bond.title) },
-                        )
+                    // S19 · un solo control para elegir vínculo: con 30 vínculos los chips
+                    // apilados empujaban el reporte fuera de la pantalla.
+                    val selectedBond = state.bonds.firstOrNull { it.id == state.reportBondId }
+                    val filteredBonds = remember(state.bonds, state.reportBondQuery) {
+                        val needle = state.reportBondQuery.foldAccents().trim()
+                        if (needle.isEmpty()) {
+                            state.bonds
+                        } else {
+                            state.bonds.filter { it.title.foldAccents().contains(needle) }
+                        }
+                    }
+
+                    Box {
+                        OutlinedButton(
+                            onClick = { viewModel.setReportBondMenuOpen(true) },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = selectedBond?.title ?: "Elegí un vínculo",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                                if (selectedBond != null) {
+                                    val members = selectedBond.members.joinToString(" · ") { it.email ?: it.role }
+                                    Text(
+                                        text = members.ifBlank { selectedBond.agreementType },
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                }
+                            }
+                            Text("▾")
+                        }
+
+                        DropdownMenu(
+                            expanded = state.reportBondMenuOpen,
+                            onDismissRequest = { viewModel.setReportBondMenuOpen(false) },
+                            modifier = Modifier.fillMaxWidth(0.92f),
+                        ) {
+                            OutlinedTextField(
+                                value = state.reportBondQuery,
+                                onValueChange = viewModel::updateReportBondQuery,
+                                singleLine = true,
+                                placeholder = { Text("Buscar vínculo") },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = Spacing.sm),
+                            )
+                            if (filteredBonds.isEmpty()) {
+                                Text(
+                                    text = "Ningún vínculo coincide.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(Spacing.md),
+                                )
+                            }
+                            filteredBonds.forEach { bond ->
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(
+                                            text = bond.title,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                        )
+                                    },
+                                    onClick = { viewModel.selectReportBond(bond.id) },
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -854,7 +1030,7 @@ private fun ReportContent(
         if (report == null) {
             EmptyHint("Elegí un vínculo y cargá el reporte del período.")
         } else {
-            ActivitiesCard(report)
+            ActivitiesCard(report) { viewModel.openReportActivities() }
             ExpensesCard(report)
             if (report.members.isNotEmpty()) {
                 MembersCard(report)
@@ -979,16 +1155,91 @@ private fun FigureRow(label: String, value: String) {
 }
 
 @Composable
-private fun ActivitiesCard(report: AdminBondReport) {
-    SectionCard(title = "Actividades", subtitle = report.activities.total.toString()) {
-        FigureRow("Cumplidas", report.activities.completed.toString())
-        FigureRow("Vencidas", report.activities.overdue.toString())
-        FigureRow("Cumplimiento", adminFormatPercent(report.activities.completionRate))
-        if (report.activities.byStatus.isNotEmpty()) {
-            Spacer(modifier = Modifier.height(Spacing.xs))
-            report.activities.byStatus.forEach { (status, count) ->
-                FigureRow(status, count.toString())
+internal fun ActivitiesCard(report: AdminBondReport, onOpenDetail: () -> Unit) {
+    val counts = remember(report) { buildActivityCounts(report) }
+    val members = remember(report) { buildMemberCompletions(report.members) }
+    val dark = isSystemInDarkTheme()
+
+    SectionCard(
+        title = "Actividades",
+        subtitle = if (counts.total > 0) "${counts.completed} de ${counts.total} cumplidas" else null,
+    ) {
+        if (counts.total == 0) {
+            Text(
+                "Sin actividades en el período.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            return@SectionCard
+        }
+
+        // S20 · un solo juego de contadores: la barra, la leyenda y el porcentaje salen de
+        // `byStatus`. El campo derivado `overdue` del backend no se lee acá.
+        StackedBar(counts.buckets.map { activityBucketColor(it.key, dark) to it.count })
+        Spacer(modifier = Modifier.height(Spacing.xs))
+        counts.buckets.forEach { bucket ->
+            LegendRow(bucket.label, bucket.count, counts.total, activityBucketColor(bucket.key, dark))
+        }
+        Spacer(modifier = Modifier.height(Spacing.xs))
+        FigureRow(
+            "Cumplidas / no cumplidas",
+            "${adminFormatPercent(counts.completionRate)} / ${adminFormatPercent(counts.notCompletedRate)}",
+        )
+        Text(
+            text = "El porcentaje divide siempre por el total del período.",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+
+        if (members.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(Spacing.sm))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Text(
+                text = "Cumplimiento por progenitor",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            members.forEach { member ->
+                val fraction = (member.percentage / 100.0).coerceIn(0.0, 1.0)
+                Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(Spacing.xxs)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.xxs),
+                    ) {
+                        Text(
+                            text = member.name,
+                            modifier = Modifier.weight(1f),
+                            style = MaterialTheme.typography.bodySmall,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Text(
+                            text = "${member.completed} de ${member.assigned}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Text(
+                            text = adminFormatPercent(member.percentage),
+                            style = MaterialTheme.typography.bodySmall,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Medium,
+                        )
+                    }
+                    // S1 · artboard 04: el cumplimiento por progenitor es un track, no solo texto.
+                    LinearProgressIndicator(
+                        progress = { fraction.toFloat() },
+                        modifier = Modifier.fillMaxWidth(),
+                        trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                    )
+                }
             }
+        }
+
+        Spacer(modifier = Modifier.height(Spacing.sm))
+        OutlinedButton(onClick = onOpenDetail, modifier = Modifier.fillMaxWidth()) {
+            // S1 · copy del artboard 04, con la cuenta del período.
+            Text(adminActivityDetailCta(counts.total))
         }
     }
 }
@@ -1010,9 +1261,12 @@ private fun ExpensesCard(report: AdminBondReport) {
     val rejectedCount = rejected?.count ?: 0
     val totalCount = paidCount + approvedCount + pendingCount + rejectedCount
 
+    // S22 · `Status.Paid` y `Status.Assigned` son el MISMO #1E88E5: usarlos para pagados y
+    // aprobados pintaba dos tramos idénticos. Pagados toma `Done` y los otros dos conservan
+    // su token, así los cuatro estados del enum se distinguen de un vistazo.
     val segments = listOf(
-        StatusTokens.triple(StatusTokens.Status.Paid, darkTheme).dot to paidCount,
-        StatusTokens.triple(StatusTokens.Status.Assigned, darkTheme).dot to approvedCount,
+        StatusTokens.triple(StatusTokens.Status.Done, darkTheme).dot to paidCount,
+        StatusTokens.triple(StatusTokens.Status.Paid, darkTheme).dot to approvedCount,
         StatusTokens.triple(StatusTokens.Status.Verify, darkTheme).dot to pendingCount,
         StatusTokens.triple(StatusTokens.Status.Rejected, darkTheme).dot to rejectedCount,
     )
@@ -1035,8 +1289,8 @@ private fun ExpensesCard(report: AdminBondReport) {
         Spacer(modifier = Modifier.height(Spacing.sm))
 
         LegendRow("Pagados", paidCount, totalCount, segments[0].first)
-        LegendRow("Aprobados", approvedCount, totalCount, segments[1].first)
-        LegendRow("Pendientes", pendingCount, totalCount, segments[2].first)
+        LegendRow("Aprobados sin pagar", approvedCount, totalCount, segments[1].first)
+        LegendRow("Pendientes de aprobación", pendingCount, totalCount, segments[2].first)
         LegendRow("Rechazados", rejectedCount, totalCount, segments[3].first)
 
         Spacer(modifier = Modifier.height(Spacing.sm))
@@ -1053,7 +1307,7 @@ private fun ExpensesCard(report: AdminBondReport) {
 }
 
 @Composable
-private fun StackedBar(segments: List<Pair<Color, Int>>) {
+internal fun StackedBar(segments: List<Pair<Color, Int>>) {
     val total = segments.sumOf { it.second }.coerceAtLeast(1)
 
     Row(
@@ -1271,10 +1525,12 @@ private fun EmptyHint(text: String) {
 @Composable
 private fun ChildCard(
     child: AdminChild,
+    activities: Int?,
     isEditing: Boolean,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
 ) {
+    val today = remember { kotlinx.datetime.LocalDate.parse(adminTodayIso()) }
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.small,
@@ -1290,7 +1546,11 @@ private fun ChildCard(
                     fontWeight = FontWeight.Medium,
                 )
                 Text(
-                    "Nacimiento: ${adminFormatIsoDate(child.dateOfBirth)}",
+                    text = listOfNotNull(
+                        "Nacimiento: ${adminFormatIsoDate(child.dateOfBirth)}",
+                        childAgeLabel(child.dateOfBirth, today),
+                        activities?.let { "$it actividades" },
+                    ).joinToString(" · "),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

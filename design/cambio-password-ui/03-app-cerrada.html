@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cambio obligatorio · Dirección 03 — App cerrada</title>
+<style>
+  /* Tokens = design/system.md. Dirección bloqueo: la app se ve detrás, apagada, con la
+     hoja del cambio por encima. Refuerza que el bloqueo es global, no una pantalla más. */
+  :root {
+    color-scheme: light;
+    --primary: #00696D; --on-primary: #FFFFFF;
+    --primary-container: #9CF1F6; --on-primary-container: #002022;
+    --secondary-container: #CCE8EA; --on-secondary-container: #051F21;
+    --on-surface: #191C1D; --on-surface-variant: #3F4849;
+    --outline: #6F797A; --error: #BA1A1A; --error-container: #FFDAD6; --on-error-container: #410002;
+    --stage: #E4ECEC; --screen: #FAFDFC; --card: #FAFDFC; --track: #DAE4E5; --divider: #BEC8C9;
+    --serif: Georgia, 'Times New Roman', serif;
+    --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    --phone-shadow: 0 8px 32px rgba(0,32,34,.18);
+  }
+  [data-theme="dark"] {
+    color-scheme: dark;
+    --primary: #BB86FC; --on-primary: #000000;
+    --primary-container: #3700B3; --on-primary-container: #FFFFFF;
+    --secondary-container: #018786; --on-secondary-container: #000000;
+    --on-surface: #FFFFFF; --on-surface-variant: rgba(255,255,255,.70);
+    --outline: rgba(255,255,255,.40); --error: #CF6679; --error-container: #93000A; --on-error-container: #FFDAD6;
+    --stage: #0B0B0B; --screen: #121212; --card: #1E1E1E; --track: rgba(255,255,255,.12); --divider: rgba(255,255,255,.12);
+    --phone-shadow: 0 8px 32px rgba(0,0,0,.65);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: var(--sans); background: var(--stage); color: var(--on-surface); min-height: 100vh; padding: 24px 0; }
+  .stage { display: flex; flex-direction: column; align-items: center; padding: 0 24px; }
+  .scaffold { width: 100%; max-width: 460px; border: 1px dashed var(--divider); border-radius: 8px; padding: 6px 10px; margin-bottom: 12px; }
+  .frame-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .frame-label { font-size: 11px; font-weight: 500; font-variant: small-caps; letter-spacing: .5px; color: var(--on-surface-variant); }
+  .scaffold-caption { font-size: 10px; font-family: ui-monospace, Menlo, monospace; color: var(--on-surface-variant); margin-top: 4px; }
+  .theme-toggle .switch { width: 60px; height: 28px; border-radius: 14px; border: 0; box-shadow: inset 0 0 0 1px var(--divider); background: var(--track); position: relative; cursor: pointer; padding: 0; }
+  .theme-toggle .knob { position: absolute; top: 4px; left: 4px; width: 20px; height: 20px; border-radius: 50%; background: var(--card); box-shadow: 0 1px 2px rgba(0,0,0,.32); z-index: 1; }
+  .theme-toggle .icon { position: absolute; top: 6.5px; width: 15px; height: 15px; z-index: 2; pointer-events: none; color: var(--outline); }
+  .theme-toggle .icon.sun { left: 6.5px; } .theme-toggle .icon.moon { left: 38.5px; }
+  .theme-toggle .switch[aria-checked="false"] .sun { color: var(--primary); }
+  .theme-toggle .switch[aria-checked="true"] .moon { color: var(--on-primary); }
+  .theme-toggle .switch[aria-checked="true"] .knob { transform: translateX(32px); background: var(--primary); }
+  @media (prefers-reduced-motion: no-preference) { .theme-toggle .knob { transition: transform 150ms, background 150ms; } }
+
+  .phone { position: relative; width: 390px; height: 844px; background: var(--screen); color: var(--on-surface); display: flex; flex-direction: column; border-radius: 24px; overflow: hidden; box-shadow: var(--phone-shadow); }
+  .phone-label { font-size: 11px; font-weight: 500; font-variant: small-caps; letter-spacing: .5px; color: var(--on-surface-variant); margin-bottom: 6px; }
+  button { font-family: inherit; }
+  :focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 4px; }
+
+  .topbar { height: 56px; background: var(--card); border-bottom: 1px solid var(--divider); display: flex; align-items: center; padding: 0 16px; font-size: 18px; font-weight: 500; }
+  .behind { flex: 1; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+  .behind .card { background: var(--card); border: 1px solid var(--divider); border-radius: 12px; padding: 14px; display: flex; gap: 10px; align-items: center; }
+  .behind .avatar { width: 40px; height: 40px; border-radius: 50%; background: var(--primary-container); color: var(--on-primary-container); display: grid; place-items: center; font-size: 14px; font-weight: 600; }
+  .behind .name { font-size: 15px; font-weight: 600; }
+  .behind .meta { font-size: 11px; color: var(--on-surface-variant); }
+  .scrim { position: absolute; inset: 0; background: rgba(0,32,34,.48); display: flex; align-items: flex-end; }
+  .sheet { width: 100%; background: var(--card); border-radius: 24px 24px 0 0; padding: 8px 20px 20px; display: flex; flex-direction: column; gap: 14px; box-shadow: 0 -8px 32px rgba(0,32,34,.24); }
+  .grabber { width: 32px; height: 4px; border-radius: 2px; background: var(--divider); margin: 0 auto 2px; }
+  .eyebrow { font-size: 11px; font-weight: 500; font-variant: small-caps; letter-spacing: .5px; color: var(--on-surface-variant); }
+  h1 { font-family: var(--serif); font-size: 24px; line-height: 30px; font-weight: 600; }
+  .lead { font-size: 13px; line-height: 18px; color: var(--on-surface-variant); }
+  .form { display: flex; flex-direction: column; gap: 10px; }
+  .control { height: 48px; border: 1px solid var(--outline); border-radius: 8px; background: var(--card); padding: 0 12px; display: flex; align-items: center; font-size: 16px; letter-spacing: 2px; }
+  .hint { font-size: 11px; color: var(--on-surface-variant); }
+  .btn { height: 48px; border-radius: 24px; border: 0; font-size: 14px; font-weight: 600; cursor: pointer; width: 100%; background: var(--primary); color: var(--on-primary); }
+  .link { border: 0; background: none; color: var(--on-surface-variant); font-size: 12px; padding: 6px; cursor: pointer; text-decoration: underline; min-height: 44px; }
+</style>
+</head>
+<body>
+<div class="stage">
+  <div class="scaffold">
+    <div class="frame-head">
+      <span class="frame-label">Cambio obligatorio · 03 — App cerrada</span>
+      <div class="theme-toggle">
+        <button class="switch" role="switch" aria-checked="false" aria-label="Cambiar a tema oscuro" onclick="toggleTheme(this)">
+          <svg class="icon sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M19.1 4.9l-1.4 1.4M6.3 17.7l-1.4 1.4"/></svg>
+          <svg class="icon moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></svg>
+          <span class="knob"></span>
+        </button>
+      </div>
+    </div>
+    <div class="scaffold-caption">390 × 844 · la app detrás, apagada · el cambio como hoja que bloquea todo</div>
+  </div>
+  <div>
+    <span class="phone-label">Pantalla obligatoria al primer ingreso</span>
+    <div class="phone">
+      <div class="topbar">Inicio</div>
+      <div class="behind" aria-hidden="true">
+        <div class="card"><span class="avatar">MG</span><div><div class="name">Marta Gómez</div><div class="meta">Abuela · Familiar</div></div></div>
+        <div class="card"><span class="avatar">SR</span><div><div class="name">Sofía Ruiz</div><div class="meta">Niñera · Cuidadora</div></div></div>
+        <div class="card"><span class="avatar">TP</span><div><div class="name">Dr. Pérez</div><div class="meta">Médico</div></div></div>
+      </div>
+      <div class="scrim">
+        <section class="sheet" role="dialog" aria-modal="true" aria-labelledby="t3">
+          <span class="grabber" aria-hidden="true"></span>
+          <p class="eyebrow">No podés seguir todavía</p>
+          <h1 id="t3">Cambiá la contraseña provisoria</h1>
+          <p class="lead">La que te enviaron por mail sirve una sola vez. Elegí una tuya y la app se abre completa.</p>
+          <form class="form" onsubmit="return false">
+            <div class="control" aria-label="Contraseña provisoria">••••••••••••••</div>
+            <div class="control" aria-label="Nueva contraseña">••••••••</div>
+            <div class="control" aria-label="Repetir la nueva">••••••••</div>
+          </form>
+          <p class="hint">8 caracteres o más, con una letra y un número.</p>
+          <button class="btn">Cambiar y continuar</button>
+          <button class="link">Cerrar sesión</button>
+        </section>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+  function toggleTheme(btn) {
+    const on = btn.getAttribute('aria-checked') !== 'true';
+    btn.setAttribute('aria-checked', String(on));
+    document.documentElement.setAttribute('data-theme', on ? 'dark' : 'light');
+  }
+</script>
+</body>
+</html>

@@ -2,6 +2,7 @@ package com.parental.shared.feature.auth.data.remote
 
 import com.parental.shared.core.error.ApiResult
 import com.parental.shared.core.network.safeApiCall
+import com.parental.shared.feature.auth.domain.model.ChangePasswordRequest
 import com.parental.shared.feature.auth.domain.model.AuthResponse
 import com.parental.shared.feature.auth.domain.model.LoginRequest
 import com.parental.shared.feature.auth.domain.model.RegisterRequest
@@ -35,5 +36,23 @@ class AuthApi(
     /** GET /auth/me — usuario del token de la sesión actual. */
     suspend fun me(): ApiResult<User> = safeApiCall {
         client.get("auth/me")
+    }
+
+    /**
+     * POST /auth/change-password — cambia la password provisoria del primer login.
+     *
+     * Un fallo NO es una etiqueta de status: 401 significa "la provisoria está mal" (el
+     * back no distingue ese caso de un login inválido) y 400 "la nueva no cumple la
+     * política". safeApiCall lee el `message` del body; sin mensaje cae al label del
+     * status, que nunca queda vacío.
+     */
+    suspend fun changePassword(
+        currentPassword: String,
+        newPassword: String,
+    ): ApiResult<AuthResponse> = safeApiCall {
+        client.post("auth/change-password") {
+            contentType(ContentType.Application.Json)
+            setBody(ChangePasswordRequest(currentPassword, newPassword))
+        }
     }
 }

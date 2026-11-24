@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "chosen": "04-vigencia-a-la-vista.html",
+  "handoffs": {
+    "02-en-dos-pasos.html": {
+      "status": "in_progress",
+      "queued": false,
+      "sentAt": "2026-11-16T14:36:20.726Z",
+      "startedAt": "2026-11-16T14:36:53.811Z",
+      "implementedAt": null,
+      "feature": "odd/tasks/terciarios-temporales.md",
+      "note": "Implementación en curso: modelos+API del dueño, VM y pantalla del asistente de dos pasos, wiring del tab Terceros."
+    },
+    "04-vigencia-a-la-vista.html": {
+      "status": "implemented",
+      "queued": false,
+      "sentAt": "2026-11-16T14:51:34.679Z",
+      "startedAt": null,
+      "implementedAt": "2026-11-16T14:51:34.679Z",
+      "note": "Implementado en Compose sobre el artboard 04: tarjetas con vigencia, asistente de dos pasos, edición, revocación por rail + menú + acciones de accesibilidad, y matriz detrás del icono. Verificado con 690 tests y assembleDebug; el APK está instalado en el dispositivo."
+    }
+  }
+}

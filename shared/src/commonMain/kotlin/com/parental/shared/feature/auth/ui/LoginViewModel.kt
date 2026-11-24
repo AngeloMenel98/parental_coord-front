@@ -2,11 +2,11 @@ package com.parental.shared.feature.auth.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.parental.shared.core.error.ApiResult
 import com.parental.shared.feature.auth.domain.model.AuthResponse
 import com.parental.shared.feature.auth.domain.repository.IAuthRepository
 import com.parental.shared.feature.bonds.data.remote.BondsApi
 import com.parental.shared.feature.session.data.SessionManager
+import com.parental.shared.feature.thirdparty.data.remote.ThirdPartiesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -30,6 +30,7 @@ class LoginViewModel(
     private val authRepository: IAuthRepository,
     private val sessionManager: SessionManager,
     private val bondsApi: BondsApi,
+    private val thirdPartiesApi: ThirdPartiesApi,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(LoginUiState())
     val uiState: StateFlow<LoginUiState> = _uiState.asStateFlow()
@@ -77,12 +78,21 @@ class LoginViewModel(
                 userName = response.user.firstName ?: response.user.email,
                 role = response.user.systemRole,
                 userId = response.user.id,
+                // S2/D3: es el servidor el que dice si la contraseña con la que se entró la
+                // generó el sistema. Si el flag se pierde acá, la app abriría el Inicio de
+                // alguien que debe cambiarla.
+                mustChangePassword = response.user.mustChangePassword,
             )
 
-            // Fetch bonds and set the first one as active (el token ya está en sesión)
-            when (val result = bondsApi.getMyBonds()) {
-                is ApiResult.Success -> result.data.firstOrNull()?.let { sessionManager.updateBondId(it.id) }
-                is ApiResult.Error -> Unit // sin vínculo: Actividades muestra "Sin vínculo activo"
+            // D2/F7: el rol vive en el miembro del vínculo, no en el JWT ni en
+            // `system_role`; la derivación también fija el `bondId` del vínculo activo.
+            // 🔴 Con una contraseña provisoria NO se deriva: el guard del back responde
+            // `403 PASSWORD_CHANGE_REQUIRED` en `GET /bonds` mientras el flag esté
+            // encendido, así que sería trabajo perdido a sabiendas (R2-001). Esa
+            // derivación la hace [BondDerivationCoordinator] al salir del cambio
+            // obligatorio de contraseña.
+            if (!sessionManager.mustChangePassword) {
+                sessionManager.deriveBondWithRetry(bondsApi, thirdPartiesApi)
             }
         } finally {
             // Complete login — now safe to navigate to Home/Admin. También si se cancela.

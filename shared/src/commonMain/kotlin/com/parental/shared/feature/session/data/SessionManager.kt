@@ -31,6 +31,15 @@ data class SessionState(
     val bondRole: String? = null,
     /** True while login is in progress (bonds fetch pending). Keeps UI on Login screen. */
     val loginPending: Boolean = false,
+    /**
+     * La contraseña con la que se entró la generó el sistema y todavía no se cambió.
+     *
+     * Mientras esté en `true`, `App` no monta ninguna vista de la app: el único destino es
+     * la pantalla de cambio. Se persiste porque el bloqueo no puede evaporarse al cerrar y
+     * volver a abrir: el back responde 403 en el resto de las rutas de todos modos, pero la
+     * app no tiene por qué descubrirlo con un error.
+     */
+    val mustChangePassword: Boolean = false,
 ) {
     val isLoggedIn: Boolean get() = token != null
 }
@@ -56,6 +65,7 @@ class SessionManager {
     val bondId: String? get() = _state.value.bondId
     val userId: String? get() = _state.value.userId
     val bondRole: String? get() = _state.value.bondRole
+    val mustChangePassword: Boolean get() = _state.value.mustChangePassword
     val isLoggedIn: Boolean get() = _state.value.isLoggedIn
 
     /** Llamado desde la capa de red (puede ser desde cualquier hilo). */
@@ -63,11 +73,27 @@ class SessionManager {
         if (isLoggedIn) _sessionExpired.tryEmit(Unit)
     }
 
-    fun setSession(token: String, userName: String, role: String?, bondId: String? = null, userId: String? = null) {
-        // copy conserva bondRole y loginPending: el rol se fija después de derivar el vínculo
-        // y beginLogin() se llama antes que setSession.
+    fun setSession(
+        token: String,
+        userName: String,
+        role: String?,
+        bondId: String? = null,
+        userId: String? = null,
+        mustChangePassword: Boolean = false,
+    ) {
+        // El vínculo no se hereda: bondId/bondRole se escriben con lo que recibe la
+        // llamada —o null—, nunca con lo que dejó la sesión anterior. mustChangePassword
+        // también se fija explícito desde la respuesta del login (S2, develop).
         _state.update {
-            it.copy(token = token, userName = userName, role = role, bondId = bondId, userId = userId)
+            it.copy(
+                token = token,
+                userName = userName,
+                role = role,
+                bondId = null,
+                bondRole = null,
+                userId = userId,
+                mustChangePassword = mustChangePassword,
+            )
         }
         // Persist to storage (los null se borran para no dejar datos de una sesión anterior)
         Platform.saveSecureString(KEY_TOKEN, token)
@@ -75,6 +101,7 @@ class SessionManager {
         persistOrRemove(KEY_ROLE, role)
         persistOrRemove(KEY_BOND_ID, bondId)
         persistOrRemove(KEY_USER_ID, userId)
+        Platform.saveString(KEY_MUST_CHANGE_PASSWORD, mustChangePassword.toString())
     }
 
     /** Mark login as in-progress so UI stays on Login screen during bonds fetch. */
@@ -90,6 +117,21 @@ class SessionManager {
     fun updateBondId(bondId: String?) {
         _state.update { it.copy(bondId = bondId) }
         persistOrRemove(KEY_BOND_ID, bondId)
+    }
+
+    /**
+     * Reemplaza el token de la sesión viva: lo pide el cambio de password, que
+     * devuelve un access_token nuevo con el que el backend invalidó al viejo.
+     */
+    fun updateToken(newToken: String) {
+        _state.update { it.copy(token = newToken) }
+        Platform.saveString(KEY_TOKEN, newToken)
+    }
+
+    /** Fija (o apaga) el bloqueo de cambio de contraseña; vive también en storage. */
+    fun updateMustChangePassword(mustChangePassword: Boolean) {
+        _state.update { it.copy(mustChangePassword = mustChangePassword) }
+        Platform.saveString(KEY_MUST_CHANGE_PASSWORD, mustChangePassword.toString())
     }
 
     /** Backfill userId for legacy sessions restored without one (via GET /auth/me). */
@@ -122,6 +164,7 @@ class SessionManager {
         Platform.remove(KEY_BOND_ID)
         Platform.remove(KEY_USER_ID)
         Platform.remove(KEY_BOND_ROLE)
+        Platform.remove(KEY_MUST_CHANGE_PASSWORD)
     }
 
     /**
@@ -137,6 +180,7 @@ class SessionManager {
             bondId = Platform.loadString(KEY_BOND_ID),
             userId = Platform.loadString(KEY_USER_ID),
             bondRole = Platform.loadString(KEY_BOND_ROLE),
+            mustChangePassword = Platform.loadString(KEY_MUST_CHANGE_PASSWORD) == "true",
         )
         return true
     }
@@ -160,5 +204,6 @@ class SessionManager {
         private const val KEY_BOND_ID = "session_bond_id"
         private const val KEY_USER_ID = "session_user_id"
         private const val KEY_BOND_ROLE = "session_bond_role"
+        private const val KEY_MUST_CHANGE_PASSWORD = "session_must_change_password"
     }
 }

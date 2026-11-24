@@ -4,6 +4,7 @@ import com.parental.shared.core.error.ApiResult
 import com.parental.shared.feature.admin.data.remote.AdminApi
 import com.parental.shared.feature.admin.data.remote.CreateBondChildRequest
 import com.parental.shared.feature.admin.domain.model.AdminBond
+import com.parental.shared.feature.admin.domain.model.AdminBondActivity
 import com.parental.shared.feature.admin.domain.model.AdminBondHealth
 import com.parental.shared.feature.admin.domain.model.AdminBondReport
 import com.parental.shared.feature.admin.domain.model.AdminBondTrendPoint
@@ -74,6 +75,18 @@ data class AdminUiState(
     val reportDateFrom: String = adminMonthStartIso(),
     val reportDateTo: String = adminTodayIso(),
     val report: AdminBondReport? = null,
+    // F7 · S19-S21 — selector desplegable y detalle de actividades del reporte.
+    val reportBondQuery: String = "",
+    val reportBondMenuOpen: Boolean = false,
+    val reportActivities: List<AdminBondActivity> = emptyList(),
+    val reportActivitiesTotal: Int = 0,
+    val isLoadingActivities: Boolean = false,
+    /** S2 — fallo del fetch del detalle, separado del `error` global (el overlay no lo ve). */
+    val activitiesError: String? = null,
+    val showReportActivities: Boolean = false,
+    val activityStatusFilter: String = FILTER_ALL,
+    /** `null` = todos los progenitores. */
+    val activityAssigneeFilter: String? = null,
     val isLoadingReport: Boolean = false,
     val requestedReport: AdminReport? = null,
     val isRequestingReport: Boolean = false,
@@ -314,7 +327,11 @@ class AdminViewModel(
         _uiState.value = _uiState.value.copy(userSearch = value)
     }
 
-    /** F3 · abre el detalle: hijos, tendencia y (al entrar a Reporte) el reporte. */
+    /**
+     * F3 · abre el detalle: hijos, tendencia y (al entrar a Reporte) el reporte.
+     * L21 · el reporte también alimenta la participación y la actividad por hijo, así
+     * que se carga en background al abrir, no sólo al entrar a Reporte.
+     */
     fun openBond(bondId: String) {
         _uiState.value = _uiState.value.copy(
             openBondId = bondId,
@@ -325,6 +342,7 @@ class AdminViewModel(
         )
         selectBond(bondId)
         loadTrend(bondId)
+        loadReportIfNeeded()
     }
 
     fun backToBondList() {
@@ -741,7 +759,95 @@ class AdminViewModel(
 
     /** S5 — sin bond elegido la pestaña explica qué falta en lugar de fallar. */
     fun selectReportBond(bondId: String) {
-        _uiState.value = _uiState.value.copy(reportBondId = bondId, error = null)
+        _uiState.value = _uiState.value.copy(
+            reportBondId = bondId,
+            reportBondMenuOpen = false,
+            error = null,
+            // S21 · cambiar de vínculo invalida el detalle: esas filas son de otro.
+            reportActivities = emptyList(),
+            reportActivitiesTotal = 0,
+            activitiesError = null,
+            showReportActivities = false,
+            activityStatusFilter = FILTER_ALL,
+            activityAssigneeFilter = null,
+        )
+    }
+
+    // ── F7 · selector desplegable y detalle de actividades ───────────
+
+    fun updateReportBondQuery(query: String) {
+        _uiState.value = _uiState.value.copy(reportBondQuery = query)
+    }
+
+    fun setReportBondMenuOpen(open: Boolean) {
+        _uiState.value = _uiState.value.copy(reportBondMenuOpen = open)
+    }
+
+    fun openReportActivities() {
+        val state = _uiState.value
+        val bondId = state.reportBondId
+        if (bondId == null) {
+            _uiState.value = state.copy(error = "Elegí un vínculo primero")
+            return
+        }
+
+        _uiState.value = state.copy(
+            showReportActivities = true,
+            activityStatusFilter = FILTER_ALL,
+            activityAssigneeFilter = null,
+            // Cada apertura es una oportunidad de reintento fresca.
+            activitiesError = null,
+        )
+        if (state.reportActivities.isNotEmpty()) return
+
+        fetchReportActivities(bondId, state.reportDateFrom, state.reportDateTo)
+    }
+
+    /** S2 — reintento explícito del fetch del detalle, sin reabrir la pantalla. */
+    fun retryReportActivities() {
+        val state = _uiState.value
+        val bondId = state.reportBondId ?: return
+        if (state.isLoadingActivities) return
+        _uiState.value = state.copy(activitiesError = null)
+        fetchReportActivities(bondId, state.reportDateFrom, state.reportDateTo)
+    }
+
+    private fun fetchReportActivities(bondId: String, dateFrom: String, dateTo: String) {
+        scope.launch {
+            _uiState.value = _uiState.value.copy(isLoadingActivities = true, error = null, activitiesError = null)
+            when (
+                val result = adminApi.getBondActivities(
+                    token,
+                    bondId,
+                    dateFrom,
+                    dateTo,
+                )
+            ) {
+                is ApiResult.Success -> _uiState.value = _uiState.value.copy(
+                    reportActivities = result.data.activities,
+                    reportActivitiesTotal = result.data.total,
+                    isLoadingActivities = false,
+                    activitiesError = null,
+                )
+                is ApiResult.Error -> _uiState.value = _uiState.value.copy(
+                    error = result.message,
+                    isLoadingActivities = false,
+                    activitiesError = result.message,
+                )
+            }
+        }
+    }
+
+    fun closeReportActivities() {
+        _uiState.value = _uiState.value.copy(showReportActivities = false)
+    }
+
+    fun selectActivityStatusFilter(key: String) {
+        _uiState.value = _uiState.value.copy(activityStatusFilter = key)
+    }
+
+    fun selectActivityAssigneeFilter(userId: String?) {
+        _uiState.value = _uiState.value.copy(activityAssigneeFilter = userId)
     }
 
     fun updateReportFrom(iso: String) {

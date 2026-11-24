@@ -34,6 +34,8 @@ import com.parental.shared.feature.activities.data.remote.ActivitiesApi
 import com.parental.shared.feature.activities.ui.ActividadesScreen
 import com.parental.shared.feature.activities.ui.ActividadesViewModel
 import com.parental.shared.feature.admin.data.remote.AdminApi
+import com.parental.shared.feature.auth.ui.ChangePasswordScreen
+import com.parental.shared.feature.auth.ui.ChangePasswordViewModel
 import com.parental.shared.feature.admin.ui.AdminScreen
 import com.parental.shared.feature.admin.ui.AdminViewModel
 import com.parental.shared.feature.auth.data.remote.AuthApi
@@ -52,8 +54,17 @@ import com.parental.shared.feature.notifications.ui.NotificationsViewModel
 import com.parental.shared.feature.notifications.ui.UnreadBadge
 import com.parental.shared.feature.notifications.ui.UnreadCountPoller
 import com.parental.shared.feature.session.data.SessionManager
+import com.parental.shared.feature.auth.ui.BOND_DERIVATION_ATTEMPTS
+import com.parental.shared.feature.thirdparty.ui.ThirdPartiesScreen
+import com.parental.shared.feature.thirdparty.ui.ThirdPartiesViewModel
 import com.parental.shared.feature.thirdparty.ui.ThirdPartyRoot
+import com.parental.shared.feature.thirdparty.data.remote.ThirdPartiesApi
+import com.parental.shared.feature.auth.ui.deriveBondWithRetry
 import com.parental.shared.platform.Platform
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import io.ktor.client.HttpClient
 import org.koin.compose.KoinContext
 import org.koin.compose.koinInject
@@ -61,6 +72,13 @@ import org.koin.compose.viewmodel.koinViewModel
 
 private sealed class Screen(val route: String) {
     data object Login : Screen("login")
+
+    /**
+     * La hoja de cambio obligatorio de contraseña (S2). No es una pantalla del recorrido:
+     * mientras `mustChangePassword` esté encendido es la ÚNICA, y por eso se resuelve antes
+     * que el rol.
+     */
+    data object ChangePassword : Screen("change_password")
     data object Home : Screen("home")
     data object Admin : Screen("admin")
     data object ThirdParty : Screen("third_party")
@@ -86,6 +104,7 @@ fun App() {
         val sessionManager = koinInject<SessionManager>()
         val authApi = koinInject<AuthApi>()
         val bondsApi = koinInject<BondsApi>()
+        val thirdPartiesApi = koinInject<ThirdPartiesApi>()
 
         LaunchedEffect(Unit) {
             // Legacy sessions (pre userId) — backfill via GET /auth/me so the
@@ -100,20 +119,12 @@ fun App() {
             // versión anterior no lo tiene; sin él la app caería en el Home de los
             // progenitores con los datos de todo el vínculo (S5). Se deriva del vínculo
             // guardado y, si no hay ninguno, queda `null`: el `else` ya es el Home de siempre,
-            // que es la degradación segura.
+            // que es la degradación segura. Es la derivación de develop portada token-free
+            // ([deriveBondWithRetry]): también repone `bondId` (y para el tercero restaurado
+            // consulta el propio grant, S5).
             val restoredToken = sessionManager.token
             if (restoredToken != null && sessionManager.bondRole == null && sessionManager.userId != null) {
-                when (val bonds = bondsApi.getMyBonds()) {
-                    is ApiResult.Success -> {
-                        val bond = bonds.data.firstOrNull { it.id == sessionManager.bondId }
-                            ?: bonds.data.firstOrNull()
-                        val role = bond?.members
-                            ?.firstOrNull { it.user?.id == sessionManager.userId }
-                            ?.role
-                        if (role != null) sessionManager.updateBondRole(role)
-                    }
-                    is ApiResult.Error -> Unit
-                }
+                sessionManager.deriveBondWithRetry(bondsApi, thirdPartiesApi)
             }
         }
 
@@ -172,11 +183,35 @@ private fun AppContent(
     // Snapshot reactivo de la sesión: cualquier cambio (login, backfill, logout) recompone.
     val session by sessionManager.state.collectAsStateWithLifecycle()
 
+    /**
+     * Scope de la SESIÓN, no de una rama: el trabajo que sigue después de cambiar la
+     * contraseña obligatoria tiene que sobrevivir a que esa rama se desmonte — es
+     * exactamente lo que pasa cuando el flag se apaga.
+     */
+    val sessionScope = rememberCoroutineScope()
+
+    /**
+     * Dueño único de la derivación del vínculo al salir del cambio obligatorio (S2/R3-001).
+     * Se recuerda a nivel de sesión —y no en la hoja— justamente porque la hoja se desmonta
+     * cuando el flag se apaga, que es el último paso de la derivación.
+     */
+    val bondsApi = koinInject<BondsApi>()
+    val thirdPartiesApi = koinInject<ThirdPartiesApi>()
+    val bondDerivation = remember(sessionManager, sessionScope, bondsApi, thirdPartiesApi) {
+        BondDerivationCoordinator(sessionManager, sessionScope, bondsApi, thirdPartiesApi)
+    }
+
     val currentScreen = if (session.loginPending) {
         // Login in progress (bonds fetch pending) — keep on Login screen
         Screen.Login
     } else if (session.isLoggedIn) {
         when {
+            // S2 · el bloqueo gana sobre el rol: da igual si es admin, progenitor o
+            // tercero, con una contraseña provisoria el back responde 403 en todas las
+            // rutas autenticadas. Se resuelve ANTES de `role`/`bondRole` para que ninguna
+            // vista con datos llegue a montarse. Cuando el flag se apaga, este mismo
+            // `when` recalcula y cae en el destino real sin ninguna navegación explícita.
+            session.mustChangePassword -> Screen.ChangePassword
             session.role == "admin" -> Screen.Admin
             // S1/S5: el tercero temporal tiene su propio árbol. El `systemRole` sigue
             // siendo `user`; lo que decide acá es el rol DENTRO del vínculo.
@@ -190,8 +225,33 @@ private fun AppContent(
     when (currentScreen) {
         Screen.Login -> {
             // El flujo de login vive en el VM (sobrevive a rotaciones); al
-            // completarse, el cambio de sesión recompone hacia Home/Admin.
+            // completarse, el cambio de sesión recompone hacia Home/Admin — y hacia la
+            // hoja de cambio obligatorio si el back marcó `mustChangePassword`.
             LoginScreen(viewModel = koinViewModel<LoginViewModel>())
+        }
+
+        Screen.ChangePassword -> {
+            // El VM escribe el token nuevo y avisa que el cambio salió; el FLAG lo apaga
+            // esta capa, y sólo después de derivar el vínculo (R3-001). Al revés, este
+            // mismo `when` recompondría hacia el destino real con `bondRole` todavía en
+            // null: un tercero montaría el Home de los progenitores.
+            val changePasswordViewModel = koinViewModel<ChangePasswordViewModel>()
+            DisposableEffect(Unit) {
+                onDispose {
+                    // S2: mientras el flag estaba encendido `GET /bonds` respondía 403, así
+                    // que el login no pudo derivar el vínculo. Además del camino de éxito
+                    // se pide al desmontarse la hoja —una red de seguridad para el caso en
+                    // que el efecto de éxito no llegue a correr—; el coordinador comparte
+                    // el guard entre los dos, así que una sola request queda en vuelo
+                    // (R3-003) y ninguna se repite sobre un resultado ya concluyente.
+                    bondDerivation.deriveOnDispose()
+                }
+            }
+            ChangePasswordScreen(
+                viewModel = changePasswordViewModel,
+                onLogout = onLogout,
+                onSuccess = { bondDerivation.deriveThenRelease() },
+            )
         }
 
         Screen.Admin -> {
@@ -235,6 +295,10 @@ private fun AppContent(
             var bottomRoute by rememberSaveable { mutableStateOf("home") }
             var showNotifications by remember { mutableStateOf(false) }
             var expenseAttachmentDraft by remember { mutableStateOf<Pair<String, String>?>(null) }
+            // Deep-link de notificaciones (slice 3): el tap en una notificación de
+            // actividad deja el refEntityId acá, cambia a la pestaña de actividades
+            // y ActividadesScreen lo consume abriendo el sheet de detalle.
+            var pendingActivityDetailId by remember { mutableStateOf<String?>(null) }
             val token = sessionManager.token
             val userName = sessionManager.userName.orEmpty()
 
@@ -243,10 +307,11 @@ private fun AppContent(
                 return
             }
 
-            // Terceros sigue siendo placeholder; Gastos ya navega (T29/T19).
+            // Terceros ya navega (T15): lista, alta, edición y revocación de los accesos
+            // que este progenitor otorgó.
             val onNavigateBottom: (String) -> Unit = { route ->
                 when (route) {
-                    "home", "activities", "expenses" -> bottomRoute = route
+                    "home", "activities", "expenses", "thirdparty" -> bottomRoute = route
                     else -> Unit
                 }
             }
@@ -331,6 +396,13 @@ private fun AppContent(
                 NotificationsScreen(
                     viewModel = notificationsViewModel,
                     onBack = { showNotifications = false },
+                    // Deep-link (slice 3): el tap en una notificación cambia a actividades
+                    // y deja el id pendiente para que la pantalla lo consuma.
+                    onOpenActivity = { activityId ->
+                        pendingActivityDetailId = activityId
+                        showNotifications = false
+                        bottomRoute = "activities"
+                    },
                     onLogout = onLogout,
                 )
             } else if (bottomRoute == "activities") {
@@ -374,6 +446,8 @@ private fun AppContent(
                             unreadCount = unreadCount,
                             onOpenNotifications = { showNotifications = true },
                             onLogout = onLogout,
+                            pendingActivityDetailId = pendingActivityDetailId,
+                            onPendingActivityDetailConsumed = { pendingActivityDetailId = null },
                         )
                     }
                 }
@@ -408,6 +482,36 @@ private fun AppContent(
                         )
                     }
                 }
+            } else if (bottomRoute == "thirdparty") {
+                when {
+                    bondId == null -> SinVinculoScreen(
+                        onGoHome = { bottomRoute = "home" },
+                        selectedRoute = "thirdparty",
+                    )
+                    else -> {
+                        val thirdPartiesApi = koinInject<ThirdPartiesApi>()
+                        val thirdPartiesViewModel = remember(currentUserId, bondId, thirdPartiesApi) {
+                            ThirdPartiesViewModel(
+                                api = thirdPartiesApi,
+                                token = token,
+                                bondId = bondId,
+                            )
+                        }
+                        DisposableEffect(thirdPartiesViewModel) {
+                            onDispose { thirdPartiesViewModel.destroy() }
+                        }
+                        LaunchedEffect(thirdPartiesViewModel) {
+                            thirdPartiesViewModel.load()
+                        }
+                        ThirdPartiesScreen(
+                            viewModel = thirdPartiesViewModel,
+                            onLogout = onLogout,
+                            onNavigateBottom = onNavigateBottom,
+                            unreadCount = unreadCount,
+                            onOpenNotifications = { showNotifications = true },
+                        )
+                    }
+                }
             } else {
                 HomeScreen(
                     viewModel = koinViewModel<HomeViewModel>(),
@@ -423,13 +527,142 @@ private fun AppContent(
     }
 }
 
+/**
+ * Coordina la derivación del vínculo al salir del cambio obligatorio de contraseña (S2).
+ *
+ * Dos caminos la piden —el éxito del cambio y el desmontaje de la hoja— y este objeto es lo
+ * que los vuelve un solo trabajo:
+ *
+ * - **Un intento en vuelo**: si ya hay una derivación corriendo, el segundo camino no
+ *   arranca otra (R3-003).
+ * - **Un presupuesto por token**: [BOND_DERIVATION_ATTEMPTS] intentos en total, compartidos
+ *   entre los dos caminos. Agotado el presupuesto no se reintenta: el flag se apaga igual
+ *   porque la contraseña YA cambió, y el routing cae en el Home de siempre.
+ * - **Nada se repite sobre un resultado concluyente**: si la respuesta fue «hay rol» o «no
+ *   hay vínculo/rol», [settledFor] lo recuerda y se deja de pedir. Ese es el caso que antes
+ *   no terminaba nunca, porque `bondRole == null` no distingue «todavía no sé» de «no hay».
+ * - **El flag lo apaga sólo el camino de éxito**, y recién cuando la derivación terminó
+ *   (R3-001): [deriveOnDispose] deriva pero nunca libera el bloqueo.
+ *
+ * La derivación en sí vive en [deriveBondWithRetry] (token-free, APIs por Koin): este
+ * coordinador es sólo el dueño del ciclo —scope, presupuesto y cuándo se libera el bloqueo.
+ */
+private class BondDerivationCoordinator(
+    private val sessionManager: SessionManager,
+    private val scope: CoroutineScope,
+    private val bondsApi: BondsApi,
+    private val thirdPartiesApi: ThirdPartiesApi,
+) {
+    /** Token cuya derivación ya quedó concluida: reintentar no cambiaría nada. */
+    private var settledFor: String? = null
+
+    /** Token al que pertenece el presupuesto de intentos ([attemptsUsed]). */
+    private var budgetFor: String? = null
+    private var attemptsUsed: Int = 0
+
+    /** El único trabajo de derivación que puede estar corriendo. */
+    private var inFlight: Job? = null
+
+    /** Token cuyo éxito espera que se apague el flag cuando la derivación termine. */
+    private var releaseRequestedFor: String? = null
+
+    /**
+     * Salida exitosa del cambio: deriva con el token NUEVO y DESPUÉS apaga el flag, que es
+     * lo que hace recomponer el routing hacia la vista real.
+     */
+    fun deriveThenRelease() {
+        val token = sessionManager.token ?: return
+        releaseRequestedFor = token
+        start()
+    }
+
+    /** Red de seguridad del desmontaje de la hoja: deriva, pero no apaga el flag. */
+    fun deriveOnDispose() = start()
+
+    private fun start() {
+        val sessionToken = sessionManager.token
+        if (sessionToken == null) {
+            // Sin sesión no hay nada que derivar ni a quién liberar.
+            releaseRequestedFor = null
+            return
+        }
+        if (inFlight?.isActive == true) return
+        if (settledFor == sessionToken) {
+            releaseNow(sessionToken)
+            return
+        }
+
+        val remaining = BOND_DERIVATION_ATTEMPTS - attemptsFor(sessionToken)
+        val job = scope.launch {
+            val settled = remaining > 0 && sessionManager.deriveBondWithRetry(
+                bondsApi,
+                thirdPartiesApi,
+                remaining,
+            )
+            attemptsUsed += remaining.coerceAtLeast(0)
+            if (sessionManager.token == sessionToken) {
+                if (settled) {
+                    settledFor = sessionToken
+                } else {
+                    // No se esconde: el rol queda en null y conviene poder verlo en el log. El
+                    // flag se apaga igual — la contraseña cambió, y dejarlo encendido sería
+                    // encerrar a la persona en la hoja por un fallo de red.
+                    println(
+                        "No se pudo derivar el vínculo tras el cambio de contraseña " +
+                            "($BOND_DERIVATION_ATTEMPTS intentos); el bloqueo se apaga igual.",
+                    )
+                }
+                releaseNow(sessionToken)
+            } else {
+                // La sesión cambió mientras corría: este trabajo es de OTRO usuario. No se
+                // toca el flag de la sesión actual (R1/R3/R4-001) y no se reintenta contra
+                // el token nuevo.
+                if (releaseRequestedFor == sessionToken) releaseRequestedFor = null
+            }
+        }
+        inFlight = job
+        job.invokeOnCompletion {
+            if (inFlight === job) inFlight = null
+            // Una sesión nueva pudo pedir su liberación mientras el job viejo corría.
+            if (releaseRequestedFor != null && releaseRequestedFor == sessionManager.token) {
+                start()
+            }
+        }
+    }
+
+    /**
+     * Apaga el bloqueo si el éxito de [sessionToken] lo pidió y esa sesión sigue viva.
+     *
+     * Keyeado por token a propósito: un pedido viejo de la sesión A no puede apagar el flag
+     * de la sesión B que entró después (R1/R3/R4-001).
+     */
+    private fun releaseNow(sessionToken: String) {
+        if (releaseRequestedFor != sessionToken) return
+        releaseRequestedFor = null
+        if (sessionManager.token != sessionToken) return
+        sessionManager.updateMustChangePassword(false)
+    }
+
+    /** Intentos ya gastados para [sessionToken]; un token nuevo arranca el presupuesto. */
+    private fun attemptsFor(sessionToken: String): Int {
+        if (budgetFor != sessionToken) {
+            budgetFor = sessionToken
+            attemptsUsed = 0
+        }
+        return attemptsUsed
+    }
+}
+
 /** Estado liviano sin VM (A14): sin vínculo activo no se puede listar actividades. */
 @Composable
-private fun SinVinculoScreen(onGoHome: () -> Unit) {
+private fun SinVinculoScreen(
+    onGoHome: () -> Unit,
+    selectedRoute: String = "activities",
+) {
     Scaffold(
         bottomBar = {
             BottomNavBar(
-                selectedRoute = "activities",
+                selectedRoute = selectedRoute,
                 onNavigate = { route -> if (route == "home") onGoHome() },
             )
         },

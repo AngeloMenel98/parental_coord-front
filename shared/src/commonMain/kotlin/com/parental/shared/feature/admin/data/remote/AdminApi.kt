@@ -3,6 +3,7 @@ package com.parental.shared.feature.admin.data.remote
 import com.parental.shared.core.error.ApiResult
 import com.parental.shared.feature.admin.domain.model.AdminBond
 import com.parental.shared.feature.admin.domain.model.AdminBondHealth
+import com.parental.shared.feature.admin.domain.model.AdminBondActivities
 import com.parental.shared.feature.admin.domain.model.AdminBondReport
 import com.parental.shared.feature.admin.domain.model.AdminBondTrend
 import com.parental.shared.feature.admin.domain.model.AdminChild
@@ -283,6 +284,34 @@ class AdminApi(
     ): ApiResult<AdminBondReport> {
         return try {
             val response = client.get("admin/bonds/$bondId/report") {
+                parameter("dateFrom", dateFrom)
+                parameter("dateTo", dateTo)
+            }
+            if (response.status.isSuccess()) {
+                ApiResult.Success(response.body())
+            } else {
+                ApiResult.Error(response.status.value, response.status.description)
+            }
+        } catch (e: Exception) {
+            ApiResult.Error(0, e.message ?: "Network error")
+        }
+    }
+
+    /**
+     * F7 · S21 — las actividades del período para el detalle del reporte.
+     *
+     * Va por una ruta admin y no por `GET /activities/bond/:bondId` porque aquélla es
+     * member-scoped: un admin que no es miembro del vínculo recibiría 403.
+     */
+    suspend fun getBondActivities(
+        token: String,
+        bondId: String,
+        dateFrom: String,
+        dateTo: String,
+    ): ApiResult<AdminBondActivities> {
+        return try {
+            val response = client.get("admin/bonds/$bondId/activities") {
+                header("Authorization", "Bearer $token")
                 parameter("dateFrom", dateFrom)
                 parameter("dateTo", dateTo)
             }
