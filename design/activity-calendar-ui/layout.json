@@ -1,0 +1,21 @@
+{
+  "arrangement": "free",
+  "positions": {
+    "system": {
+      "x": 0,
+      "y": 620
+    },
+    "01-mes-que-respira.html": {
+      "x": 1520,
+      "y": 620
+    },
+    "02-semana-en-carriles.html": {
+      "x": 1990,
+      "y": 620
+    },
+    "03-riel-del-tiempo.html": {
+      "x": 2933,
+      "y": 375
+    }
+  }
+}

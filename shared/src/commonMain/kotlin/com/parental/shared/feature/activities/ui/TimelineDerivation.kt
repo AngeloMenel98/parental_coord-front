@@ -28,6 +28,65 @@ import kotlinx.datetime.toLocalDateTime
 /** Token para el chip "Todos" del filtro de hijos. */
 internal const val CHILD_FILTER_ALL = "all"
 
+/**
+ * Entrada de la lista AGENDA ya agrupada — T2 de `odd/tasks/activity-card-stack.md` (S3).
+ *
+ * `Single` es la card de siempre. `Stack` agrupa las filas que comparten franja
+ * (fecha + hora + minuto local) de un MISMO día: [Stack.first] es la PRIMERA en el
+ * orden de la lista (el orden es el orden de la lista, nunca por id), [Stack.rest]
+ * son las que se apilan detrás y se despliegan al tocar; [Stack.slotKey] es la clave
+ * de la franja, y es también la clave de estado del despliegue en la UI.
+ */
+internal sealed interface AgendaEntry {
+    data class Single(val row: TimelineRow) : AgendaEntry
+    data class Stack(
+        val first: TimelineRow,
+        val rest: List<TimelineRow>,
+        val slotKey: String,
+    ) : AgendaEntry
+}
+
+/**
+ * Clave de franja de una fila: fecha local + hora + minuto con cero, p.ej.
+ * `"2026-05-13T09:30"`. La FECHA va en la clave — dos filas a la misma hora en
+ * días distintos NO apilan, aunque la lista las traiga juntas. `null` si la fila no
+ * tiene inicio: las filas sin fecha no se apilan entre sí.
+ */
+internal fun startSlotKey(row: TimelineRow): String? =
+    row.localStart?.let { localStart ->
+        "${localStart.date}T${formatTime(localStart.hour, localStart.minute)}"
+    }
+
+/**
+ * Agrupa las filas de UN grupo de día por franja de inicio, conservando el orden de
+ * la lista: cada entrada se emite en la posición de su primera fila, y una franja con
+ * una sola fila queda como [AgendaEntry.Single] (no hay pila de una).
+ */
+internal fun groupByStartSlot(rows: List<TimelineRow>): List<AgendaEntry> {
+    val bySlot = LinkedHashMap<String, MutableList<TimelineRow>>()
+    rows.forEach { row ->
+        startSlotKey(row)?.let { slotKey -> bySlot.getOrPut(slotKey) { mutableListOf() }.add(row) }
+    }
+    val emitted = mutableSetOf<String>()
+    val entries = mutableListOf<AgendaEntry>()
+    rows.forEach { row ->
+        val slotKey = startSlotKey(row)
+        if (slotKey == null) {
+            // Sin inicio no hay franja: la fila sale como card suelta, en su sitio.
+            entries += AgendaEntry.Single(row)
+            return@forEach
+        }
+        if (!emitted.add(slotKey)) return@forEach
+        val slotRows = bySlot.getValue(slotKey)
+        entries += if (slotRows.size == 1) {
+            AgendaEntry.Single(row)
+        } else {
+            AgendaEntry.Stack(first = row, rest = slotRows.drop(1), slotKey = slotKey)
+        }
+    }
+    return entries
+}
+
 internal fun filterActivities(
     all: List<Actividad>,
     tab: ActivityTab,

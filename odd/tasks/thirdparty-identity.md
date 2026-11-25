@@ -83,3 +83,8 @@ del terciario sólo a quien lo autorizó; los demás miembros ven "Autorizado po
   hacer un diseno nuevo con como esta ahora toda la vista" abrió `design/activity-card-ui/`
   con 3 artboards (01-ficha-alineada, 02-personas-al-frente, 03-riel-de-urgencia).
   Pendiente: elección del artboard.
+
+- L6 (handoff, verbatim del tool): "Implement the design artboard
+  design/activity-card-ui/02-personas-al-frente.html" — la tarjeta "Personas al frente"
+  se implementa en Compose como feature nueva `activity-card-stack` (doc propio,
+  `odd/tasks/activity-card-stack.md`); esta doc queda como feature de origen.

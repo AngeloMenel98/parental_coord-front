@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "chosen": "02-personas-al-frente.html",
+  "handoffs": {
+    "02-personas-al-frente.html": {
+      "status": "in_progress",
+      "queued": false,
+      "sentAt": "2026-11-25T14:14:54.742Z",
+      "startedAt": "2026-11-25T14:15:06.503Z",
+      "implementedAt": null,
+      "feature": "odd/tasks/thirdparty-identity.md",
+      "note": "Implementación de la tarjeta Personas al frente en Compose (rail + densidad + dropdowns + stack)."
+    }
+  }
+}
