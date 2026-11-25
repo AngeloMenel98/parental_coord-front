@@ -42,6 +42,10 @@ private suspend fun HttpResponse.toApiError(): ApiResult.Error {
  */
 internal fun CreateThirdPartyAccessRequest.toCreateBody(): JsonObject = buildJsonObject {
     put("email", email.trim())
+    put("firstName", firstName.trim())
+    put("lastName", lastName.trim())
+    phone?.takeIf { it.isNotBlank() }?.let { put("phone", it.trim()) }
+    document?.takeIf { it.isNotBlank() }?.let { put("document", it.trim()) }
     put("relationship", relationship)
     put("accessEnd", accessEnd.trim())
     note?.takeIf { it.isNotBlank() }?.let { put("note", it) }

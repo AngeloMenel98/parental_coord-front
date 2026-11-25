@@ -76,6 +76,11 @@ data class ThirdPartyAccess(
     val userId: String = "",
     /** Nombre del visitante dentro del vínculo; `null` si no tiene datos personales. */
     val displayName: String? = null,
+    /** S1 (thirdparty-identity): identidad declarada; nullable para grants previos. */
+    val firstName: String? = null,
+    val lastName: String? = null,
+    val phone: String? = null,
+    val document: String? = null,
     /** `family|caregiver|medical|educational`. */
     val relationship: String? = null,
     val startDate: String? = null,
@@ -99,6 +104,11 @@ data class ThirdPartyAccess(
 @Serializable
 data class CreateThirdPartyAccessRequest(
     val email: String,
+    /** S1 (thirdparty-identity): identidad declarada por el progenitor. */
+    val firstName: String = "",
+    val lastName: String = "",
+    val phone: String? = null,
+    val document: String? = null,
     val relationship: String,
     /** `YYYY-MM-DD`, obligatorio (D3). */
     val accessEnd: String,

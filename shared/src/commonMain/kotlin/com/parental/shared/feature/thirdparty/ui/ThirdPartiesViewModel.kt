@@ -60,6 +60,11 @@ enum class ThirdPartyDuration(val label: String) {
 data class ThirdPartyWizardState(
     val step: ThirdPartyWizardStep = ThirdPartyWizardStep.QUIEN,
     val email: String = "",
+    /** S1 (thirdparty-identity): nombre y apellido obligatorios; tel y doc opcionales. */
+    val firstName: String = "",
+    val lastName: String = "",
+    val phone: String = "",
+    val document: String = "",
     /** `family|caregiver|medical|educational`, o `null` si todavía no eligió. */
     val relationship: String? = null,
     val duration: ThirdPartyDuration = ThirdPartyDuration.THREE_MONTHS,
@@ -175,6 +180,8 @@ internal val THIRD_PARTY_CAPABILITIES: List<ThirdPartyCapability> = listOf(
 
 // Validación del formulario. Son constantes para que el test afirme el texto exacto que
 // ve la persona y para que el mensaje del servidor no se confunda con uno propio.
+internal const val THIRD_PARTY_FIRST_NAME_MISSING = "Escribí el nombre de la persona."
+internal const val THIRD_PARTY_LAST_NAME_MISSING = "Escribí el apellido de la persona."
 internal const val THIRD_PARTY_EMAIL_MISSING = "Escribí el email de la persona."
 internal const val THIRD_PARTY_EMAIL_INVALID = "Ese email no parece válido."
 internal const val THIRD_PARTY_RELATIONSHIP_MISSING = "Elegí la relación con la persona."
@@ -248,6 +255,26 @@ class ThirdPartiesViewModel(
         _state.value = _state.value.copy(wizard = wizard.copy(relationship = value, error = null))
     }
 
+    fun setFirstName(value: String) {
+        val wizard = _state.value.wizard ?: return
+        _state.value = _state.value.copy(wizard = wizard.copy(firstName = value, error = null))
+    }
+
+    fun setLastName(value: String) {
+        val wizard = _state.value.wizard ?: return
+        _state.value = _state.value.copy(wizard = wizard.copy(lastName = value, error = null))
+    }
+
+    fun setPhone(value: String) {
+        val wizard = _state.value.wizard ?: return
+        _state.value = _state.value.copy(wizard = wizard.copy(phone = value, error = null))
+    }
+
+    fun setDocument(value: String) {
+        val wizard = _state.value.wizard ?: return
+        _state.value = _state.value.copy(wizard = wizard.copy(document = value, error = null))
+    }
+
     /** Un preset recalcula la fecha; "elegir fecha" deja el campo vacío para escribir. */
     fun setDuration(duration: ThirdPartyDuration) {
         val wizard = _state.value.wizard ?: return
@@ -283,7 +310,11 @@ class ThirdPartiesViewModel(
     fun next() {
         val wizard = _state.value.wizard ?: return
         val email = wizard.email.trim()
+        val firstName = wizard.firstName.trim()
+        val lastName = wizard.lastName.trim()
         val error = when {
+            firstName.length < 2 -> THIRD_PARTY_FIRST_NAME_MISSING
+            lastName.length < 2 -> THIRD_PARTY_LAST_NAME_MISSING
             email.isEmpty() -> THIRD_PARTY_EMAIL_MISSING
             !looksLikeEmail(email) -> THIRD_PARTY_EMAIL_INVALID
             wizard.relationship == null -> THIRD_PARTY_RELATIONSHIP_MISSING
@@ -292,6 +323,8 @@ class ThirdPartiesViewModel(
         _state.value = _state.value.copy(
             wizard = wizard.copy(
                 email = email,
+                firstName = firstName,
+                lastName = lastName,
                 step = if (error == null) ThirdPartyWizardStep.HASTA_CUANDO else wizard.step,
                 error = error,
             ),
@@ -337,6 +370,10 @@ class ThirdPartiesViewModel(
 
         val request = CreateThirdPartyAccessRequest(
             email = wizard.email.trim(),
+            firstName = wizard.firstName.trim(),
+            lastName = wizard.lastName.trim(),
+            phone = wizard.phone.trim().takeIf { it.isNotEmpty() },
+            document = wizard.document.trim().takeIf { it.isNotEmpty() },
             relationship = relationship.orEmpty(),
             accessEnd = wizard.accessEnd.trim(),
             note = wizard.note.trim().takeIf { it.isNotEmpty() },
