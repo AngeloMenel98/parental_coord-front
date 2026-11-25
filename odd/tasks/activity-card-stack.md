@@ -54,3 +54,14 @@ dropdowns multi-select (checks, Todos excluyente) y botón Hoy.
   que activa todo (tarjeta, riel, stack) en la app; (b) un test en dispositivo podría
   reasentar el offset del dot 1-2dp; (c) el import cruzado `initialsOf`
   (activities→thirdparty) convendría reubicarlo a un paquete común.
+
+- L4 (C1, verbatim del humano): "Reemplaza lo que hay ahora con lo nuevo... que sea una
+  unica vista" — la agenda de tarjetas reemplaza al lienzo proporcional como ÚNICA vista
+  (refina la L6 de activity-r). Implementado en `992ed7c`: pantalla monta AgendaTimeline con
+  listState propio, salto vía `agendaItemIndexOf` ( AgendaItemIndexTest, 4), collapsdDays y
+  anclaje por píxel retirados con el lienzo; guards de swipe y contract re-escritos a la forma
+  nueva (RailAnchoredTimeline/RailTimeline quedan NO montados, archivos vivos con sus tests hasta
+  el retiro). Suite 80/781, 0 fallos; assembleDebug OK.
+- L5: deuda menor restante — retiro definitivo de los archivos del lienzo (RailTimeline/
+  RailCanvas/RailIndex usados sólo por tests ahora), el offset 1-2dp del dot en dispositivo, y
+  la reubicación del «initialsOf» cruzado.
