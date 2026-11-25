@@ -59,6 +59,15 @@ del terciario sólo a quien lo autorizó; los demás miembros ven "Autorizado po
   real en `GET /bonds`); asignación de terciario validada (`assignedTo` acepta su
   user id).
 
+## Estado final
+
+- Front: rama `feature/thirdparty-identity`, 2 commits (`8643b4c`, `4aa381d`).
+- Back: rama `feature/thirdparty-identity`, 2 commits (`9410292`, `1beb690`).
+- Deuda conocida (del worker del back): `findThirdPartyDisplayNames` sin spec SQL de
+  repositorio; guard de método opcional en `bonds.service` mientras exista el double
+  viejo del T12-verifier; hot path de listByBond +3 queries fijas por request (O(1),
+  no N+1).
+
 ## Log
 
 - L1 (verbatim): "la idea primero es yo poder crear un terciario y agregarle los nombres
