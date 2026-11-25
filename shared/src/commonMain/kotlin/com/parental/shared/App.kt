@@ -412,6 +412,7 @@ private fun AppContent(
                         val activitiesApi = koinInject<ActivitiesApi>()
                         val categoriesApi = koinInject<CategoriesApi>()
                         val bondsApi = koinInject<BondsApi>()
+                        val thirdPartiesApi = koinInject<ThirdPartiesApi>()
                         // userId: login lo provee; sesiones legacy → backfill vía /auth/me.
                         // keyed on userId para que el VM se reconstruya si el backfill llega tarde.
                         val activitiesViewModel = remember(currentUserId) {
@@ -423,6 +424,7 @@ private fun AppContent(
                                 bondId = bondId,
                                 currentUserId = currentUserId ?: "",
                                 realtime = realtimeManager,
+                                thirdPartiesApi = thirdPartiesApi,
                             )
                         }
                         // W2: keyed en currentUserId — al cambiar el userId (backfill tardío)

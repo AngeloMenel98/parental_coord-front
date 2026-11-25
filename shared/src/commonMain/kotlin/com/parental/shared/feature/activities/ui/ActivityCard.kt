@@ -45,6 +45,7 @@ import com.parental.shared.core.ui.theme.ParentalShapes
 import com.parental.shared.core.ui.theme.ProgressStroke
 import com.parental.shared.core.ui.theme.Spacing
 import com.parental.shared.core.ui.theme.TypeTokens
+import com.parental.shared.feature.activities.domain.attributionLine
 import com.parental.shared.feature.activities.domain.model.resolveChildNames
 import com.parental.shared.feature.bonds.domain.model.VinculoChild
 import kotlinx.datetime.Instant
@@ -214,6 +215,14 @@ private fun ActivityCardBody(
                     if (assigneeName != null) {
                         Spacer(modifier = Modifier.height(Spacing.xs))
                         AssigneeLine(name = assigneeName)
+                    }
+
+                    // S3/S5 (thirdparty-identity): atribución del creador terciario.
+                    // Una sola policy decide la línea; el servidor ya filtró el nombre.
+                    val attributionName = attributionLine(row.actividad.attribution)
+                    if (attributionName != null) {
+                        Spacer(modifier = Modifier.height(Spacing.xs))
+                        AssigneeLine(name = attributionName)
                     }
 
                     val childNames = remember(row.actividad.childrenIds, children) {

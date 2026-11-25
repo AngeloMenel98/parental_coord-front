@@ -7,6 +7,25 @@ import kotlinx.serialization.Serializable
  * CamelCase, categoryId es UUID, enums en minúsculas, fechas ISO-8601 nullable.
  * No requiere @SerialName: los nombres de propiedad coinciden con las claves JSON.
  */
+/**
+ * Quién creó o realizó la actividad, decidido POR EL SERVIDOR (S7 de
+ * `odd/tasks/thirdparty-identity.md`). El front nunca calcula visibilidad: si
+ * `name` viene es porque el requester puede verlo.
+ *
+ * - `kind = "member"`: la creó un miembro del vínculo; `name` es su nombre real.
+ * - `kind = "third_party"`: la creó un terciario. `name` (nombre real del
+ *   terciario) SÓLO viaja al autorizante del grant; los demás reciben `name`
+ *   `null` y `authorizedByName` con el nombre de quien lo autorizó.
+ *
+ * Nullable con default: un back previo a la feature no manda el campo (S6).
+ */
+@Serializable
+data class ActividadAttribution(
+    val kind: String,
+    val name: String? = null,
+    val authorizedByName: String? = null,
+)
+
 @Serializable
 data class Actividad(
     val id: String,
@@ -20,6 +39,7 @@ data class Actividad(
     val deadline: String? = null,      // ISO-8601
     val assignedTo: String? = null,    // user UUID
     val assignedConfirmed: Boolean = false, // flag-only: confirmar asignación no toca status
+    val attribution: ActividadAttribution? = null,
     val confirmedAt: String? = null,   // ISO-8601, null mientras assignedConfirmed=false
     val completedAt: String? = null,   // ISO-8601 (D14)
     /** T03 · ids de los hijos vinculados a la actividad (backend: `ActivitySummaryDto.childrenIds`). */
@@ -61,6 +81,7 @@ data class ActividadDetalle(
     val assignedConfirmed: Boolean = false,
     val confirmedAt: String? = null,
     val completedAt: String? = null,   // ISO-8601 (D14)
+    val attribution: ActividadAttribution? = null,
     val canDelete: Boolean = false,
     val canCancel: Boolean = false,
     val canConfirm: Boolean = false,
