@@ -173,8 +173,8 @@ class ActivityRailScreenContractTest {
             "🔴 La pantalla sigue construyendo secciones del lienzo: la única vista es la agenda.",
         )
         assertTrue(
-            "agendaItemIndexOf(" in screen,
-            "🔴 La pantalla no usa `agendaItemIndexOf` para el salto: el índice del encabezado " +
+            "agendaHeaderIndex(" in screen,
+            "🔴 La pantalla no usa `agendaHeaderIndex` para el salto: el índice del encabezado " +
                 "del día tiene que salir de la pura que cuenta la MISMA forma de lista.",
         )
         assertTrue(
@@ -593,7 +593,7 @@ class ActivityRailScreenContractTest {
         // S15 reescrita por C1: el lienzo anclado por píxel se retiró con el lienzo; el ancho
         // de la ley ahora es el índice PURO del salto (agendaItemIndexOf), no condiciones inline.
         assertTrue(
-            "agendaItemIndexOf(" in screen,
+            "agendaHeaderIndex(" in screen,
             "🔴 La pantalla no usa `agendaItemIndexOf`: el índice volvió a contarse inline, " +
                 "que no se puede probar.",
         )

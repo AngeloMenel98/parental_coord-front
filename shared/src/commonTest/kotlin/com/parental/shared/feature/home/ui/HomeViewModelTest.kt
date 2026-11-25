@@ -73,7 +73,7 @@ class HomeViewModelTest {
         FakeBondsApi(ApiResult.Success(emptyList())),
         FakeActivitiesApi(),
         FakeExpensesApi(),
-        FakeCategoriesApi(),
+        FakeCategoriesApi(), complianceClient = HttpClient { },
     ) {
         var calls = 0
         var result: ApiResult<HomeSummary> = ApiResult.Success(

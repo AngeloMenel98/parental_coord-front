@@ -444,13 +444,19 @@ private fun ActividadesListScreen(
     val agendaListState = rememberLazyListState()
 
     // El salto del mapa/Hoy se APLICA sobre la agenda: el índice del encabezado del día sale
-    // de `agendaItemIndexOf` (la MISMA cuenta que monta `AgendaTimeline`), así que el destino
+    // de `agendaHeaderIndex` (la MISMA cuenta que monta `AgendaTimeline`), así que el destino
     // no puede desalinearse — mismo contrato del riel con `railItemIndexOf`.
+    //
+    // FIX "Hoy no me lleva": si el día pedido no tiene grupo (hoy sin actividades), NO se
+    // descarta el salto: `jumpTargetDate` lo deriva al día con actividades más CERCANO
+    // (exactamente lo que ya hace la selección del mapa), así que "Hoy" siempre aterriza
+    // en algún lugar visible en vez de quedarse donde estaba. Lista vacía → se queda arriba.
     LaunchedEffect(pendingJumpDate, dayGroups) {
-        val target = pendingJumpDate ?: return@LaunchedEffect
-        val index = agendaItemIndexOf(dayGroups, target)
-        if (index != null) agendaListState.scrollToItem(index)
+        val requested = pendingJumpDate ?: return@LaunchedEffect
         pendingJumpDate = null
+        val target = jumpTargetDate(requested, dayGroups) ?: requested
+        val index = agendaHeaderIndex(dayGroups, target)
+        if (index != null) agendaListState.scrollToItem(index)
     }
 
 

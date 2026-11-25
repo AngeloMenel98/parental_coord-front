@@ -64,8 +64,13 @@ android {
 
     buildTypes {
         debug {
-            // Emulador Android → backend local de la máquina host.
-            buildConfigField("String", "API_BASE_URL", "\"http://10.0.2.2:3000/api\"")
+            // Emulador Android → backend local de la máquina host (10.0.2.2). En un TELÉFONO
+            // FÍSICO esa ruta no existe: sobrescribila con la IP LAN del host, p. ej.
+            //   ./gradlew :androidApp:assembleDebug -PAPI_BASE_URL_DEBUG=http://192.168.0.17:3000/api
+            // (192.168.0.17 ya está permitida por el network_security_config de debug).
+            val debugUrl = (project.findProperty("API_BASE_URL_DEBUG") as String?)
+                ?: "http://10.0.2.2:3000/api"
+            buildConfigField("String", "API_BASE_URL", "\"$debugUrl\"")
         }
         release {
             // Definir en ~/.gradle/gradle.properties o con -PAPI_BASE_URL_RELEASE=https://...

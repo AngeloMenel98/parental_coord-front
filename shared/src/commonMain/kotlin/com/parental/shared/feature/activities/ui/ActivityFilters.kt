@@ -32,6 +32,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Event
+import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -195,7 +197,9 @@ internal fun childrenDropdownLabel(
     children: List<VinculoChild>,
     selectedChildren: Set<String>,
 ): String {
-    if (selectedChildren.isEmpty()) return "Hijo"
+    // S4 llave por ícono: sin selección el chip no muestra texto (sólo el icono de personas);
+    // el label queda vacío por contrato del test.
+    if (selectedChildren.isEmpty()) return ""
     val names = children.filter { it.id in selectedChildren }.map { child ->
         listOfNotNull(child.firstName, child.lastName).joinToString(" ").trim()
             .ifEmpty { child.id }
@@ -218,10 +222,19 @@ internal fun ChildrenDropdown(
             onClick = { expanded = !expanded },
             label = {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = childrenDropdownLabel(children, selectedChildren),
-                        style = MaterialTheme.typography.labelLarge,
+                    // Pedido del humano (2026-11-25): icono de HIJOS/PERSONAS como llave del chip.
+                    Icon(
+                        imageVector = Icons.Filled.Group,
+                        contentDescription = null,
+                        modifier = Modifier.height(Spacing.md),
                     )
+                    if (selectedChildren.isNotEmpty()) {
+                        Spacer(modifier = Modifier.width(Spacing.xs))
+                        Text(
+                            text = childrenDropdownLabel(children, selectedChildren),
+                            style = MaterialTheme.typography.labelLarge,
+                        )
+                    }
                     if (selectedChildren.size > 1) {
                         Spacer(modifier = Modifier.width(Spacing.xs))
                         Text(
@@ -339,10 +352,20 @@ internal fun ActivityTypeDropdown(
             onClick = { expanded = !expanded },
             label = {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = "Tipo: ${selectedTab.label}",
-                        style = MaterialTheme.typography.labelLarge,
+                    // Pedido del humano (2026-11-25): "en vez de decir Tipo: que sea un icono
+                    // de actividades" — el chip abre con el ícono de evento de cardinal.
+                    Icon(
+                        imageVector = Icons.Filled.Event,
+                        contentDescription = null,
+                        modifier = Modifier.height(Spacing.md),
                     )
+                    if (selectedTab != ActivityTab.TODOS) {
+                        Spacer(modifier = Modifier.width(Spacing.xs))
+                        Text(
+                            text = selectedTab.label,
+                            style = MaterialTheme.typography.labelLarge,
+                        )
+                    }
                     Spacer(modifier = Modifier.width(Spacing.xs))
                     Icon(
                         imageVector = Icons.Filled.ArrowDropDown,

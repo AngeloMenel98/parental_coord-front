@@ -23,8 +23,9 @@ class ChildrenDropdownLabelTest {
     )
 
     @Test
-    fun `sin seleccion el label es el default`() {
-        assertEquals("Hijo", childrenDropdownLabel(children, emptySet()))
+    fun `sin seleccion el label queda vacio - el icono solo lleva el chip`() {
+        // S4 llave por ícono: el chip YA no dice "Hijo" cuando no hay nada seleccionado.
+        assertEquals("", childrenDropdownLabel(children, emptySet()))
     }
 
     @Test

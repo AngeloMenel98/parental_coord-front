@@ -44,6 +44,11 @@ open class HomeApi(
     private val expensesApi: ExpensesApi,
     private val categoriesApi: CategoriesApi,
     /**
+     * HttpClient SHARED (SessionAuth + logging + timeouts). El compliance no construye
+     * motor propio ya: la decisión de hacerlo "sin engine" dejó un 401 invisible.
+     */
+    private val complianceClient: io.ktor.client.HttpClient,
+    /**
      * ExpensesApi y el fetch de compliance mantienen por ahora la forma vieja de
      * origin/main (token por llamada): HomeApi no lleva token (viaja en el bearer
      * del shared HttpClient), así que lo consulta por acá en cada request.
@@ -51,13 +56,13 @@ open class HomeApi(
     private val tokenProvider: () -> String? = { null },
 ) {
     /**
-     * Cliente dedicado para compliance (viene de origin/main): NO lleva el plugin
-     * SessionAuth del shared HttpClient; el bearer va por header por llamada. Lazy:
-     * HomeApi puede vivir sin engine hasta que se pida compliance.
+     * FIX (2026-11-25, "no se pudo cargar el cumplimiento"): el cliente dedicado se creaba
+     * SIN SessionAuth y su `tokenProvider` default era `{ null }` — el GET de compliance viajaba
+     * sin bearer y el back respondía 401. Y sin el plugin de Logging, el fallo era invisible
+     * en logcat. Ahora marcha sobre el HttpClient SHARED (SessionAuth + logging + timeouts).
+     * El header explícito queda: si el provider tiene token no lo pisa (SessionAuth no
+     * duplica Authorization).
      */
-    private val complianceClient: io.ktor.client.HttpClient by lazy {
-        io.ktor.client.HttpClient(Platform.createHttpEngine())
-    }
 
     /**
      * El resumen del Home: los vínculos, el cumplimiento y las tres métricas.
@@ -139,7 +144,7 @@ open class HomeApi(
 
     open suspend fun getCompliance(bondId: String): ApiResult<ComplianceResponse> {
         return try {
-            val response = complianceClient.get("${Platform.baseUrl.trimEnd('/')}/activities/$bondId/compliance") {
+            val response = complianceClient.get("activities/$bondId/compliance") {
                 tokenProvider()?.let { header("Authorization", "Bearer $it") }
             }
             if (response.status.isSuccess()) {
