@@ -3,13 +3,14 @@
   "chosen": "02-personas-al-frente.html",
   "handoffs": {
     "02-personas-al-frente.html": {
-      "status": "in_progress",
+      "status": "implemented",
       "queued": false,
       "sentAt": "2026-11-25T14:14:54.742Z",
       "startedAt": "2026-11-25T14:15:06.503Z",
-      "implementedAt": null,
+      "implementedAt": "2026-11-25T15:00:08.973Z",
       "feature": "odd/tasks/thirdparty-identity.md",
-      "note": "T1+T2 implementados y commiteados (6157988): tarjeta con asignatario al frente, riel con puntos de categoría, stacks con fantasmas abajo-izquierda y dot-contador en el riel. Falta T3 (dropdowns densidad + Hoy) y T4 (cierre)."
+      "note": "Implementación completa: tarjeta personas-al-frente, riel con puntos de categoría y dot-contador de stack, stacks desplegables, dropdowns multi-select del panel de densidad y vacío con fecha. Suite 79/777 verde, assembleDebug OK. Commits 6157988 + 4f68f39 + doc bd8e4fb en feature/thirdparty-identity.",
+      "previewUrl": "http://127.0.0.1:33251/"
     }
   }
 }

@@ -392,36 +392,41 @@ class SwipeMountingTest {
     }
 
     @Test
-    fun `la pantalla monta el riel como unica superficie y el motivo sigue siendo obligatorio`() {
-        // T6 · LA PANTALLA CAMBIÓ DE FORMA, el guard no se borra: se reescribe para la forma
-        // nueva. `TimelineMode` desapareció (L6: el riel REEMPLAZA Agenda y Semana), así que
-        // `ActivitiesScreen.kt` ya no monta `AgendaTimeline` ni le pasa su `onSwipeAction`: el
-        // feed de la lista es el riel. Dos feeds a la vez es justo lo que el guard no puede
-        // dejar pasar.
-        val agendaTimeline = callSites("AgendaTimeline")
-        assertTrue(
-            agendaTimeline.isEmpty(),
-            "🔴 La pantalla vuelve a montar `AgendaTimeline` en ${agendaTimeline.map { it.file }}. " +
-                "L6 decidió que el riel es la única vista; la agenda se retira en T8 y hasta " +
-                "entonces sólo se sostiene con sus propias pruebas.",
+    fun `la pantalla monta la agenda como única superficie y el motivo sigue siendo obligatorio`() {
+        // C1 (activity-card-stack) · La ÚNICA superficie paso de ser el lienzo del riel a ser la
+        // agenda de tarjetas (decisión del humano, 2026-11-25). El guard no se borra: reescribe
+        // la forma que vigila — una sola superficie de lista, `onSwipeAction` cableado desde la
+        // pantalla, diálogo de motivo y la entrada "No asistir" desde el detalle.
+        // La PANTALLA (no el archivo muerto del lienzo, que sigue existiendo con sus pruebas)
+        // no puede montar ninguna de las dos formas del lienzo: la única vista es la agenda.
+        val screenMounts = callSites(
+            "RailAnchoredTimeline",
+            files = listOf(java.io.File(uiDir, "ActivitiesScreen.kt")),
         )
-        // La firma sigue declarada en `AgendaList.kt` (T8 borra el fichero): mientras exista,
-        // el parámetro no puede recuperar un valor por defecto.
-        val firma = declaredParameters(source("AgendaList.kt"), "AgendaTimeline")
+        assertFalse(
+            screenMounts.isNotEmpty(),
+            "🔴 `ActivitiesScreen.kt` monta `RailAnchoredTimeline`: C1 decidió que la agenda de " +
+                "tarjetas es la única vista (2026-11-25).",
+        )
+        // La firma del lienzo sigue declarada en su archivo: mientras exista, el parámetro no
+        // puede recuperar un valor por defecto.
+        val firma = declaredParameters(source("RailTimeline.kt"), "RailTimeline")
         val linea = firma.lines().firstOrNull { "onSwipeAction:" in it }
-        assertTrue(linea != null, "`AgendaTimeline` no declara `onSwipeAction`:\n$firma")
+        assertTrue(linea != null, "`RailTimeline` no declara `onSwipeAction`:\n$firma")
         assertFalse(
             "=" in linea,
-            "🔴 `AgendaTimeline.onSwipeAction` lleva valor por defecto. En una SUPERFICIE eso " +
-                "repite el defecto del hueco: si un llamante nuevo se olvida de pasarlo, la " +
+            "🔴 `RailTimeline.onSwipeAction` lleva valor por defecto. En una SUPERFICIE eso " +
+                "repite el defecto del hueco: si un llamante nuevo lo omite, la " +
                 "lista se dibuja sin gesto y compila.",
         )
 
-        // El cable de la pantalla al riel: sin él, los bloques tendrían gesto y nada que hacer.
+        // El cable de la pantalla a la agenda: sin él, las tarjetas tendrían gesto y nada que
+        // hacer (C1).
         val screen = stripCommentsAndStrings(source("ActivitiesScreen.kt"))
         assertTrue(
-            "RailTimeline(" in screen,
-            "La pantalla no monta el riel: sin feed de lista, el gesto se quedaría sin superficie.",
+            "AgendaTimeline(" in screen,
+            "La pantalla no monta la agenda: sin feed de lista, el gesto se quedaría sin " +
+                "superficie (C1).",
         )
         assertTrue(
             "onSwipeAction = viewModel::startSwipeAction" in screen,

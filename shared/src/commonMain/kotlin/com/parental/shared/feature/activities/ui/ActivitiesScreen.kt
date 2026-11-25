@@ -211,6 +211,7 @@ fun ActividadesScreen(
             onSelectTab = viewModel::selectTab,
             onToggleChild = viewModel::toggleChildFilter,
             onClearChildren = viewModel::clearChildFilter,
+            onConfirmActividad = viewModel::confirmAssignment,
             onSelectActividad = { id -> originId = id; viewModel.selectActividad(id) },
             onRetryList = viewModel::retry,
             snackbarHostState = snackbarHostState,
@@ -317,6 +318,7 @@ private fun ActividadesListScreen(
     onSelectTab: (ActivityTab) -> Unit,
     onToggleChild: (String) -> Unit,
     onClearChildren: () -> Unit,
+    onConfirmActividad: (String) -> Unit,
     onSelectActividad: (String) -> Unit,
     onRetryList: () -> Unit,
     snackbarHostState: SnackbarHostState,
@@ -398,25 +400,10 @@ private fun ActividadesListScreen(
         )
     }
     // El agrupador es el MISMO de la agenda: días ascendentes y "sin fecha de inicio" al
-    // final. El riel no ordena, sólo traduce cada grupo a su sección (T4).
+    // final. C1 (activity-card-stack): las secciones del lienzo NO se derivan más — la
+    // agenda de tarjetas es la única vista y sus grupos son la única forma de lista.
     val dayGroups = remember(filteredRows) { buildAgendaGroups(filteredRows) }
-    val sections = remember(dayGroups, zone, collapsedDays) {
-        dayGroups.map { group ->
-            val date = group.date
-            if (date == null) {
-                // La sección sin fecha no se pliega y no tiene eje horario.
-                RailSection(date = null, railDay = null, undatedRows = group.rows)
-            } else {
-                RailSection(
-                    date = date,
-                    // Las filas del grupo son exactamente las de ese día, así que alimentan
-                    // el eje sin volver a filtrar la lista entera por día.
-                    railDay = buildRailDay(group.rows, date, zone),
-                    isExpanded = date.toString() !in collapsedDays,
-                )
-            }
-        }
-    }
+
     // T7 (R4) · Poda del mapa de foco por CONJUNTO DE DATOS, y ahora por el conjunto que el riel
     // RENDERIZA. Podar al cerrar borraría la entrada de un bloque que sigue compuesto y que no
     // volvería a registrarse —`SideEffect` sólo corre al recomponer—, así que el retorno caería al
@@ -425,11 +412,8 @@ private fun ActividadesListScreen(
     // lo que queda vivo se reinscribe solo. Un día PLEGADO conserva las suyas: su `railDay` sigue
     // en la sección, y si el bloque no está compuesto el segundo respaldo de `returnFocus`
     // (`onFailure`) cubre el nodo desprendido. Queda acotado.
-    val railVisibleIds = remember(sections) {
-        sections.flatMap { section ->
-            section.railDay?.blocks?.map { block -> block.row.actividad.id }
-                ?: section.undatedRows.map { row -> row.actividad.id }
-        }.toSet()
+    val railVisibleIds = remember(dayGroups) {
+        dayGroups.flatMap { group -> group.rows.map { row -> row.actividad.id } }.toSet()
     }
     LaunchedEffect(railVisibleIds) {
         focusRequesters.keys.retainAll(railVisibleIds)
@@ -443,13 +427,10 @@ private fun ActividadesListScreen(
     }
     // La línea de "ahora" sólo se pasa si HOY es una sección del riel: en un riel sin hoy
     // sería una hora sin eje que la pinte.
-    val railNowMinute = if (sections.any { it.date == today }) nowMinute else null
 
     // T10 (S12) · Si hoy tiene siquiera un bloque. Una sección de hoy EXISTE aunque esté vacía,
     // así que "hay sección" no sirve: lo que decide es que tenga bloques.
-    val todayHasBlocks = sections.any { section ->
-        section.date == today && !section.railDay?.blocks.isNullOrEmpty()
-    }
+    val todayHasBlocks = dayGroups.any { group -> group.date == today && group.rows.isNotEmpty() }
     // El aviso se pinta sólo si se pidió Y hoy sigue vacío: si una recarga o un filtro le trae
     // actividades a hoy, el aviso se reemplaza solo.
     val showTodayEmptyNotice = todayEmptyNotice && !todayHasBlocks
@@ -457,17 +438,21 @@ private fun ActividadesListScreen(
     // el reloj ya dio su primera lectura. Se calcula en composición pero NO se consume hasta
     // montar el riel: `RailAnchoredTimeline` la usa como posición INICIAL del `LazyListState`, así
     // que el primer frame con contenido ya está anclado y no hay scroll visible después.
-    val initialRailAnchor = nowMinute?.let { minute -> railInitialAnchor(sections, today, minute) }
 
-    // S5 · Un día se pliega desde el chevron de SU encabezado y desde ningún otro sitio.
-    val toggleDay: (LocalDate) -> Unit = { date ->
-        val iso = date.toString()
-        collapsedDaysIso = if (iso in collapsedDays) {
-            collapsedDaysIso - iso
-        } else {
-            collapsedDaysIso + iso
-        }
+    // activity-card-stack C1 · El estado de scroll de la ÚNICA vista (la agenda de tarjetas).
+    // Se recrea cuando el feed deja la composición (vacío/error), igual criterio que el riel.
+    val agendaListState = rememberLazyListState()
+
+    // El salto del mapa/Hoy se APLICA sobre la agenda: el índice del encabezado del día sale
+    // de `agendaItemIndexOf` (la MISMA cuenta que monta `AgendaTimeline`), así que el destino
+    // no puede desalinearse — mismo contrato del riel con `railItemIndexOf`.
+    LaunchedEffect(pendingJumpDate, dayGroups) {
+        val target = pendingJumpDate ?: return@LaunchedEffect
+        val index = agendaItemIndexOf(dayGroups, target)
+        if (index != null) agendaListState.scrollToItem(index)
+        pendingJumpDate = null
     }
+
 
     // S6 · "Hoy": despliega el día de hoy si estaba plegado y lleva el riel a su encabezado.
     // Las dos cosas ocurren en el MISMO toque: el desplegado cambia las secciones y el índice
@@ -476,8 +461,6 @@ private fun ActividadesListScreen(
     // T10 (S12) · Si hoy no tiene ni un bloque, el toque además deja el aviso: con el anclaje de
     // S15 el riel muchas veces ya está en hoy, así que un salto mudo parecía un botón roto.
     val goToToday: () -> Unit = {
-        val iso = today.toString()
-        if (iso in collapsedDays) collapsedDaysIso = collapsedDaysIso - iso
         todayEmptyNotice = !todayHasBlocks
         pendingJumpDate = today
     }
@@ -699,34 +682,35 @@ private fun ActividadesListScreen(
                             if (minute == null) {
                                 Spacer(modifier = Modifier.fillMaxSize())
                             } else {
-                                // T6 (S3) · El riel es la ÚNICA vista de Actividades (L6). Las
-                                // secciones ya vienen derivadas y en orden: el riel no agrupa ni
-                                // ordena, sólo pinta encabezados pegajosos y cuerpos de día.
-                                RailAnchoredTimeline(
-                                    sections = sections,
-                                    initialAnchor = initialRailAnchor,
-                                    pendingJumpDate = pendingJumpDate,
-                                    onJumpApplied = { pendingJumpDate = null },
-                                    categories = uiState.categories,
+                                // activity-card-stack C1 · LA ÚNICA VISTA: el lienzo proporcional
+                                // del riel se retira del montaje (decisión del humano, 2026-11-25:
+                                // "Reemplaza lo que hay ahora con lo nuevo... que sea una única vista",
+                                // que refina la L6 de `activity-rail`). El feed son las tarjetas
+                                // personas-al-frente con su riel de puntos de categoría y stacks
+                                // desplegables. La lista vive con el mismo `LazyListState` del
+                                // `RailAnchoredTimeline`:
+                                //  · el anclaje inicial y el salto del mapa usan los ÍNDICES DE
+                                //    ENCABEZADO de las secciones (`railItemIndexOf`), y la agenda
+                                //    ordena los días de la MISMA manera (`buildAgendaGroups` por fecha
+                                //    ascendente + sección sin fecha al final), así que el índice del
+                                //    encabezado N es el mismo ítem en ambas formas de lista;
+                                //  · el anclaje por PÍXEL de la línea de "ahora" era del lienzo y
+                                //    no viaja: perأ el offset inicial queda en el tope del
+                                //    encabezado anclado (el `initialFirstVisibleItemScrollOffset`
+                                //    del lienzo no tiene significado aquí).
+                                // El plegado de días del lienzo no tiene equivalente en la agenda
+                                AgendaTimeline(
+                                    groups = dayGroups,
+                                    zone = zone,
+                                    resolve = { id -> uiState.categories[id] },
+                                    onSelectActividad = { id -> onSelectActividad(id) },
+                                    onConfirm = onConfirmActividad,
+                                    isConfirming = uiState.isConfirming,
                                     memberNames = uiState.memberNames,
                                     children = uiState.children,
-                                    zone = zone,
-                                    today = today,
-                                    nowMinute = railNowMinute,
-                                    // T10 (S12) · El aviso de "hoy sin actividades" y su acción,
-                                    // que es el MISMO alta que el FAB (S7).
-                                    todayEmptyNotice = showTodayEmptyNotice,
-                                    onCreateFromEmptyToday = onOpenCreate,
-                                    onOpen = { row -> onSelectActividad(row.actividad.id) },
-                                    onToggleDay = toggleDay,
-                                    // T7 (R2-T2-7, L11) · El gesto vuelve a tener superficie: la
-                                    // agenda lo llevaba en sus filas y el riel lo monta en sus
-                                    // bloques, con el motivo obligatorio y la oferta de deshacer
-                                    // que la pantalla ya tenía cableadas.
                                     onSwipeAction = onSwipeAction,
-                                    // T7 (R4) · El mapa de foco, para que el retorno desde la
-                                    // hoja vuelva al bloque que la abrió.
                                     focusRequesters = focusRequesters,
+                                    listState = agendaListState,
                                 )
                             }
                         }

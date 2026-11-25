@@ -235,3 +235,24 @@ internal fun mondayStart(date: LocalDate): LocalDate =
 
 internal fun parseIsoDate(raw: String): LocalDate? =
     runCatching { LocalDate.parse(raw) }.getOrNull()
+
+/**
+ * Índice del ENCABEZADO de [date] en la lista de la agenda de tarjetas — C1 de
+ * `activity-card-stack`: el salto del mapa de densidad sigue vivo con la nueva ÚNICA vista.
+ *
+ * La forma de la lista de [com.parental.shared.feature.activities.ui.AgendaTimeline] es
+ * `[hint, header(g0), items(g0), header(g1), items(g1)…]`, donde cada GRUPO con N filas
+ * produce N ítems de tarjetas (las pilas se expanden EN el ítem del encabezado de la
+ * pila: una franja apilada es UN ítem). El grupo sin fecha queda último y es un destino
+ * imposible — como en el riel, [date] debe ser un día real.
+ *
+ * La agenda no pliega días, así que no hay estado de plegado en la cuenta.
+ */
+internal fun agendaItemIndexOf(groups: List<AgendaGroup>, date: LocalDate): Int? {
+    var index = 1 // el hint de swipe siempre existe
+    for (group in groups) {
+        if (group.date == date) return index
+        index += 1 + group.rows.size
+    }
+    return null
+}
