@@ -29,6 +29,11 @@ data class ThirdPartyGrant(
     val endDate: String? = null,
     val authorizedBy: String? = null,
     val authorizedByName: String? = null,
+    /** S9: identidad declarada; nullable para grants previos (S6). */
+    val firstName: String? = null,
+    val lastName: String? = null,
+    val phone: String? = null,
+    val document: String? = null,
 )
 
 /**
@@ -126,6 +131,15 @@ data class UpdateThirdPartyAccessRequest(
     val relationship: String? = null,
     val accessEnd: String? = null,
     val note: String? = null,
+    /**
+     * S9 (thirdparty-identity): identidad editable del grant vivo. `null` = no tocar
+     * (PATCH parcial); nombre/apellido exigen 2..80 en el back, y tel/doc con `""`
+     * limpian (limpieza explícita).
+     */
+    val firstName: String? = null,
+    val lastName: String? = null,
+    val phone: String? = null,
+    val document: String? = null,
 )
 
 /**

@@ -62,6 +62,12 @@ internal fun UpdateThirdPartyAccessRequest.toPatchBody(): JsonObject = buildJson
     relationship?.let { put("relationship", it) }
     accessEnd?.let { put("accessEnd", it.trim()) }
     note?.let { put("note", it) }
+    // S9: sólo los campos presentes viajan (PATCH parcial del back); phone/document
+    // con "" limpian a propósito.
+    firstName?.let { put("firstName", it) }
+    lastName?.let { put("lastName", it) }
+    phone?.let { put("phone", it) }
+    document?.let { put("document", it) }
 }
 
 /**

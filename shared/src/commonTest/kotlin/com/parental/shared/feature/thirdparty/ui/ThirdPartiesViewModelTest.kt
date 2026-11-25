@@ -427,6 +427,81 @@ class ThirdPartiesViewModelTest {
         assertEquals(0, api.updateCalls, "🔴 T15: y no se llamó al back.")
     }
 
+    @Test
+    fun `la edicion precarga la identidad declarada y viaja en el PATCH (S9)`() {
+        val api = FakeThirdPartiesApi().apply {
+            grants += grant(
+                "g-active",
+                "Pablo Charles",
+                "CAREGIVER",
+                "2026-12-12",
+                "active",
+                firstName = "Pablo",
+                lastName = "Charles",
+                phone = "+54 9 11 5555",
+                document = "DNI 34.567.890",
+            )
+        }
+        val viewModel = viewModel(api)
+        viewModel.load()
+
+        viewModel.openEdit(viewModel.state.value.items.single())
+        val edit = assertNotNull(viewModel.state.value.edit, "S9: la hoja abre precargada.")
+        assertEquals("Pablo", edit.firstName, "S9: el nombre precarga del grant.")
+        assertEquals("Charles", edit.lastName, "S9: el apellido precarga del grant.")
+        assertEquals("+54 9 11 5555", edit.phone, "S9: el teléfono precarga.")
+        assertEquals("DNI 34.567.890", edit.document, "S9: el documento precarga.")
+
+        viewModel.setEditFirstName(" Pablo ")
+        // S9: el teléfono se vacía a propósito, el documento se queda con "" → los dos
+        // limpian; el apellido SIN edición viaja igual a su valor persistido.
+        viewModel.setEditPhone("")
+        viewModel.setEditDocument("")
+        viewModel.saveEdit()
+
+        assertEquals(1, api.updateCalls, "S9: guardar llama al PATCH.")
+        assertEquals("Pablo", api.lastUpdate?.firstName, "S9: el nombre viaja trimado.")
+        assertEquals("Charles", api.lastUpdate?.lastName, "S9: el apellido sin edición viaja igual.")
+        assertEquals("", api.lastUpdate?.phone, "S9: el teléfono vaciado limpia de forma explícita.")
+        assertEquals("", api.lastUpdate?.document, "S9: el documento vaciado limpia de forma explícita.")
+    }
+
+    @Test
+    fun `el nombre declarado gana sobre displayName en la tarjeta (S9)`() {
+        val api = FakeThirdPartiesApi().apply {
+            grants += grant(
+                "g-old",
+                "Ana Previa",
+                "FAMILY",
+                "2026-12-12",
+                "active",
+            )
+            grants += grant(
+                "g-new",
+                "Nombre sin declarar",
+                "FAMILY",
+                "2026-12-13",
+                "active",
+                firstName = "Pablo",
+                lastName = "Charles",
+            )
+        }
+        val viewModel = viewModel(api)
+        viewModel.load()
+
+        val byId = viewModel.state.value.items.associateBy { it.id }
+        assertEquals(
+            "Pablo Charles",
+            byId["g-new"]?.name,
+            "S9: la identidad declarada es el nombre de la persona.",
+        )
+        assertEquals(
+            "Ana Previa",
+            byId["g-old"]?.name,
+            "S6: sin identidad, displayName sigue mandando.",
+        )
+    }
+
     // ── Revocación ──────────────────────────────────────────────────────
 
     @Test
@@ -509,11 +584,19 @@ class ThirdPartiesViewModelTest {
         relationship: String,
         endDate: String,
         status: String,
+        firstName: String? = null,
+        lastName: String? = null,
+        phone: String? = null,
+        document: String? = null,
     ) = ThirdPartyAccess(
         id = id,
         bondId = bondId,
         userId = "user-$id",
         displayName = name,
+        firstName = firstName,
+        lastName = lastName,
+        phone = phone,
+        document = document,
         relationship = relationship,
         startDate = "2026-10-01",
         endDate = endDate,

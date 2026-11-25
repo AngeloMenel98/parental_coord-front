@@ -232,6 +232,10 @@ fun ThirdPartiesScreen(
             edit = edit,
             isSaving = state.isSaving,
             onRelationship = viewModel::setEditRelationship,
+            onFirstName = viewModel::setEditFirstName,
+            onLastName = viewModel::setEditLastName,
+            onPhone = viewModel::setEditPhone,
+            onDocument = viewModel::setEditDocument,
             onAccessEnd = viewModel::setEditAccessEnd,
             onNote = viewModel::setEditNote,
             onSave = viewModel::saveEdit,
@@ -1297,6 +1301,10 @@ private fun ThirdPartyEditSheet(
     edit: ThirdPartyEditState,
     isSaving: Boolean,
     onRelationship: (String) -> Unit,
+    onFirstName: (String) -> Unit,
+    onLastName: (String) -> Unit,
+    onPhone: (String) -> Unit,
+    onDocument: (String) -> Unit,
     onAccessEnd: (String) -> Unit,
     onNote: (String) -> Unit,
     onSave: () -> Unit,
@@ -1321,6 +1329,38 @@ private fun ThirdPartyEditSheet(
                 style = MaterialTheme.typography.titleMedium,
             )
             RelationshipChips(selected = edit.relationship, onSelect = onRelationship)
+
+            // S9 (thirdparty-identity): identidad precargada del grant; NaN = el grant
+            // previo a la feature no la tiene y el campo nace vacío para completarla.
+            OutlinedTextField(
+                value = edit.firstName.orEmpty(),
+                onValueChange = onFirstName,
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("Nombre") },
+                singleLine = true,
+            )
+            OutlinedTextField(
+                value = edit.lastName.orEmpty(),
+                onValueChange = onLastName,
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("Apellido") },
+                singleLine = true,
+            )
+            OutlinedTextField(
+                value = edit.phone.orEmpty(),
+                onValueChange = onPhone,
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("Teléfono (opcional)") },
+                singleLine = true,
+            )
+            OutlinedTextField(
+                value = edit.document.orEmpty(),
+                onValueChange = onDocument,
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("Documento (opcional)") },
+                singleLine = true,
+            )
+
             OutlinedTextField(
                 value = edit.accessEnd,
                 onValueChange = onAccessEnd,
