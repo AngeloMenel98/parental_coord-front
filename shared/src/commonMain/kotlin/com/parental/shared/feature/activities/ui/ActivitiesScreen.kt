@@ -36,6 +36,7 @@ import com.parental.shared.feature.activities.ui.swipe.SwipeAction
 import com.parental.shared.feature.activities.ui.swipe.SwipeReasonDialog
 import com.parental.shared.feature.activities.ui.swipe.SWIPE_UNDO_LABEL
 import com.parental.shared.feature.bonds.domain.model.VinculoChild
+import com.parental.shared.feature.thirdparty.ui.fullDateLabel
 import kotlinx.coroutines.delay
 import kotlinx.datetime.Clock
 import kotlinx.datetime.DateTimeUnit
@@ -606,22 +607,29 @@ private fun ActividadesListScreen(
                 // existentes TAL CUAL: misma selección, mismos contadores y mismos callbacks; lo
                 // único que cambia es el sitio donde se montan.
                 filters = {
-                    ActivityFiltersRow(
-                        selectedTab = uiState.selectedTab,
-                        onSelectTab = onSelectTab,
-                        counts = tabCounts(uiState.actividades),
-                    )
-                    if (uiState.children.size > 1) {
-                        val childCounts = remember(uiState.actividades, uiState.selectedTab) {
-                            childFilterCounts(uiState.actividades, uiState.selectedTab)
-                        }
-                        ChildrenFiltersRow(
-                            children = uiState.children,
-                            selectedChildren = uiState.selectedChildren,
-                            counts = childCounts,
-                            onSelectAll = onClearChildren,
-                            onToggleChild = onToggleChild,
+                    // T3 (activity-card-stack S4): los DOS filtros del panel ahora son
+                    // dropdowns multi-select en la misma fila, con checks en caja teal y
+                    // "Todos" excluyente — MISMOS callbacks que las filas de chips.
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.lg, vertical = Spacing.xs),
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                    ) {
+                        ActivityTypeDropdown(
+                            selectedTab = uiState.selectedTab,
+                            onSelectTab = onSelectTab,
                         )
+                        if (uiState.children.size > 1) {
+                            val childCounts = remember(uiState.actividades, uiState.selectedTab) {
+                                childFilterCounts(uiState.actividades, uiState.selectedTab)
+                            }
+                            ChildrenDropdown(
+                                children = uiState.children,
+                                selectedChildren = uiState.selectedChildren,
+                                counts = childCounts,
+                                onSelectAll = onClearChildren,
+                                onToggleChild = onToggleChild,
+                            )
+                        }
                     }
                 },
             )
@@ -667,8 +675,16 @@ private fun ActividadesListScreen(
                         label = "listEmptyToContent",
                     ) { isEmpty ->
                         if (isEmpty) {
+                            // activity-card-stack S5 · "No hay actividades el <fecha>": la fecha
+                            // elegida en el mapa es la pregunta que la persona ya hizo, así que
+                            // el vacío la repite — no un genérico. Sin fecha elegida (hoy), el
+                            // mensaje es el de siempre.
                             EmptyState(
-                                title = "No hay actividades",
+                                title = if (selectedDate == today) {
+                                    "No hay actividades"
+                                } else {
+                                    "No hay actividades el ${fullDateLabel(selectedDate)}"
+                                },
                                 message = "",
                                 actionLabel = "Crear actividad",
                                 onAction = onOpenCreate,

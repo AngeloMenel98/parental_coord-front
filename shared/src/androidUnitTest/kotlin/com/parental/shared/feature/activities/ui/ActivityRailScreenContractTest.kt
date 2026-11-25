@@ -406,8 +406,8 @@ class ActivityRailScreenContractTest {
 
     @Test
     fun `los filtros, la barra y el snackbar siguen montados como antes`() {
-        assertTrue("ActivityFiltersRow(" in screen, "🔴 Se perdió la fila de filtros de pestaña.")
-        assertTrue("ChildrenFiltersRow(" in screen, "🔴 Se perdió la fila de filtros de hijos.")
+        assertTrue("ActivityTypeDropdown(" in screen, "🔴 Se perdió el dropdown de tipo (S4 activity-card-stack).")
+        assertTrue("ChildrenDropdown(" in screen, "🔴 Se perdió el dropdown de hijos (S4 activity-card-stack).")
         assertTrue(
             "onOpenNotifications = onOpenNotifications" in screen,
             "🔴 La campana dejó de recibir su callback: se perdió el wiring de notificaciones.",
@@ -473,15 +473,15 @@ class ActivityRailScreenContractTest {
         val panel = callBody(screen, "MonthDensityMap")
 
         assertTrue(
-            "ActivityFiltersRow(" in panel,
+            "ActivityTypeDropdown(" in panel,
             "🔴 La fila de tipos (Eventos / Obligaciones) no está DENTRO de la llamada al panel " +
                 "(S14): sigue en una fila aparte debajo del calendario.",
         )
         assertTrue(
-            "ChildrenFiltersRow(" in panel,
+            "ChildrenDropdown(" in panel,
             "🔴 La fila de hijos no está DENTRO de la llamada al panel (S14).",
         )
-        listOf("ActivityFiltersRow", "ChildrenFiltersRow").forEach { row ->
+        listOf("ActivityTypeDropdown", "ChildrenDropdown").forEach { row ->
             assertEquals(
                 1,
                 Regex("$row\\s*\\(").findAll(screen).count(),

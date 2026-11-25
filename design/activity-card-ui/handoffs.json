@@ -9,7 +9,7 @@
       "startedAt": "2026-11-25T14:15:06.503Z",
       "implementedAt": null,
       "feature": "odd/tasks/thirdparty-identity.md",
-      "note": "Implementación de la tarjeta Personas al frente en Compose (rail + densidad + dropdowns + stack)."
+      "note": "T1+T2 implementados y commiteados (6157988): tarjeta con asignatario al frente, riel con puntos de categoría, stacks con fantasmas abajo-izquierda y dot-contador en el riel. Falta T3 (dropdowns densidad + Hoy) y T4 (cierre)."
     }
   }
 }
