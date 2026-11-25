@@ -33,12 +33,13 @@ dropdowns multi-select (checks, Todos excluyente) y botón Hoy.
 
 ## Tasks
 
-- T1 (S1) — `ActivityCard.kt` rework: columna de asignatario, meta de una línea,
-  atribución; tests de contract (source-level).
-- T2 (S2, S3) — `AgendaList.kt` riel + stack con despliegue; test del modelo
-  de stacks (agrupación por franja) en commonTest.
-- T3 (S4, S5) — dropdowns multi-select + estado vacío de Hoy; tests del VM.
-- T4 — gates: suite completa + assembleDebug; cierre del feature doc.
+- T1 (S1) DONE `6157988` — ActivityCard rework (lead column, meta 1 línea,
+  atribución).
+- T2 (S2,S3) DONE `6157988` — riel + stack (8+7 tests; suite 78/773).
+- T3 (S4,S5) DONE `4f68f39` — dropdowns multi-select (ChildrenDropdown/
+  ActivityTypeDropdown), vacío con fecha; contract Android retargeted;
+  ChildrenDropdownLabelTest (4); suite 79/777.
+- T4 — suite final 79/777 verde, assembleDebug OK; cierre abajo.
 
 ## Log
 
@@ -46,3 +47,10 @@ dropdowns multi-select (checks, Todos excluyente) y botón Hoy.
   design/activity-card-ui/02-personas-al-frente.html" (handoff del canvas).
 - L2: historial de la iteración del artboard (13 comentarios aplicados) vive en
   `design/activity-card-ui/comments.json`.
+
+- L3 (cierre): implementación completa de T1-T3 + gates. Deuda menor: (a) `AgendaTimeline`
+  sigue INERTO para el usuario — `ActivitiesScreen` monta el riel preexistente
+  (`RailAnchoredTimeline`), no la Agenda nueva; conectar la vista es el paso pendiente
+  que activa todo (tarjeta, riel, stack) en la app; (b) un test en dispositivo podría
+  reasentar el offset del dot 1-2dp; (c) el import cruzado `initialsOf`
+  (activities→thirdparty) convendría reubicarlo a un paquete común.
