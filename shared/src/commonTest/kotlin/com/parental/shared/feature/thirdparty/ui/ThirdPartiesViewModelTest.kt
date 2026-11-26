@@ -138,9 +138,9 @@ class ThirdPartiesViewModelTest {
 
         viewModel.next()
         assertEquals(
-            THIRD_PARTY_EMAIL_MISSING,
+            THIRD_PARTY_FIRST_NAME_MISSING,
             viewModel.state.value.wizard?.error,
-            "🔴 T15: sin email no se avanza.",
+            "S3: sin nombre no se avanza.",
         )
         assertEquals(
             ThirdPartyWizardStep.QUIEN,
@@ -148,11 +148,22 @@ class ThirdPartiesViewModelTest {
             "🔴 T15: el error deja a la persona en el paso 1.",
         )
 
+        viewModel.setFirstName("Ab")
+        viewModel.setLastName("An")
+        viewModel.next()
+        assertEquals(
+            THIRD_PARTY_EMAIL_MISSING,
+            viewModel.state.value.wizard?.error,
+            "🔴 T15: sin email no se avanza (con identidad completa).",
+        )
+
         viewModel.setEmail("no-es-un-email")
         viewModel.next()
         assertEquals(THIRD_PARTY_EMAIL_INVALID, viewModel.state.value.wizard?.error, "🔴 T15: un email sin forma no pasa.")
 
         viewModel.setEmail("abuela@example.com")
+        viewModel.setFirstName("Abuela")
+        viewModel.setLastName("Ana")
         viewModel.next()
         assertEquals(
             THIRD_PARTY_RELATIONSHIP_MISSING,
@@ -171,6 +182,85 @@ class ThirdPartiesViewModelTest {
     }
 
     @Test
+    fun `el alta sin nombre o apellido no avanza y pide el dato (S3 thirdparty-identity)`() {
+        val viewModel = viewModel(FakeThirdPartiesApi())
+        viewModel.load()
+
+        viewModel.openCreate()
+        viewModel.setEmail("pablo@example.com")
+        viewModel.setRelationship("family")
+        viewModel.next()
+        assertEquals(
+            THIRD_PARTY_FIRST_NAME_MISSING,
+            viewModel.state.value.wizard?.error,
+            "S3: sin nombre no se pasa al paso 2; el texto es el que ve la persona.",
+        )
+        assertEquals(
+            ThirdPartyWizardStep.QUIEN,
+            viewModel.state.value.wizard?.step,
+            "S3: el paso no avanza sin la identidad.",
+        )
+
+        viewModel.setFirstName("P")
+        viewModel.next()
+        assertEquals(
+            THIRD_PARTY_FIRST_NAME_MISSING,
+            viewModel.state.value.wizard?.error,
+            "S3: menos de 2 caracteres no es un nombre; el límite lo fija el back.",
+        )
+
+        viewModel.setFirstName("Pablo")
+        viewModel.next()
+        assertEquals(
+            THIRD_PARTY_LAST_NAME_MISSING,
+            viewModel.state.value.wizard?.error,
+            "S3: el apellido es obligatorio con su propio mensaje.",
+        )
+
+        viewModel.setLastName("Charles")
+        viewModel.next()
+        assertNull(
+            viewModel.state.value.wizard?.error,
+            "S3: con nombre y apellido el paso avanza.",
+        )
+    }
+
+    @Test
+    fun `el alta viaja con la identidad declarada y recorta espacios (S1 S4)`() {
+        val api = FakeThirdPartiesApi()
+        val viewModel = viewModel(api)
+        viewModel.load()
+
+        viewModel.openCreate()
+        viewModel.setFirstName("  Pablo  ")
+        viewModel.setLastName("  Charles  ")
+        viewModel.setPhone("  +54 9 11 5555  " )
+        viewModel.setDocument("  DNI 34.567.890  ")
+        viewModel.setEmail("pablo@example.com")
+        viewModel.setRelationship("caregiver")
+        viewModel.next()
+        viewModel.submit()
+
+        assertEquals(1, api.createCalls, "S1: el alta lleva la identidad declarada.")
+        assertEquals("Pablo", api.lastCreate?.firstName, "S4: el nombre viaja recortado.")
+        assertEquals("Charles", api.lastCreate?.lastName, "S4: el apellido viaja recortado.")
+        assertEquals("+54 9 11 5555", api.lastCreate?.phone, "S4: el teléfono opcional viaja si vino.")
+        assertEquals("DNI 34.567.890", api.lastCreate?.document, "S4: el documento opcional viaja si vino.")
+
+        viewModel.openCreate()
+        viewModel.setFirstName("Pablo")
+        viewModel.setLastName("Charles")
+        viewModel.setEmail("pablo@example.com")
+        viewModel.setFirstName("Abuela")
+        viewModel.setLastName("Ana")
+        viewModel.setRelationship("family")
+        viewModel.next()
+        viewModel.submit()
+        assertNull(api.lastCreate?.phone, "S4: sin teléfono no viaja el campo.")
+        assertNull(api.lastCreate?.document, "S4: sin documento no viaja el campo.")
+    }
+
+    @Test
     fun `el alta exitosa cierra el asistente y entra en la lista`() {
         val api = FakeThirdPartiesApi()
         val viewModel = viewModel(api)
@@ -178,6 +268,8 @@ class ThirdPartiesViewModelTest {
 
         viewModel.openCreate()
         viewModel.setEmail("abuela@example.com")
+        viewModel.setFirstName("Abuela")
+        viewModel.setLastName("Ana")
         viewModel.setRelationship("family")
         viewModel.next()
         assertEquals(
@@ -211,6 +303,8 @@ class ThirdPartiesViewModelTest {
 
         viewModel.openCreate()
         viewModel.setEmail("abuela@example.com")
+        viewModel.setFirstName("Abuela")
+        viewModel.setLastName("Ana")
         viewModel.setRelationship("caregiver")
         viewModel.next()
         viewModel.setNote("Llevarla a la escuela")
@@ -236,6 +330,8 @@ class ThirdPartiesViewModelTest {
 
         viewModel.openCreate()
         viewModel.setEmail("abuela@example.com")
+        viewModel.setFirstName("Abuela")
+        viewModel.setLastName("Ana")
         viewModel.setRelationship("family")
         viewModel.next()
         viewModel.setDuration(ThirdPartyDuration.CUSTOM)
@@ -273,6 +369,8 @@ class ThirdPartiesViewModelTest {
         val viewModel = viewModel(api)
         viewModel.openCreate()
         viewModel.setEmail("medico@example.com")
+        viewModel.setFirstName("Abuela")
+        viewModel.setLastName("Ana")
         viewModel.setRelationship("medical")
         viewModel.next()
         viewModel.setAccessEnd("2027-01-31")
@@ -327,6 +425,81 @@ class ThirdPartiesViewModelTest {
             "🔴 T15: el PATCH del back responde 409 sobre un grant no vigente, así que no se ofrece editar.",
         )
         assertEquals(0, api.updateCalls, "🔴 T15: y no se llamó al back.")
+    }
+
+    @Test
+    fun `la edicion precarga la identidad declarada y viaja en el PATCH (S9)`() {
+        val api = FakeThirdPartiesApi().apply {
+            grants += grant(
+                "g-active",
+                "Pablo Charles",
+                "CAREGIVER",
+                "2026-12-12",
+                "active",
+                firstName = "Pablo",
+                lastName = "Charles",
+                phone = "+54 9 11 5555",
+                document = "DNI 34.567.890",
+            )
+        }
+        val viewModel = viewModel(api)
+        viewModel.load()
+
+        viewModel.openEdit(viewModel.state.value.items.single())
+        val edit = assertNotNull(viewModel.state.value.edit, "S9: la hoja abre precargada.")
+        assertEquals("Pablo", edit.firstName, "S9: el nombre precarga del grant.")
+        assertEquals("Charles", edit.lastName, "S9: el apellido precarga del grant.")
+        assertEquals("+54 9 11 5555", edit.phone, "S9: el teléfono precarga.")
+        assertEquals("DNI 34.567.890", edit.document, "S9: el documento precarga.")
+
+        viewModel.setEditFirstName(" Pablo ")
+        // S9: el teléfono se vacía a propósito, el documento se queda con "" → los dos
+        // limpian; el apellido SIN edición viaja igual a su valor persistido.
+        viewModel.setEditPhone("")
+        viewModel.setEditDocument("")
+        viewModel.saveEdit()
+
+        assertEquals(1, api.updateCalls, "S9: guardar llama al PATCH.")
+        assertEquals("Pablo", api.lastUpdate?.firstName, "S9: el nombre viaja trimado.")
+        assertEquals("Charles", api.lastUpdate?.lastName, "S9: el apellido sin edición viaja igual.")
+        assertEquals("", api.lastUpdate?.phone, "S9: el teléfono vaciado limpia de forma explícita.")
+        assertEquals("", api.lastUpdate?.document, "S9: el documento vaciado limpia de forma explícita.")
+    }
+
+    @Test
+    fun `el nombre declarado gana sobre displayName en la tarjeta (S9)`() {
+        val api = FakeThirdPartiesApi().apply {
+            grants += grant(
+                "g-old",
+                "Ana Previa",
+                "FAMILY",
+                "2026-12-12",
+                "active",
+            )
+            grants += grant(
+                "g-new",
+                "Nombre sin declarar",
+                "FAMILY",
+                "2026-12-13",
+                "active",
+                firstName = "Pablo",
+                lastName = "Charles",
+            )
+        }
+        val viewModel = viewModel(api)
+        viewModel.load()
+
+        val byId = viewModel.state.value.items.associateBy { it.id }
+        assertEquals(
+            "Pablo Charles",
+            byId["g-new"]?.name,
+            "S9: la identidad declarada es el nombre de la persona.",
+        )
+        assertEquals(
+            "Ana Previa",
+            byId["g-old"]?.name,
+            "S6: sin identidad, displayName sigue mandando.",
+        )
     }
 
     // ── Revocación ──────────────────────────────────────────────────────
@@ -411,11 +584,19 @@ class ThirdPartiesViewModelTest {
         relationship: String,
         endDate: String,
         status: String,
+        firstName: String? = null,
+        lastName: String? = null,
+        phone: String? = null,
+        document: String? = null,
     ) = ThirdPartyAccess(
         id = id,
         bondId = bondId,
         userId = "user-$id",
         displayName = name,
+        firstName = firstName,
+        lastName = lastName,
+        phone = phone,
+        document = document,
         relationship = relationship,
         startDate = "2026-10-01",
         endDate = endDate,

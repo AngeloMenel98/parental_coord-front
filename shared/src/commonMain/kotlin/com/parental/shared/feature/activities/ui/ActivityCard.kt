@@ -2,18 +2,21 @@ package com.parental.shared.feature.activities.ui
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.CircularProgressIndicator
@@ -27,51 +30,71 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.parental.shared.core.ui.components.CategoryInfo
 import com.parental.shared.core.ui.components.TagDot
 import com.parental.shared.core.ui.components.categoryTagTriple
 import com.parental.shared.core.ui.components.isDoneStatus
+import com.parental.shared.core.ui.components.isOverdueStatus
 import com.parental.shared.core.ui.components.statusTagTriple
 import com.parental.shared.core.ui.theme.AgendaGeometry
 import com.parental.shared.core.ui.theme.ParentalShapes
 import com.parental.shared.core.ui.theme.ProgressStroke
 import com.parental.shared.core.ui.theme.Spacing
 import com.parental.shared.core.ui.theme.TypeTokens
+import com.parental.shared.feature.activities.domain.attributionLine
 import com.parental.shared.feature.activities.domain.model.resolveChildNames
 import com.parental.shared.feature.bonds.domain.model.VinculoChild
+import com.parental.shared.feature.thirdparty.ui.initialsOf
 import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 
 /*
- * Tarjeta de actividad — dirección de diseño 03 ("Tarjetas a la vista"), T2 de
- * `odd/tasks/activities-cards-ui.md` (S2, S4).
+ * Tarjeta de actividad — dirección de diseño 02 ("Personas al frente"), T1/T2 de
+ * `odd/tasks/activity-card-stack.md` (S1, S2). El CSS final del artboard es la verdad
+ * de las proporciones: persona asignataria en columna de avatar (40dp + rol), título +
+ * píldora de estado, hora y límite en UNA línea, atribución del creador, hijos en una
+ * línea de texto y categoría con dot en el pie.
  *
  * REEMPLAZA a la fila de la agenda (columna de fecha + riel + `ActivityBody`) en el modo
  * AGENDA. El modo SEMANA no se toca: sigue pintando con `AgendaTimelineRow`.
  *
  * ⚠ CERO COLORES NUEVOS. La tarjeta es una RECOMPOSICIÓN de piezas que ya existen:
  * `TagDot` (punto), `categoryTagTriple`/`statusTagTriple` (color de etiqueta),
- * `TypeTokens.time` (la hora monoespaciada), `ParentalShapes.medium` (radio 12). No se
- * declara ningún hex ni ningún token de tema — `Color.kt` sigue siendo su único dueño.
+ * `TypeTokens.time` (la hora monoespaciada), `ParentalShapes.medium` (radio 12),
+ * `secondaryContainer`/`onSecondaryContainer` (el avatar). No se declara ningún hex ni
+ * ningún token de tema — `Color.kt` sigue siendo su único dueño.
  *
  * ⚠ EL BOTÓN "CONFIRMAR" ES HERMANO DEL CUERPO, NO HIJO (regla `R2-T2-8`, que el
  * `sdd-verify` de `activity-swipe-actions` convirtió en ley). Anidarlo dentro del área
  * clickeable haría que un toque cerca del botón ABRIERA EL DETALLE en vez de confirmar.
  * Por eso el cuerpo clickeable (título + hora + límite) y la fila de pie (categoría +
  * botón) son DOS hermanos: un nodo de semántica y el otro.
+ *
+ * EL COLOR DE CATEGORÍA YA NO BORDEA LA TARJETA: el artboard lo vive en el PUNTO DEL
+ * RIEL a la izquierda (`.node`) y en el pie. El punto se dibuja aquí, dentro de esta
+ * card, con offset lateral negativo para caer sobre la línea del riel que la lista
+ * pinta como fondo del contenedor (ver `AgendaList.kt`); así no hay medición cruzada
+ * entre ítems. Los offsets los fija `agendaRailDotOffset`, pura y probada en
+ * `AgendaRailTest`.
  */
 
 /**
- * Tarjeta de una actividad, con su hueco de gesto.
+ * Tarjeta de una actividad, con su hueco de gesto y su punto del riel.
  *
  * @param swipe envuelve la TARJETA entera. NO TIENE VALOR POR DEFECTO: la omisión tiene
  *   que ser un error de compilación, no un fallo silencioso (misma regla que el hueco de
@@ -79,6 +102,9 @@ import kotlinx.datetime.toLocalDateTime
  * @param focusRequesters destino de foco por id — lo registra el `SideEffect`, igual que
  *   la fila de la agenda, para que el retorno de foco desde la hoja de detalle encuentre
  *   la tarjeta y no el contenedor de la lista.
+ * @param railDot dibuja el punto de categoría sobre el riel. La pila (`S3`) lo APAGA:
+ *   su franja se marca con el dot-contador que `AgendaList` dibuja, y dos marcas sobre
+ *   el riel serían una mentira visual.
  */
 @Composable
 internal fun ActivityCard(
@@ -94,6 +120,7 @@ internal fun ActivityCard(
     onSelectActividad: (String) -> Unit,
     onConfirm: (String) -> Unit,
     swipe: @Composable (content: @Composable () -> Unit) -> Unit,
+    railDot: Boolean = true,
 ) {
     // R4-T1-2 (mismo patrón que la fila): `SideEffect` + no-leer-en-composición ⇒
     // escribir el mapa no recompone a nadie.
@@ -121,7 +148,83 @@ internal fun ActivityCard(
                 onConfirm = { onConfirm(row.actividad.id) },
             )
         }
+        // ⚠ FUERA del hueco de gesto: el punto vive en el FONDO de la pantalla
+        // (surfaceVariant), no en la tarjeta que se desplaza al swipe; por eso es
+        // hermano del hueco y se dibuje después, sobre él.
+        if (railDot) {
+            RailDot(
+                info = info,
+                overdue = isOverdueRow(row),
+                modifier = Modifier
+                    .align(Alignment.CenterStart)
+                    .offset(x = agendaRailDotOffset(railLeading = 0.dp))
+                    .size(AgendaRailDotBox),
+            )
+        }
     }
+}
+
+// ── Punto del riel (artboard `.node`) y su geometría, probada en `AgendaRailTest` ──
+
+/** Núcleo del punto: 10dp de diámetro, como el `.node` del artboard. */
+internal val AgendaRailDotRadius: Dp = 5.dp
+
+/** Aureola del color de la card entre núcleo y fondo: `.node` lleva 2px de borde. */
+internal val AgendaRailDotHalo: Dp = 2.dp
+
+/** Radio del anillo punteado del vencimiento (`.ring-over` envuelve al `.node`). */
+internal val AgendaRailRingRadius: Dp = 11.dp
+
+/** Trazo del anillo punteado: 2dp, el grosor del `.ring-over` del artboard. */
+internal val AgendaRailRingWidth: Dp = 2.dp
+
+/** Punteo del anillo, en px: línea 6, hueco 6, dentro del `DrawScope`. */
+private val AgendaRailRingDash = PathEffect.dashPathEffect(floatArrayOf(6f, 6f))
+
+/** Caja del punto: todo lo que alcanza el dibujo, anillo incluido. */
+internal val AgendaRailDotBox: Dp = AgendaRailRingRadius * 2
+
+/**
+ * Offset lateral del punto respecto del borde izquierdo de la card para que su centro
+ * caiga sobre el centro de la línea del riel (geometría en `AgendaList.kt`);
+ * `railLeading` es el inset EXTRA que la pila le deja a los fantasmas (0 en una card
+ * normal, y la pila apaga su punto con `railDot = false`).
+ */
+internal fun agendaRailDotOffset(railLeading: Dp): Dp =
+    AgendaRailCenter - AgendaListStartPadding - railLeading - AgendaRailDotBox / 2
+
+/**
+ * ¿Está vencida? La derivación CANÓNICA es `isOverdueStatus` (`TagColors.kt`: el mapa
+ * de alias de `Color.kt`); esto era una segunda copia local de la comparación — la única
+ * que el propio `TagColors.kt` esperaba retirar. El anillo del riel y la meta roja leen
+ * ESTA función: dos lugares, UNA verdad.
+ */
+internal fun isOverdueRow(row: TimelineRow): Boolean =
+    isOverdueStatus(row.actividad.status)
+
+@Composable
+private fun RailDot(info: CategoryInfo?, overdue: Boolean, modifier: Modifier = Modifier) {
+    val color = categoryTagTriple(info)?.dot ?: MaterialTheme.colorScheme.outline
+    val haloColor = MaterialTheme.colorScheme.surface
+    val ringColor = MaterialTheme.colorScheme.error
+    Box(
+        modifier = modifier.drawBehind {
+                // Núcleo + aureola: el `.node` del artboard es un círculo de 10px con borde
+                // de 2px del color de la card, y así se diferencia del fondo sin tercer color.
+                drawCircle(color = haloColor, radius = (AgendaRailDotRadius + AgendaRailDotHalo).toPx())
+                drawCircle(color = color, radius = AgendaRailDotRadius.toPx())
+                if (overdue) {
+                    drawCircle(
+                        color = ringColor,
+                        radius = AgendaRailRingRadius.toPx(),
+                        style = Stroke(
+                            width = AgendaRailRingWidth.toPx(),
+                            pathEffect = AgendaRailRingDash,
+                        ),
+                    )
+                }
+            },
+    )
 }
 
 @Composable
@@ -138,8 +241,13 @@ private fun ActivityCardBody(
     onConfirm: () -> Unit,
 ) {
     val category = categoryTagTriple(info)
-    val railColor = category?.dot ?: MaterialTheme.colorScheme.outline
     val isDone = isDoneStatus(row.actividad.status)
+    val overdue = isOverdueRow(row)
+    // Asignatario con nombre RESUELTO: sin mapping (back viejo, id desconocido) la columna
+    // no existe — un avatar "?" por su cuenta diría una asignación que nadie puede leer.
+    // El rótulo combinado de la tarjeta sigue anunciando al asignatario (S7).
+    val assigneeName = row.actividad.assignedTo
+        ?.let { memberNames[it]?.takeIf { name -> name.isNotBlank() } }
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -147,24 +255,19 @@ private fun ActivityCardBody(
         color = MaterialTheme.colorScheme.surface,
         border = BorderStroke(Spacing.hairline, MaterialTheme.colorScheme.outlineVariant),
     ) {
+        // Columna de la persona (artboard `.who`) + cuerpo: dos columnas de un Row, como
+        // el `.card { grid-template-columns: 40px 1fr }` del artboard, y la persona fuera
+        // del cuerpo clickeable: es adorno del rótulo. El color de categoría ya no borde la
+        //  tarjeta — vive en el punto del riel y en el pie.
         Row(
-            // `IntrinsicSize.Min` + `fillMaxHeight()` en el riel: es el mismo patrón que
-            // usa la línea del timeline. Sin él, el riel mediría 0 en una `LazyColumn`
-            // (alto no acotado) y la tarjeta perdería su color de categoría.
             modifier = Modifier
                 .fillMaxWidth()
-                .height(IntrinsicSize.Min),
+                .padding(Spacing.md),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
         ) {
-            Box(
-                modifier = Modifier
-                    .width(Spacing.xs)
-                    .fillMaxHeight()
-                    .background(railColor),
-            )
+            assigneeName?.let { name -> AssigneeLead(name = name) }
             Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(Spacing.md),
+                modifier = Modifier.weight(1f),
             ) {
                 // ── Cuerpo clickeable: UN nodo de semántica ──────────────────────
                 Column(
@@ -193,27 +296,50 @@ private fun ActivityCardBody(
                         StatusPill(status = row.actividad.status)
                     }
 
-                    row.localStart?.let { localStart ->
+                    // ── Meta en UNA línea (artboard `.meta`): hora mono, separador
+                    // vertical hairline y límite comprimidos en la misma fila — antes
+                    // eran dos líneas apiladas.
+                    val hasTime = row.localStart != null
+                    val hasDeadline = row.deadline != null
+                    if (hasTime || hasDeadline) {
                         Spacer(modifier = Modifier.height(Spacing.xs))
-                        Text(
-                            text = formatTime(localStart.hour, localStart.minute),
-                            style = TypeTokens.time,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                    }
-                    row.deadline?.let { deadline ->
-                        Spacer(modifier = Modifier.height(Spacing.xs))
-                        DeadlineLabel(deadline = deadline, zone = zone, overdue = isOverdue(row))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                        ) {
+                            row.localStart?.let { localStart ->
+                                Text(
+                                    text = formatTime(localStart.hour, localStart.minute),
+                                    style = TypeTokens.time,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    fontWeight = FontWeight.SemiBold,
+                                )
+                            }
+                            if (hasTime && hasDeadline) {
+                                Box(
+                                    modifier = Modifier
+                                        .width(Spacing.hairline)
+                                        .height(Spacing.md)
+                                        .background(MaterialTheme.colorScheme.outlineVariant),
+                                )
+                            }
+                            row.deadline?.let { deadline ->
+                                DeadlineLabel(deadline = deadline, zone = zone, overdue = overdue)
+                            }
+                        }
                     }
 
-                    // S7/S8 · Asignatario e hijos DENTRO del cuerpo clickeable,
-                    // bajo la misma etiqueta de semántica fusionada.
-                    val assigneeName = row.actividad.assignedTo
-                        ?.let { memberNames[it]?.takeIf { name -> name.isNotBlank() } }
-                    if (assigneeName != null) {
+                    // S7/S8 · El asignatario vive en la COLUMNA DE LA PERSONA; dentro del
+                    // cuerpo clickeable, bajo la misma etiqueta de semántica fusionada,
+                    // quedan la atribución del creador terciario y los hijos.
+
+                    // S3/S5 (thirdparty-identity): atribución del creador terciario.
+                    // Una sola policy decide la línea; el servidor ya filtró el nombre.
+                    val attributionName = attributionLine(row.actividad.attribution)
+                    if (attributionName != null) {
                         Spacer(modifier = Modifier.height(Spacing.xs))
-                        AssigneeLine(name = assigneeName)
+                        AssigneeLine(name = attributionName)
                     }
 
                     val childNames = remember(row.actividad.childrenIds, children) {
@@ -231,6 +357,14 @@ private fun ActivityCardBody(
                 // estado ya dice cómo va la actividad, y un segundo aviso la contradice.
                 // Por eso aquí ya no se mira `assignedConfirmed` para nada.
                 if (canConfirm || info != null) {
+                    Spacer(modifier = Modifier.height(Spacing.xs))
+                    // Filete del pie (artboard `.foot { border-top ... }`).
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(Spacing.hairline)
+                            .background(MaterialTheme.colorScheme.outlineVariant),
+                    )
                     Spacer(modifier = Modifier.height(Spacing.sm))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         CategoryLabel(info = info, category = category)
@@ -245,6 +379,48 @@ private fun ActivityCardBody(
                 }
             }
         }
+    }
+}
+
+/** Columna de la persona asignataria: 40dp, como el `.who` del artboard. */
+private val LeadColumnWidth: Dp = 40.dp
+
+/** Avatar circular del asignatario: 40dp (S1, artboard `.avatar.assignee`). */
+private val LeadAvatarSize: Dp = 40.dp
+
+/**
+ * Columna de la persona asignataria (artboard `.who`): avatar circular de 40dp con las
+ * iniciales y el nombre en pequeño debajo. Las iniciales NO se re-derivan aquí:
+ * `initialsOf` ya existe en `feature/thirdparty/ui` ("MG para Marta Gómez") y es
+ * `internal` del módulo. El color es el par `secondaryContainer`/`onSecondaryContainer`
+ * del esquema — cero colores nuevos.
+ */
+@Composable
+private fun AssigneeLead(name: String) {
+    Column(modifier = Modifier.width(LeadColumnWidth)) {
+        Box(
+            modifier = Modifier
+                .size(LeadAvatarSize)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.secondaryContainer),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = initialsOf(name),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+            )
+        }
+        Spacer(modifier = Modifier.height(Spacing.xs))
+        Text(
+            text = name,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 
@@ -393,11 +569,3 @@ private fun ChildrenLine(names: List<String>) {
 
 /** Cuántos hijos se nombran en la tarjeta antes de resumir el resto como "+N". */
 private const val MAX_VISIBLE_CHILDREN = 2
-
-/**
- * ¿Está vencida? El estado llega en minúsculas del backend (`overdue`). No hay mapa de
- * alias aquí: es el MISMO valor que `statusSemanticLabel` traduce a "Vencida", y la
- * insignia de estado ya lo dice en palabras.
- */
-private fun isOverdue(row: TimelineRow): Boolean =
-    row.actividad.status.uppercase() == "OVERDUE"

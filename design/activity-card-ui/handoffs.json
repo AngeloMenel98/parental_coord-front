@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "chosen": "02-personas-al-frente.html",
+  "handoffs": {
+    "02-personas-al-frente.html": {
+      "status": "implemented",
+      "queued": false,
+      "sentAt": "2026-11-25T14:14:54.742Z",
+      "startedAt": "2026-11-25T14:15:06.503Z",
+      "implementedAt": "2026-11-25T15:45:32.589Z",
+      "feature": "odd/tasks/thirdparty-identity.md",
+      "note": "Conectada como ÚNICA vista (C1): la agenda de tarjetas reemplaza al lienzo del riel; salto del mapa por índice puro; guards actualizados. Suite 80/781, assembleDebug OK.",
+      "previewUrl": "http://127.0.0.1:33251/"
+    }
+  }
+}

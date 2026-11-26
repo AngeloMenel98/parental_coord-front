@@ -3,6 +3,8 @@ package com.parental.shared.feature.activities.ui.swipe
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -11,6 +13,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -428,33 +431,35 @@ private fun SwipeAction.contentColor(): Color = when (this) {
 
 @Composable
 private fun ActionButton(action: SwipeAction, onClick: () -> Unit) {
-    // 🔴 EL COLOR DISTINGUE LA ACCIÓN. Antes los tres botones eran `primary` lleno: el
-    // mismo aspecto para "No asistir", "Cancelar" y "Eliminar", con "Eliminar" —la
-    // única irreversible— painted like a neutral action. Se vio en el teléfono ("se
-    // siente mal el tipo de botones"). Ahora cada acción usa su propio papel del
-    // esquema: la destructiva en `error`, la reversible en `secondary` y la de la
-    // asistencia en `primary`. CERO colores nuevos: son papeles, no literales.
+    // 🔴 EL COLOR DISTINGUE LA ACCIÓN. Cada acción usa su propio papel del esquema: la
+    // destructiva en `error`, la reversible en `secondary` y la de asistencia en `primary`.
+    // CERO colores nuevos: son papeles, no literales.
+    //
+    // 🔴 FORMA (pedido del humano, 2026-11-25): "Usa los mismos botones para eliminar y
+    // cancelar q los de la vista de gastos": BLOQUE CUADRADO del ALTO de la tarjeta —
+    // like el `SwipeAction` de ExpenseSwipeBox: fondo plano full-height, sin esquinas
+    // redondas, sin separación horizontal (bloques continuos), y SÓLO EL ÍCONO con la
+    // etiqueta como nombre accesible.
     val container = action.containerColor()
     val content = action.contentColor()
-    Button(
-        onClick = onClick,
-        colors = ButtonDefaults.buttonColors(
-            containerColor = container,
-            contentColor = content,
-        ),
-        // 48dp de alto (R2 · `touchTarget`): tres botones en el 55% del ancho no caben
-        // más anchos, así que la separación va en el `padding` y no en el ancho del botón.
+    Box(
         modifier = Modifier
-            .heightIn(min = SwipeTouchTargetHeight)
+            .fillMaxHeight()
+            .background(container)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onClick,
+            )
             .padding(horizontal = 4.dp),
+        contentAlignment = Alignment.Center,
     ) {
         Icon(
             imageVector = action.icon(),
-            contentDescription = null,
+            contentDescription = action.label,
             modifier = Modifier.size(SwipeIconSize),
+            tint = content,
         )
-        Spacer(modifier = Modifier.width(Spacing.xs))
-        Text(action.label, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 

@@ -140,37 +140,45 @@ class ActivityRailScreenContractTest {
     }
 
     @Test
-    fun `la pantalla ya no monta la agenda, la semana ni la hoja de calendario`() {
-        listOf("AgendaTimeline(", "WeekTimeline(", "CalendarJumpSheet(").forEach { callee ->
+    fun `la pantalla monta la agenda de tarjetas como ÚNICA vista (C1 de activity-card-stack)`() {
+        // C1 · El humano pidió "Reemplaza lo que hay ahora con lo nuevo... que sea una única
+        // vista": la agenda persona-al-frente reemplaza al lienzo proporcional como ÚNICA
+        // superficie (refina la L6 de activity-rail). Sigue prohibido revivir DOS superficies
+        // de lista: la semana y la hoja de calendario modal.
+        listOf("WeekTimeline(", "CalendarJumpSheet(", "ActivityFiltersRow(", "ChildrenFiltersRow(").forEach { callee ->
             assertFalse(
                 callee in screen,
-                "🔴 `ActivitiesScreen.kt` vuelve a montar `$callee`. El riel es la única vista " +
-                    "(S3/L6) y el salto de día vive en el mapa de densidad y en el pill `Hoy`.",
+                "🔴 `ActivitiesScreen.kt` monta `$callee` desde el feed. La única vista es la " +
+                    "agenda de tarjetas (C1) y los dropdowns del panel (S4).",
             )
         }
+        assertTrue(
+            "AgendaTimeline(" in screen,
+            "🔴 La pantalla dejó de montar `AgendaTimeline`: la ÚNICA vista desapareció.",
+        )
     }
 
     // ── 2 · Las secciones se derivan de las piezas que ya existen ──────────────────────
 
     @Test
-    fun `la pantalla monta el riel con secciones derivadas por buildRailDay`() {
-        assertTrue("RailTimeline(" in screen, "🔴 La pantalla no monta `RailTimeline` (S3).")
+    fun `la pantalla monta la agenda con el agrupador existente y el índice puro de salto`() {
+        assertTrue("AgendaTimeline(" in screen, "🔴 La pantalla no monta `AgendaTimeline` (C1).")
         assertTrue(
             "buildAgendaGroups(" in screen,
             "🔴 La pantalla agrupa por su cuenta: el agrupador existente es el que respeta el " +
                 "orden de días y el grupo `Sin fecha de inicio` al final.",
         )
-        assertTrue(
+        assertFalse(
             "RailSection(" in screen,
-            "🔴 La pantalla no construye `RailSection`: el riel no tiene qué pintar.",
+            "🔴 La pantalla sigue construyendo secciones del lienzo: la única vista es la agenda.",
         )
         assertTrue(
-            "buildRailDay(" in screen,
-            "🔴 La pantalla no deriva el día con `buildRailDay`: el eje, los carriles y los " +
-                "ticks de T1 se perderían.",
+            "agendaHeaderIndex(" in screen,
+            "🔴 La pantalla no usa `agendaHeaderIndex` para el salto: el índice del encabezado " +
+                "del día tiene que salir de la pura que cuenta la MISMA forma de lista.",
         )
         assertTrue(
-            "undatedRows = " in screen,
+            "group.rows" in screen,
             "🔴 La sección `Sin fecha de inicio` se queda sin filas: el grupo sin fecha tiene " +
                 "que llegar al riel o esas actividades desaparecen de la pantalla.",
         )
@@ -406,8 +414,8 @@ class ActivityRailScreenContractTest {
 
     @Test
     fun `los filtros, la barra y el snackbar siguen montados como antes`() {
-        assertTrue("ActivityFiltersRow(" in screen, "🔴 Se perdió la fila de filtros de pestaña.")
-        assertTrue("ChildrenFiltersRow(" in screen, "🔴 Se perdió la fila de filtros de hijos.")
+        assertTrue("ActivityTypeDropdown(" in screen, "🔴 Se perdió el dropdown de tipo (S4 activity-card-stack).")
+        assertTrue("ChildrenDropdown(" in screen, "🔴 Se perdió el dropdown de hijos (S4 activity-card-stack).")
         assertTrue(
             "onOpenNotifications = onOpenNotifications" in screen,
             "🔴 La campana dejó de recibir su callback: se perdió el wiring de notificaciones.",
@@ -473,15 +481,15 @@ class ActivityRailScreenContractTest {
         val panel = callBody(screen, "MonthDensityMap")
 
         assertTrue(
-            "ActivityFiltersRow(" in panel,
+            "ActivityTypeDropdown(" in panel,
             "🔴 La fila de tipos (Eventos / Obligaciones) no está DENTRO de la llamada al panel " +
                 "(S14): sigue en una fila aparte debajo del calendario.",
         )
         assertTrue(
-            "ChildrenFiltersRow(" in panel,
+            "ChildrenDropdown(" in panel,
             "🔴 La fila de hijos no está DENTRO de la llamada al panel (S14).",
         )
-        listOf("ActivityFiltersRow", "ChildrenFiltersRow").forEach { row ->
+        listOf("ActivityTypeDropdown", "ChildrenDropdown").forEach { row ->
             assertEquals(
                 1,
                 Regex("$row\\s*\\(").findAll(screen).count(),
@@ -540,27 +548,20 @@ class ActivityRailScreenContractTest {
     // ── 10 · T10 (S12) · «Hoy» sin nada hoy avisa, no salta en silencio ───────────────
 
     @Test
-    fun `hoy sin actividades deja un aviso en el riel en vez de saltar en silencio`() {
-        val rail = stripComments(source("RailTimeline.kt"))
+    fun `hoy sin actividades deja un aviso en la única vista en vez de saltar en silencio`() {
+        // C1 · El aviso ahora vive en la agenda (el lienzo se retiró): EmptyState nombra el
+        // día elegido y ofrece el MISMO alta (S12 + S7).
+        val screenCode = stripComments(source("ActivitiesScreen.kt"))
         assertTrue(
-            "RailTodayEmptyNotice(" in rail,
-            "🔴 El riel no monta el aviso de «hoy sin actividades» (S12).",
-        )
-        val notice = functionBody(rail, "private fun RailTodayEmptyNotice(")
-        assertTrue(
-            "liveRegion = LiveRegionMode.Polite" in notice,
-            "🔴 El aviso no se anuncia a tecnología asistiva: aparece y TalkBack no dice nada.",
+            "No hay actividades el " in screenCode,
+            "🔴 El vacío no nombra la fecha elegida (activity-card-stack S5).",
         )
         assertTrue(
-            "RAIL_TODAY_EMPTY_TITLE" in notice && "\"Hoy no tiene actividades\"" in rail,
-            "🔴 El aviso perdió su copy: S12 pide decir que hoy no hay actividades.",
-        )
-        assertTrue(
-            "onCreate" in notice,
+            "onOpenCreate" in screenCode.substringAfter("No hay actividades"),
             "🔴 El aviso no ofrece el alta: informa y deja al usuario sin salida (S12 + S7).",
         )
 
-        val jump = screen.substringAfter("val goToToday").substringBefore("val shiftMonth")
+        val jump = screen.substringAfter("val goToToday")
         assertTrue(
             "todayEmptyNotice = " in jump,
             "🔴 El toque de `Hoy` sigue saltando en silencio: el control no decide nada cuando el " +
@@ -576,11 +577,11 @@ class ActivityRailScreenContractTest {
             "🔴 El aviso no se reemplaza al elegir otro día en el mapa: quedaría pegado al riel.",
         )
         assertTrue(
-            "todayEmptyNotice = showTodayEmptyNotice" in screen,
-            "🔴 El riel no recibe el aviso: la pantalla lo decidiría y nadie lo pintaría (S12).",
+            "EmptyState(" in screen,
+            "🔴 La única vista no muestra el aviso: sin EmptyState montado el vacío sería silencio.",
         )
         assertTrue(
-            "onCreateFromEmptyToday = onOpenCreate" in screen,
+            "onAction = onOpenCreate" in screen,
             "🔴 La acción del aviso no es el MISMO alta que el FAB (S7: un solo camino de alta).",
         )
     }
@@ -588,15 +589,17 @@ class ActivityRailScreenContractTest {
     // ── 11 · T10 (S15) · el anclaje inicial es una regla pura ─────────────────────────
 
     @Test
-    fun `el anclaje inicial del riel sale de una funcion pura`() {
+    fun `el salto de día vive en una funcion pura de índice`() {
+        // S15 reescrita por C1: el lienzo anclado por píxel se retiró con el lienzo; el ancho
+        // de la ley ahora es el índice PURO del salto (agendaItemIndexOf), no condiciones inline.
         assertTrue(
-            "railInitialAnchor(" in screen,
-            "🔴 La pantalla no usa `railInitialAnchor`: el anclaje volvió a ser una condición " +
-                "inline en composición, que no se puede probar (S15).",
+            "agendaHeaderIndex(" in screen,
+            "🔴 La pantalla no usa `agendaItemIndexOf`: el índice volvió a contarse inline, " +
+                "que no se puede probar.",
         )
         assertFalse(
-            "startMinute <= nowMinute" in screen,
-            "🔴 La pantalla decide «en curso» por su cuenta: la regla vive en `railInitialAnchor`.",
+            "railInitialAnchor(" in screen,
+            "🔴 La pantalla sigue derivando el ancla del lienzo que ya no monta.",
         )
         // El anclaje tiene que ser la posición de CREACIÓN del `LazyListState`: un `scrollToItem`
         // desde un efecto llega un frame tarde y se ve el salto (el defecto que encontró el

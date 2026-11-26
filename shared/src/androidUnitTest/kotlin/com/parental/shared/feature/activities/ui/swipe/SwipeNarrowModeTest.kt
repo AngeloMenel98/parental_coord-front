@@ -418,23 +418,21 @@ class SwipeNarrowModeTest {
     }
 
     @Test
-    fun `el estado de iconos usa la etiqueta como nombre accesible del icono`() {
+    fun `el botón cuadrado usa la etiqueta como nombre accesible del ícono`() {
+        // Pedido del humano (2026-11-25): los botones de la barra son BLOQUES CUADRADOS del
+        // alto de la tarjeta, estilo gastos, SÓLO ÍCONO — la etiqueta vive como
+        // contentDescription (el nombre accesible no se borra con el texto).
         val code = codeOf(source("swipe/ActivitySwipeBox.kt"))
         assertTrue(
             "contentDescription = action.label" in code,
-            "🔴 El ícono del estado de íconos no lleva `contentDescription = action.label`: sería un " +
+            "🔴 El ícono no lleva `contentDescription = action.label`: sería un " +
                 "ícono sin nombre para TalkBack.",
         )
-        // El estado con etiqueta conserva el suyo: el TEXTO es el nombre y el ícono es decorativo.
-        assertTrue(
-            "Text(action.label" in code,
-            "🔴 El estado con etiqueta perdió el texto de la acción: es su nombre accesible ahí.",
-        )
         assertEquals(
-            1,
+            0,
             Regex("contentDescription = null").findAll(code).count(),
-            "Hay más de un ícono con `contentDescription = null`: sólo el del estado CON ETIQUETA es " +
-                "decorativo, porque su nombre lo pone el texto del botón.",
+            "Hay íconos con `contentDescription = null`: en bloques de sólo-ícono TODOS llevan el " +
+                "nombre de la acción.",
         )
         // Y ninguno se queda sin el argumento, en ninguno de los dos botones.
         callArguments(code, "Icon").forEach { args ->

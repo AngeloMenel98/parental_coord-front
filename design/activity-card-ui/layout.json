@@ -1,0 +1,21 @@
+{
+  "arrangement": "free",
+  "positions": {
+    "system": {
+      "x": 0,
+      "y": 6
+    },
+    "01-ficha-alineada.html": {
+      "x": 1520,
+      "y": 6
+    },
+    "02-personas-al-frente.html": {
+      "x": 1991,
+      "y": 0
+    },
+    "03-riel-de-urgencia.html": {
+      "x": 2578,
+      "y": 49
+    }
+  }
+}

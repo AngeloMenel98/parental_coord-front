@@ -1,0 +1,10 @@
+{
+  "title": "Tarjeta de actividad — redistribución de datos",
+  "brief": "Rediseñar la card de la agenda de actividades mostrando TODOS los datos que hoy expone la vista: título, estado, hora, límite (vencido o no), asignatario, hijos, creador (miembro o tercero con atribución server-side: autorizante ve nombre real, demás ven 'Autorizado por X') y categoría. Alcance: Android/iOS vía Compose, 390dp.",
+  "feature": "odd/tasks/thirdparty-identity.md",
+  "artboards": [
+    { "file": "01-ficha-alineada.html", "title": "Ficha alineada", "tradeoff": "Completa y escaneable con filas etiqueta-valor y avatares; la tarjeta crece verticalmente con cada dato", "width": 390, "height": 844 },
+    { "file": "02-personas-al-frente.html", "title": "Personas al frente", "tradeoff": "La persona (asignatario o creador) conduce la tarjeta y separa 'tu autorizado' de 'autorizado por'; hora/límite comprimidos en una línea", "width": 390, "height": 844 },
+    { "file": "03-riel-de-urgencia.html", "title": "Riel de urgencia", "tradeoff": "La hora y el estado capitaneados por un riel continuo dan ritmo de agenda; órden de datos por urgencia; riel duplica señal del pill", "width": 390, "height": 844 }
+  ]
+}

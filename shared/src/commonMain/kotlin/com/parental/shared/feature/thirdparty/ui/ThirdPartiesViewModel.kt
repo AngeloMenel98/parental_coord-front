@@ -60,6 +60,11 @@ enum class ThirdPartyDuration(val label: String) {
 data class ThirdPartyWizardState(
     val step: ThirdPartyWizardStep = ThirdPartyWizardStep.QUIEN,
     val email: String = "",
+    /** S1 (thirdparty-identity): nombre y apellido obligatorios; tel y doc opcionales. */
+    val firstName: String = "",
+    val lastName: String = "",
+    val phone: String = "",
+    val document: String = "",
     /** `family|caregiver|medical|educational`, o `null` si todavía no eligió. */
     val relationship: String? = null,
     val duration: ThirdPartyDuration = ThirdPartyDuration.THREE_MONTHS,
@@ -78,6 +83,11 @@ data class ThirdPartyWizardState(
 data class ThirdPartyEditState(
     val id: String,
     val name: String,
+    /** S9 (thirdparty-identity): identidad precargada; `null` = el grant no la tiene. */
+    val firstName: String? = null,
+    val lastName: String? = null,
+    val phone: String? = null,
+    val document: String? = null,
     val relationship: String? = null,
     /** `YYYY-MM-DD`, inicializado con el vencimiento actual. */
     val accessEnd: String = "",
@@ -99,6 +109,11 @@ data class ThirdPartyAccessUi(
     val userId: String,
     val name: String,
     val initials: String,
+    /** S9: identidad declarada, para precargar la edición; `null` en grants previos. */
+    val firstName: String? = null,
+    val lastName: String? = null,
+    val phone: String? = null,
+    val document: String? = null,
     /** `family|caregiver|medical|educational`, tal cual lo manda el servidor. */
     val relationship: String?,
     /** La relación en palabras, para la tarjeta ("Familiar"). */
@@ -175,6 +190,8 @@ internal val THIRD_PARTY_CAPABILITIES: List<ThirdPartyCapability> = listOf(
 
 // Validación del formulario. Son constantes para que el test afirme el texto exacto que
 // ve la persona y para que el mensaje del servidor no se confunda con uno propio.
+internal const val THIRD_PARTY_FIRST_NAME_MISSING = "Escribí el nombre de la persona."
+internal const val THIRD_PARTY_LAST_NAME_MISSING = "Escribí el apellido de la persona."
 internal const val THIRD_PARTY_EMAIL_MISSING = "Escribí el email de la persona."
 internal const val THIRD_PARTY_EMAIL_INVALID = "Ese email no parece válido."
 internal const val THIRD_PARTY_RELATIONSHIP_MISSING = "Elegí la relación con la persona."
@@ -248,6 +265,26 @@ class ThirdPartiesViewModel(
         _state.value = _state.value.copy(wizard = wizard.copy(relationship = value, error = null))
     }
 
+    fun setFirstName(value: String) {
+        val wizard = _state.value.wizard ?: return
+        _state.value = _state.value.copy(wizard = wizard.copy(firstName = value, error = null))
+    }
+
+    fun setLastName(value: String) {
+        val wizard = _state.value.wizard ?: return
+        _state.value = _state.value.copy(wizard = wizard.copy(lastName = value, error = null))
+    }
+
+    fun setPhone(value: String) {
+        val wizard = _state.value.wizard ?: return
+        _state.value = _state.value.copy(wizard = wizard.copy(phone = value, error = null))
+    }
+
+    fun setDocument(value: String) {
+        val wizard = _state.value.wizard ?: return
+        _state.value = _state.value.copy(wizard = wizard.copy(document = value, error = null))
+    }
+
     /** Un preset recalcula la fecha; "elegir fecha" deja el campo vacío para escribir. */
     fun setDuration(duration: ThirdPartyDuration) {
         val wizard = _state.value.wizard ?: return
@@ -283,7 +320,11 @@ class ThirdPartiesViewModel(
     fun next() {
         val wizard = _state.value.wizard ?: return
         val email = wizard.email.trim()
+        val firstName = wizard.firstName.trim()
+        val lastName = wizard.lastName.trim()
         val error = when {
+            firstName.length < 2 -> THIRD_PARTY_FIRST_NAME_MISSING
+            lastName.length < 2 -> THIRD_PARTY_LAST_NAME_MISSING
             email.isEmpty() -> THIRD_PARTY_EMAIL_MISSING
             !looksLikeEmail(email) -> THIRD_PARTY_EMAIL_INVALID
             wizard.relationship == null -> THIRD_PARTY_RELATIONSHIP_MISSING
@@ -292,6 +333,8 @@ class ThirdPartiesViewModel(
         _state.value = _state.value.copy(
             wizard = wizard.copy(
                 email = email,
+                firstName = firstName,
+                lastName = lastName,
                 step = if (error == null) ThirdPartyWizardStep.HASTA_CUANDO else wizard.step,
                 error = error,
             ),
@@ -337,6 +380,10 @@ class ThirdPartiesViewModel(
 
         val request = CreateThirdPartyAccessRequest(
             email = wizard.email.trim(),
+            firstName = wizard.firstName.trim(),
+            lastName = wizard.lastName.trim(),
+            phone = wizard.phone.trim().takeIf { it.isNotEmpty() },
+            document = wizard.document.trim().takeIf { it.isNotEmpty() },
             relationship = relationship.orEmpty(),
             accessEnd = wizard.accessEnd.trim(),
             note = wizard.note.trim().takeIf { it.isNotEmpty() },
@@ -376,6 +423,10 @@ class ThirdPartiesViewModel(
             edit = ThirdPartyEditState(
                 id = item.id,
                 name = item.name,
+                firstName = item.firstName,
+                lastName = item.lastName,
+                phone = item.phone,
+                document = item.document,
                 relationship = item.relationship,
                 accessEnd = item.endDateIso,
                 note = item.note.orEmpty(),
@@ -397,6 +448,27 @@ class ThirdPartiesViewModel(
     fun setEditNote(value: String) {
         val edit = _state.value.edit ?: return
         _state.value = _state.value.copy(edit = edit.copy(note = value, error = null))
+    }
+
+    /** Edita la identidad declarada; escribir habilita mandar el campo (S9). */
+    fun setEditFirstName(value: String) {
+        val edit = _state.value.edit ?: return
+        _state.value = _state.value.copy(edit = edit.copy(firstName = value, error = null))
+    }
+
+    fun setEditLastName(value: String) {
+        val edit = _state.value.edit ?: return
+        _state.value = _state.value.copy(edit = edit.copy(lastName = value, error = null))
+    }
+
+    fun setEditPhone(value: String) {
+        val edit = _state.value.edit ?: return
+        _state.value = _state.value.copy(edit = edit.copy(phone = value, error = null))
+    }
+
+    fun setEditDocument(value: String) {
+        val edit = _state.value.edit ?: return
+        _state.value = _state.value.copy(edit = edit.copy(document = value, error = null))
     }
 
     fun closeEdit() {
@@ -426,6 +498,12 @@ class ThirdPartiesViewModel(
             relationship = edit.relationship,
             accessEnd = edit.accessEnd.trim(),
             note = edit.note.trim(),
+            // S9: el nombre exige 2..80 en el back, así que un campo en blanco no viaja
+            // (no hay forma de "borrar" el nombre); tel/doc viajan siempre — "" limpia.
+            firstName = edit.firstName?.trim()?.takeIf { it.length >= 2 },
+            lastName = edit.lastName?.trim()?.takeIf { it.length >= 2 },
+            phone = edit.phone?.trim().orEmpty(),
+            document = edit.document?.trim().orEmpty(),
         )
         _state.value = _state.value.copy(edit = edit.copy(error = null), isSaving = true)
 
@@ -586,7 +664,14 @@ private val EMAIL_SHAPE = Regex("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$")
  * "cuánto queda" no puede calcularse distinto según quién mire.
  */
 internal fun ThirdPartyAccess.toAccessUi(today: LocalDate): ThirdPartyAccessUi {
-    val name = displayName?.trim()?.takeIf { it.isNotEmpty() } ?: "Sin nombre"
+    // S9: la identidad DECLARADA en el alta es el nombre de la persona; displayName del
+    // perfil queda como fallback (grants previos sin identidad, S6).
+    val declaredName = firstName?.trim()?.takeIf { it.isNotEmpty() }?.let { first ->
+        listOfNotNull(first, lastName?.trim()?.takeIf { it.isNotEmpty() }).joinToString(" ")
+    }
+    val name = declaredName
+        ?: displayName?.trim()?.takeIf { it.isNotEmpty() }
+        ?: "Sin nombre"
     val end = endDate?.trim()?.takeIf { it.isNotEmpty() }?.let(::parseCalendarDate)
     val start = startDate?.trim()?.takeIf { it.isNotEmpty() }?.let(::parseCalendarDate)
     val status = status?.trim()?.lowercase().orEmpty()
@@ -597,6 +682,10 @@ internal fun ThirdPartyAccess.toAccessUi(today: LocalDate): ThirdPartyAccessUi {
         userId = userId,
         name = name,
         initials = initialsOf(name),
+        firstName = firstName,
+        lastName = lastName,
+        phone = phone,
+        document = document,
         relationship = relationship,
         relationshipLabel = relationshipLabel(relationship),
         note = note?.trim()?.takeIf { it.isNotEmpty() },

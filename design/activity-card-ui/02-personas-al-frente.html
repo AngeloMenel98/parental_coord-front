@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Actividades · Tarjeta — Personas al frente</title>
+<style>
+  :root {
+    --primary: #00696D; --on-primary: #FFFFFF;
+    --primary-container: #9CF1F6; --on-primary-container: #002022;
+    --secondary-container: #CCE8EA; --on-secondary-container: #051F21;
+    --surface: #FAFDFC; --on-surface: #191C1D;
+    --surface-variant: #DAE4E5; --on-surface-variant: #3F4849;
+    --outline: #6F797A; --outline-variant: #BEC8C9;
+    --error: #BA1A1A;
+    --serif: Georgia, 'Times New Roman', serif;
+    --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    --mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: var(--sans); background: #E4ECEC; min-height: 100vh; padding: 24px 0; }
+  .stage { display: flex; flex-direction: column; align-items: center; gap: 16px; padding: 0 24px; }
+  .frame-note { font-size: 12px; color: #3F4849; max-width: 400px; line-height: 1.5; }
+  .phone { width: 390px; min-height: 844px; background: var(--surface-variant); color: var(--on-surface); display: flex; flex-direction: column; border-radius: 24px; overflow: hidden; box-shadow: 0 8px 32px rgba(0,32,34,.18); position: relative; }
+  :focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 4px; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+
+  .topbar { background: var(--surface); display: flex; align-items: center; height: 56px; padding: 0 8px 0 16px; flex: none; border-bottom: 1px solid var(--outline-variant); }
+  .topbar h1 { font-family: var(--serif); font-size: 22px; font-weight: 400; flex: 1; }
+  .icon-btn { width: 44px; height: 44px; border: 0; background: transparent; border-radius: 50%; display: grid; place-items: center; color: var(--on-surface-variant); position: relative; cursor: pointer; }
+  .icon-btn.active { color: var(--primary); background: rgba(0,105,109,.08); }
+
+  /* ── Mapa de densidad: el calendario real de la app ── */
+  .density { background: var(--surface); border-bottom: 1px solid var(--outline-variant); padding: 8px 16px 10px; flex: none; }
+  .dhead { display: flex; align-items: center; gap: 6px; }
+  .dhead h2 { font-family: var(--serif); font-size: 20px; font-weight: 400; flex: 1; }
+  .arrow { width: 36px; height: 36px; border: 0; background: none; border-radius: 50%; color: var(--on-surface-variant); font-size: 18px; cursor: pointer; }
+  .sub { font-size: 11px; font-variant: small-caps; letter-spacing: .5px; color: var(--on-surface-variant); margin-right: 2px; }
+  .toggle { width: 36px; height: 36px; border: 0; border-radius: 50%; background: var(--surface-variant); color: var(--primary); font-size: 13px; cursor: pointer; }
+  .ws { display: grid; grid-template-columns: repeat(7,1fr); margin-top: 6px; }
+  .ws span { text-align: center; font-size: 9.5px; font-weight: 800; letter-spacing: .09em; color: var(--on-surface-variant); }
+  .heat { display: grid; grid-template-columns: repeat(7,1fr); gap: 3px; margin-top: 3px; }
+  .hcell { position: relative; height: 34px; border: 0; border-radius: 8px; display: grid; place-items: center; font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--on-surface); cursor: pointer; background: rgba(25,28,29,.04); }
+  .hcell.lvl1 { background: rgba(0,105,109,.14); }
+  .hcell.lvl2 { background: rgba(0,105,109,.26); }
+  .hcell.lvl3 { background: rgba(0,105,109,.40); }
+  .hcell.lvl4 { background: rgba(0,105,109,.54); }
+  .hcell.sel { box-shadow: inset 0 0 0 2px var(--primary); }
+  .hcell.today::after { content: ""; position: absolute; top: 4px; right: 4px; width: 5px; height: 5px; border-radius: 50%; background: var(--primary); box-shadow: 0 0 0 1.5px var(--surface); }
+  .hcell .alert { position: absolute; bottom: 3px; left: 50%; transform: translateX(-50%); width: 5px; height: 5px; border-radius: 50%; background: var(--error); }
+  .legend { display: flex; align-items: center; gap: 5px; margin-top: 7px; font-size: 10px; color: var(--on-surface-variant); }
+  .legend i { width: 12px; height: 8px; border-radius: 3px; display: inline-block; }
+  .lg-alert { background: var(--error); width: 6px !important; height: 6px !important; border-radius: 50% !important; }
+  .inner-filters { display: flex; flex-direction: row; flex-wrap: nowrap; gap: 8px; align-items: center; margin-top: 9px; }
+  .dd { position: relative; }
+  /* El chip cerrado del dropdown: píldora tonal — al lado del otro en la misma fila */
+  .fchip.dd-trigger { height: 34px; padding: 3px 8px 3px 6px; border: 0; border-radius: 17px; background: var(--secondary-container); color: var(--on-secondary-container); font-size: 13px; font-weight: 600; }
+  .fchip.dd-trigger .lead { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: rgba(5,31,33,.10); font-variant: small-caps; font-size: 11px; letter-spacing: .3px; margin-right: 4px; vertical-align: middle; }
+  .fchip.dd-trigger[aria-expanded="true"] { box-shadow: inset 0 0 0 2px var(--primary); }
+  .fchip.dd-trigger .caret { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: rgba(5,31,33,.10); font-size: 9px; margin-left: 2px; }
+  .fchip.dd-trigger .cnt { display: inline-grid; place-items: center; min-width: 18px; height: 18px; border-radius: 9px; background: var(--primary); color: var(--on-primary); font-size: 10px; font-weight: 700; padding: 0 5px; margin-left: 2px; }
+  .menu { position: absolute; top: 34px; left: 0; z-index: 8; min-width: 176px; background: var(--surface); border: 1px solid var(--outline-variant); border-radius: 12px; box-shadow: 0 8px 24px rgba(0,32,34,.16); padding: 4px; }
+  .opt { display: flex; align-items: center; gap: 10px; width: 100%; border: 0; background: none; text-align: left; font-size: 13px; color: var(--on-surface); min-height: 40px; padding: 0 10px; border-radius: 8px; cursor: pointer; }
+  .opt:hover { background: rgba(0,105,109,.06); }
+  /* El check: caja 18px con tick, relleno teal si activo (contraste AA sobre el fondo) */
+  .boxw { flex: none; width: 18px; height: 18px; border-radius: 5px; border: 1.6px solid var(--outline); display: grid; place-items: center; background: var(--surface); color: transparent; font-weight: 800; font-size: 12px; line-height: 1; }
+  .opt[aria-checked="true"] .boxw { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
+  .opt .name { font-weight: 500; }
+  .dd.open .menu { display: block; }
+  .day-head { display: flex; align-items: baseline; gap: 8px; padding: 12px 16px 4px; flex: none; }
+  .day-head .d { font-size: 11px; font-variant: small-caps; letter-spacing: .6px; color: var(--on-surface-variant); font-weight: 500; text-transform: uppercase; }
+  .day-head .rel { color: var(--primary); font-size: 11px; font-weight: 600; }
+  .day-head .sum { margin-left: auto; font-size: 11px; color: var(--on-surface-variant); font-variant: small-caps; letter-spacing: .4px; }
+  .day-head .sum .late { color: #C62828; }
+
+  .feed { flex: 1; overflow-y: auto; padding: 4px 16px 88px; }
+  .empty { margin: 24px 4px; font-size: 14px; color: var(--on-surface-variant); text-align: center; }
+
+  /* ── Tarjeta: la persona conduce ── */
+  /* Rail timeline a la izquierda de la lista: punto centrado en cada actividad (7rag67k2) */
+  /* Stack EN LA LISTA (comentario 9csr9knx): la card con solapamiento muestra los
+     fantasmas por detrás; tocarla expande todas las actividades a ancho completo. */
+  /* Stack en la lista: la card de arriba es una card COMUN (la primera actividad);
+     detras asoman 2 fantasmas + badge. Tocarla despliega las actividades tapadas. */
+  .card.stack .ghostwrap { position: absolute; left: 0; bottom: 0; right: 0; height: 100%; z-index: 0; pointer-events: none; }
+  /* Fantasmas estilo iOS: 2 capas que asoman SÓLO 6-8px por abajo-izquierda,
+     SIN colgarse fuera de la altura de la card (no chocan con la card siguiente). */
+  .card.stack .ghostwrap i { position: absolute; left: 8px; right: 8px; bottom: 4px; height: 100%; border-radius: 14px; border: 1px solid var(--outline-variant); background: rgba(0,105,109,.16); }
+  .card.stack .ghostwrap i.b { left: 16px; right: 0; bottom: 0; background: rgba(0,105,109,.08); }
+  .card.stack > .card-inner { position: relative; z-index: 2; background: var(--surface); border-radius: 14px; border: 1px solid var(--outline-variant); display: grid; grid-template-columns: 40px 1fr; column-gap: 8px; padding: 10px; box-shadow: 0 1px 4px rgba(0,32,34,.08); }
+  /* El stack NO se desplaza: sólo los fantasmas detrás quedan levemente más chicos */
+  .card.stack { padding: 0; margin-left: 0; margin-bottom: 14px; }
+  /* El contador del stack vive EN EL RIEL: el punto se vuelve un dot-alargado
+     con el número, color de la categoría de la primera actividad apilada. */
+  .card.stack .zcount { position: absolute; top: 50%; left: -22px; transform: translateY(-50%); z-index: 3; width: auto; min-width: 20px; height: 18px; border-radius: 10px; background: #8E24AA; color: var(--on-primary); border: 2px solid var(--surface); box-sizing: content-box; display: grid; place-items: center; font-size: 10px; font-weight: 800; padding: 0 3px; }
+  .card.stack > .node { z-index: 3; }
+  .card.stack.expanded .ghostwrap, .card.stack.expanded .zcount { display: none; }
+  .card.stack.expanded { padding-bottom: 0; }
+  .card.stack .stack-more { display: none; }
+  .card.stack.expanded .stack-more { display: block; margin-top: 8px; position: relative; z-index: 2; }
+  .feed-inner { position: relative; padding-left: 18px; }
+  .feed-inner::before { content: ""; position: absolute; left: 8px; top: 14px; bottom: 14px; width: 2px; margin-left: -1px; background: var(--outline-variant); }
+  .card { position: relative; background: var(--surface); border-radius: 14px; border: 1px solid var(--outline-variant); margin-bottom: 8px; display: grid; grid-template-columns: 40px 1fr; column-gap: 8px; padding: 10px; cursor: pointer; }
+  .card .node { position: absolute; left: -14px; top: 50%; transform: translateY(-50%); width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--surface); box-sizing: content-box; z-index: 1; }
+  .card .node.pulse { box-shadow: 0 0 0 3px rgba(0,105,109,.14); }
+  .card .node .ring-over { position: absolute; inset: -5px; border-radius: 50%; border: 2px dashed var(--error); }
+  /* Cluster: >1 actividad en el mismo horario → el punto se vuelve tag clickeable
+     que abre un zoom de esa franja horaria (comentario 1qgoaykv). */
+            .zoom-gutter { display: flex; flex-direction: column; align-items: flex-end; gap: 18px; font-family: var(--mono); font-size: 11px; color: var(--on-surface-variant); padding-top: 12px; }
+  .zoom-cards { display: flex; flex-direction: column; gap: 8px; }
+  .card .node .badge-n { position: absolute; top: -8px; right: -14px; background: var(--surface); border: 1px solid var(--outline-variant); color: var(--on-surface-variant); border-radius: 999px; padding: 0 5px; font-size: 9px; font-weight: 700; line-height: 14px; }
+
+
+  .card:hover { box-shadow: 0 2px 8px rgba(0,32,34,.1); }
+  .who { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+  .avatar { width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 600; }
+  .avatar.assignee { background: var(--secondary-container); color: var(--on-secondary-container); }
+  .role { font-size: 8px; font-variant: small-caps; letter-spacing: .3px; color: var(--on-surface-variant); text-align: center; line-height: 1.2; max-width: 48px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .body { min-width: 0; }
+  .head { display: flex; align-items: flex-start; gap: 8px; }
+  .head h3 { font-size: 14px; font-weight: 500; line-height: 20px; flex: 1; }
+  .status-pill { flex: none; display: inline-flex; align-items: center; gap: 6px; border-radius: 12px; padding: 3px 8px; font-size: 11px; font-weight: 500; }
+  .status-pill i { width: 6px; height: 6px; border-radius: 50%; }
+  .meta { display: flex; align-items: center; gap: 8px; margin-top: 4px; font-size: 12px; color: var(--on-surface-variant); flex-wrap: wrap; }
+  .meta .time { font-family: var(--mono); font-weight: 500; font-size: 12px; }
+  .meta .vsep { width: 1px; height: 12px; background: var(--outline-variant); }
+  .meta .late { color: #C62828; font-weight: 500; font-size: 11px; }
+  .creator { margin-top: 5px; font-size: 11px; color: var(--on-surface-variant); }
+  .creator .mask { border: 1px solid var(--outline-variant); border-radius: 999px; padding: 1px 8px; font-size: 10px; font-variant: small-caps; }
+  .kids { margin-top: 5px; display: flex; gap: 6px; flex-wrap: wrap; }
+  .kid { font-size: 10px; color: var(--on-surface); background: var(--surface-variant); border-radius: 999px; padding: 2px 8px; }
+  .foot { display: flex; align-items: center; gap: 8px; margin-top: 8px; padding-top: 6px; border-top: 1px solid var(--outline-variant); }
+  .cat-label { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 500; }
+  .cat-label i { width: 8px; height: 8px; border-radius: 50%; }
+  .btn-confirm { margin-left: auto; border: 1px solid var(--primary); background: transparent; color: var(--primary); font-size: 12px; font-weight: 500; border-radius: 12px; min-height: 32px; padding: 0 12px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; }
+
+  /* FABs y nav: como la app hoy */
+  .fab { position: absolute; bottom: 84px; min-width: 56px; height: 44px; border-radius: 22px; border: 1px solid var(--outline-variant); background: var(--surface); color: var(--primary); font-size: 13px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; padding: 0 16px; box-shadow: 0 2px 8px rgba(0,32,34,.16); z-index: 4; cursor: pointer; }
+  .fab.left { left: 16px; }
+  .fab.right { right: 16px; width: 56px; justify-content: center; font-size: 22px; padding: 0; background: var(--primary); color: var(--on-primary); border: 0; }
+  .navbar { flex: none; display: flex; border-top: 1px solid var(--outline-variant); background: var(--surface); height: 64px; }
+  .nav-item { flex: 1; border: 0; background: none; font-size: 12px; color: var(--on-surface-variant); display: flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer; }
+  .nav-item .pill { display: inline-block; padding: 3px 16px; border-radius: 16px; font-weight: 600; font-size: 12px; }
+  .nav-item[aria-current="page"] { color: var(--primary); }
+  .nav-item[aria-current="page"] .pill { background: var(--primary-container); }
+</style>
+</head>
+<body>
+<div class="stage">
+  <div class="phone">
+    <header class="topbar">
+      <h1>Actividades</h1>
+    </header>
+
+    <section class="density" aria-label="Densidad de mayo">
+      <div class="dhead">
+        <button class="arrow" type="button" aria-label="Mes anterior">‹</button>
+        <h2>Mayo 2026</h2>
+        <button class="arrow" type="button" aria-label="Mes siguiente">›</button>
+        <span class="sub">Densidad</span>
+        <button class="toggle" type="button" id="densityToggle" aria-expanded="true" aria-controls="dowRow heatGrid densityLegend" aria-label="Ocultar el mapa de densidad">▲</button>
+      </div>
+      <div class="ws" id="dowRow" aria-hidden="true"><span>LU</span><span>MA</span><span>MI</span><span>JU</span><span>VI</span><span>SA</span><span>DO</span></div>
+      <div class="heat" id="heatGrid"></div>
+      <div class="legend" id="densityLegend" role="group" aria-label="Escala de densidad">
+        <span>Menos</span>
+        <i style="background:rgba(25,28,29,.04);box-shadow:inset 0 0 0 1px var(--outline-variant)"></i>
+        <i style="background:rgba(0,105,109,.14)"></i>
+        <i style="background:rgba(0,105,109,.26)"></i>
+        <i style="background:rgba(0,105,109,.40)"></i>
+        <i style="background:rgba(0,105,109,.54)"></i>
+        <span>Más</span>
+        <i class="lg-alert"></i><span>vencida</span>
+      </div>
+      <div class="inner-filters" role="group" aria-label="Filtrar por hijo y por tipo">
+        <div class="dd" id="ddKids">
+          <button class="fchip dd-trigger" type="button" id="ddKidsBtn" aria-haspopup="listbox" aria-expanded="false" aria-controls="ddKidsMenu"><span class="lead" aria-hidden="true">👤</span><span class="dd-label">Todos</span><span class="caret" aria-hidden="true">▾</span></button>
+          <div class="menu" id="ddKidsMenu" role="listbox" aria-multiselectable="true" aria-label="Filtrar por hijo" hidden>
+            <button class="opt" role="option" aria-checked="true" data-value="all" type="button"><span class="boxw" aria-hidden="true">✓</span><span class="name">Todos</span></button>
+            <button class="opt" role="option" aria-checked="false" data-value="sofia" type="button"><span class="boxw" aria-hidden="true">✓</span><span class="cav" style="background:#FCE4EC;color:#AD1457">S</span><span class="name">Sofía</span></button>
+            <button class="opt" role="option" aria-checked="false" data-value="tomas" type="button"><span class="boxw" aria-hidden="true">✓</span><span class="cav" style="background:#E8EAF6;color:#303F9F">T</span><span class="name">Tomás</span></button>
+          </div>
+        </div>
+        <div class="dd" id="ddType">
+          <button class="fchip dd-trigger" type="button" id="ddTypeBtn" aria-haspopup="listbox" aria-expanded="false" aria-controls="ddTypeMenu"><span class="lead" aria-hidden="true">☰</span><span class="dd-label">Todas</span><span class="caret" aria-hidden="true">▾</span></button>
+          <div class="menu" id="ddTypeMenu" role="listbox" aria-multiselectable="true" aria-label="Filtrar por tipo" hidden>
+            <button class="opt" role="option" aria-checked="true" data-value="all" type="button"><span class="boxw" aria-hidden="true">✓</span><span class="name">Todas</span></button>
+            <button class="opt" role="option" aria-checked="false" data-value="event" type="button"><span class="boxw" aria-hidden="true">✓</span><span class="name">Eventos</span></button>
+            <button class="opt" role="option" aria-checked="false" data-value="obligation" type="button"><span class="boxw" aria-hidden="true">✓</span><span class="name">Obligaciones</span></button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="day-head">
+      <span class="d" id="dayLabel">mié 13 may</span>
+      <span class="rel" id="dayRel">· hoy</span>
+      <span class="sum" id="daySum">5 actividades · <span class="late">1 vencida</span></span>
+    </div>
+
+    <main class="feed" id="feed">
+      <noscript><p class="empty">Este artboard necesita JavaScript para el calendario interactivo.</p></noscript>
+    </main>
+
+    <button class="fab left" id="hoyBtn" aria-label="Ir a hoy; si el día no tiene actividades muestra «No hay actividades hoy»">◈ Hoy</button>
+    <button class="fab right" aria-label="Nueva actividad">＋</button>
+    <nav class="navbar" aria-label="Navegación principal">
+      <button class="nav-item">Inicio</button>
+      <button class="nav-item" aria-current="page"><span class="pill">Actividades</span></button>
+      <button class="nav-item">Gastos</button>
+      <button class="nav-item">Terceros</button>
+    </nav>
+  </div>
+  <p class="frame-note">El calendario es el mapa de densidad real de la app: al seleccionar una fecha la lista muestra ese día, y un día sin actividades muestra «No hay actividades…». Los días con actividades renderizan el mismo conjunto demo de cards — lo que se evalúa es el diseño de la tarjeta (la persona de la columna es el ASIGNATARIO; un tercero asignado se lee «Asignado a un Tercero»).</p>
+</div>
+
+<script>
+  var TODAY = 13, LAST = 31, LEAD = 4; /* 1 may 2026 = viernes → 4 celdas vanas (L..J) */
+  var HEAT = {5:1, 8:1, 12:3, 13:4, 15:1, 18:2, 21:3, 26:1};
+  var OVER = {13:1};
+  function lvl(n){ return n<=0?0 : n===1?1 : n===2?2 : n===3?3 : 4; }
+  var CARDS = ''
+    + '<div class="card" tabindex="0" role="button" aria-label="09:30 a 10:30, Turno con el pediatra, Salud, Asignada a Ana García, para Martina, límite hoy 12:00, acción: confirmar"><span class="node" style="background:#D81B60" aria-hidden="true"></span>'
+    +   '<div class="who"><span class="avatar assignee" aria-hidden="true">AG</span><span class="role">Ana G.</span></div>'
+    +   '<div class="body">'
+    +     '<div class="head"><h3>Turno con el pediatra</h3><span class="status-pill" style="background:rgba(30,136,229,.15);color:#1565C0"><i style="background:#1E88E5"></i>Asignada</span></div>'
+    +     '<div class="meta"><span class="time">09:30 – 10:30</span><span class="vsep" aria-hidden="true"></span><span>límite hoy 12:00</span></div>'
+    +     '<div class="kids"><span class="kid">Martina</span></div>'
+    +     '<div class="foot"><span class="cat-label" style="color:#AD1457"><i style="background:#D81B60"></i>Salud</span>'
+    +       '<button class="btn-confirm">✓ Confirmar</button></div>'
+    +   '</div>'
+    + '</div>'
+    + '<div class="card" tabindex="0" role="button" aria-label="10:40 a 11:40, Control odontológico, Salud, Por verificar, asignado a Ana García, para Sofía"><span class="node" style="background:#D81B60" aria-hidden="true"></span>'
+    +   '<div class="who"><span class="avatar assignee" aria-hidden="true">AG</span><span class="role">Ana G.</span></div>'
+    +   '<div class="body">'
+    +     '<div class="head"><h3>Control odontológico</h3><span class="status-pill" style="background:rgba(178,106,0,.15);color:#9E5F00"><i style="background:#B26A00"></i>Por verificar</span></div>'
+    +     '<div class="meta"><span class="time">10:40 – 11:40</span></div>'
+    +     '<div class="kids"><span class="kid">Sofía</span></div>'
+    +     '<div class="foot"><span class="cat-label" style="color:#AD1457"><i style="background:#D81B60"></i>Salud</span></div>'
+    +   '</div>'
+    + '</div>'
+    + '<div class="card" tabindex="0" role="button" aria-label="11:00, Reunión con la tutora, Educación, Vencida, asignada a un tercero, para Tomás"><span class="node" style="background:#3F51B5"><span class="ring-over" aria-hidden="true"></span></span>'
+    +   '<div class="who"><span class="avatar assignee" aria-hidden="true">?</span><span class="role">tercero</span></div>'
+    +   '<div class="body">'
+    +     '<div class="head"><h3>Reunión con la tutora</h3><span class="status-pill" style="background:rgba(229,57,53,.15);color:#C62828"><i style="background:#E53935"></i>Vencida</span></div>'
+    +     '<div class="meta"><span class="time">09:30 – 10:30</span><span class="vsep" aria-hidden="true"></span><span class="late">límite vencido</span></div>'
+    +     '<div class="creator"><span class="mask">Asignado a un Tercero</span></div>'
+    +     '<div class="kids"><span class="kid">Tomás</span></div>'
+    +     '<div class="foot"><span class="cat-label" style="color:#303F9F"><i style="background:#3F51B5"></i>Educación</span></div>'
+    +   '</div>'
+    + '</div>'
+    + '<div class="card" tabindex="0" role="button" aria-label="15:30, Compras del súper, Otros, Creada, asignada a vos"><span class="node" style="background:#8D6E63" aria-hidden="true"></span>'
+    +   '<div class="who"><span class="avatar assignee" aria-hidden="true">Yo</span><span class="role">vos</span></div>'
+    +   '<div class="body">'
+    +     '<div class="head"><h3>Compras del súper</h3><span class="status-pill" style="background:rgba(117,117,117,.15);color:#616161"><i style="background:#757575"></i>Creada</span></div>'
+    +     '<div class="meta"><span class="time">15:30</span></div>'
+    +     '<div class="foot"><span class="cat-label" style="color:#5D4037"><i style="background:#8D6E63"></i>Otros</span></div>'
+    +   '</div>'
+    + '</div>'
+    + '<div class="card stack" tabindex="0" role="button" aria-expanded="false" aria-label="Cena con los abuelos, En progreso, y 1 actividad apilada detras. Tocar para desplegar">'
+    +   '<span class="zcount" aria-hidden="true">2</span>'
+    +   '<span class="ghostwrap" aria-hidden="true"><i></i><i class="b"></i></span>'
+    +   '<div class="card-inner">'
+    +     '<div class="who"><span class="avatar assignee" aria-hidden="true">AG</span><span class="role">Ana G.</span></div>'
+    +     '<div class="body">'
+    +       '<div class="head"><h3>Cena con los abuelos</h3><span class="status-pill" style="background:rgba(230,81,0,.15);color:#B42C0E"><i style="background:#E65100"></i>En progreso</span></div>'
+    +       '<div class="meta"><span class="time">18:00 - 20:00</span></div>'
+    +     '</div>'
+    +   '</div>'
+    +   '<div class="stack-more">'
+    +     '<div class="card" tabindex="0" role="button" aria-label="18:00 a 19:30, Voley en el club, Recreacion, Asignada a vos, para Sofia">'
+    +       '<div class="who"><span class="avatar assignee" aria-hidden="true">Yo</span><span class="role">vos</span></div>'
+    +       '<div class="body">'
+    +         '<div class="head"><h3>Voley en el club</h3><span class="status-pill" style="background:rgba(30,136,229,.15);color:#1565C0"><i style="background:#1E88E5"></i>Asignada</span></div>'
+    +         '<div class="meta"><span class="time">18:00 - 19:30</span></div>'
+    +         '<div class="kids"><span class="kid">Sofia</span></div>'
+    +         '<div class="foot"><span class="cat-label" style="color:#B42C0E"><i style="background:#F4511E"></i>Recreacion</span></div>'
+    +       '</div>'
+    +     '</div>'
+    +   '</div>'
+    + '</div>';
+
+  var grid = document.getElementById('heatGrid');
+  function labelFor(d){
+    var s = new Date(Date.UTC(2026,4,d)).toLocaleDateString('es-AR',{weekday:'short', day:'numeric', month:'short', timeZone:'UTC'});
+    return s.replace('.','');
+  }
+  function renderFeed(d){
+    var n = HEAT[d] || 0;
+    document.getElementById('dayLabel').textContent = labelFor(d);
+    document.getElementById('dayRel').textContent = d === TODAY ? '· hoy' : '';
+    if (n === 0) {
+      document.getElementById('daySum').textContent = 'sin actividades';
+      document.getElementById('feed').innerHTML = '<p class="empty">No hay actividades el ' + labelFor(d) + '.</p>';
+      return;
+    }
+    document.getElementById('daySum').innerHTML = n + ' actividades' + (d === TODAY && OVER[d] ? ' · <span class="late">1 vencida</span>' : '');
+    document.getElementById('feed').innerHTML = '<div class="feed-inner">' + CARDS + '</div>';
+  }
+  function select(d){
+    grid.querySelectorAll('.hcell').forEach(function(c){
+      var day = Number(c.dataset.day);
+      c.classList.toggle('sel', day === d);
+      c.setAttribute('aria-pressed', day === d ? 'true' : 'false');
+    });
+    renderFeed(d);
+  }
+  for (var i = 0; i < LEAD; i++) {
+    var s = document.createElement('span');
+    s.setAttribute('aria-hidden','true');
+    grid.appendChild(s);
+  }
+  for (var d = 1; d <= LAST; d++) {
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.dataset.day = String(d);
+    var n = HEAT[d] || 0, od = OVER[d] || 0;
+    b.className = 'hcell' + (lvl(n) ? ' lvl' + lvl(n) : '') + (d === TODAY ? ' today sel' : '');
+    b.textContent = String(d);
+    b.setAttribute('aria-pressed', d === TODAY ? 'true' : 'false');
+    b.setAttribute('aria-label', d + ' de mayo, ' + (n ? n + (n === 1 ? ' actividad' : ' actividades') : 'sin actividades') + (od ? ', ' + od + ' vencida' : ''));
+    if (od) {
+      var dot = document.createElement('span');
+      dot.className = 'alert'; dot.setAttribute('aria-hidden','true');
+      b.appendChild(dot);
+    }
+    (function(day){ b.addEventListener('click', function(){ select(day); }); })(d);
+    grid.appendChild(b);
+  }
+  document.getElementById('densityToggle').addEventListener('click', function(){
+    var open = this.getAttribute('aria-expanded') === 'true';
+    this.setAttribute('aria-expanded', String(!open));
+    this.setAttribute('aria-label', open ? 'Mostrar el mapa de densidad' : 'Ocultar el mapa de densidad');
+    this.textContent = open ? '▼' : '▲';
+    ['dowRow','heatGrid','densityLegend'].forEach(function(id){
+      document.getElementById(id).style.display = open ? 'none' : '';
+    });
+  });
+  document.getElementById('hoyBtn').addEventListener('click', function(){ select(TODAY); });
+
+  /* Stack de la LISTA: tocar la card apilada despliega las actividades a ancho completo */
+  document.addEventListener('click', function(e){
+    var card = e.target.closest('.card.stack');
+    if (!card) return;
+    var on = !card.classList.contains('expanded');
+    card.classList.toggle('expanded', on);
+    card.setAttribute('aria-expanded', String(on));
+  });
+
+  renderFeed(TODAY);
+  /* Dropdowns multi-select con check (comentario kk1azucd) */
+  function refreshLabel(btn, menu) {
+    var labelEl = btn.querySelector('.dd-label');
+    var opts = Array.prototype.slice.call(menu.querySelectorAll('.opt'));
+    var sel = opts.filter(function(o){ return o.getAttribute('aria-checked') === 'true'; });
+    var all = opts.find(function(o){ return o.dataset.value === 'all'; });
+    if (!sel.length || (all && all.getAttribute('aria-checked') === 'true')) {
+      /* nada activo → el default "Todos"/"Todas" SIN mostrar el estado */
+      labelEl.textContent = (menu.id.indexOf('Kids') >= 0 ? 'Todos' : 'Todas');
+      var old = btn.querySelector('.cnt'); if (old) old.remove();
+      return;
+    }
+    if (all && sel.includes(all)) { labelEl.textContent = 'Todos'; var oc = btn.querySelector('.cnt'); if (oc) oc.remove(); return; }
+    var names = sel.filter(function(o){ return o.dataset.value !== 'all'; })
+                   .map(function(o){ return o.querySelector('.name').textContent; });
+    var base = menu.id.indexOf('Kids') >= 0 ? 'Todos' : 'Todas';
+    if (names.length) {
+      labelEl.textContent = names.slice(0, 2).join(', ') + (names.length > 2 ? '…' : '');
+    } else {
+      labelEl.textContent = base;
+    }
+    var oldCnt = btn.querySelector('.cnt'); if (oldCnt) oldCnt.remove();
+    if (names.length) {
+      var cnt = document.createElement('span');
+      cnt.className = 'cnt'; cnt.textContent = String(names.length);
+      btn.insertBefore(cnt, btn.querySelector('.caret'));
+    }
+  }
+  document.querySelectorAll('.dd').forEach(function(dd){
+    var btn = dd.querySelector('.fchip');
+    var menu = dd.querySelector('.menu');
+
+    btn.addEventListener('click', function(e){
+      e.stopPropagation();
+      var open = !menu.hidden;
+      menu.hidden = open;
+      btn.setAttribute('aria-expanded', String(!open));
+      dd.classList.toggle('open', !open);
+    });
+    menu.querySelectorAll('.opt').forEach(function(opt){
+      opt.addEventListener('click', function(e){
+        e.stopPropagation();
+        var allOpt = menu.querySelector('.opt[data-value="all"]');
+        var on = opt.getAttribute('aria-checked') === 'true';
+        if (opt === allOpt) {
+          /* Todos excluye al resto */
+          menu.querySelectorAll('.opt').forEach(function(o){
+            o.setAttribute('aria-checked', o === allOpt ? String(!on) : 'false');
+          });
+        } else {
+          /* elegir una específica hace desaparecer Todos */
+          if (allOpt) allOpt.setAttribute('aria-checked', 'false');
+          var sameGroup = on && menu.querySelectorAll('.opt[aria-checked="true"][data-value]:not([data-value="all"])').filter(function(o){return o!==opt;}).length === 0;
+          opt.setAttribute('aria-checked', String(!on));
+          /* si ninguna específica quedó activa, vuelve Todos */
+          if (!on) {
+            var anyLeft = menu.querySelectorAll('.opt[aria-checked="true"][data-value]:not([data-value="all"])').length > 0;
+            if (!anyLeft && allOpt) allOpt.setAttribute('aria-checked', 'true');
+          }
+        }
+        refreshLabel(btn, menu);
+      });
+    });
+  });
+  document.addEventListener('click', function(){
+    document.querySelectorAll('.dd .menu').forEach(function(m){ m.hidden = true; });
+    document.querySelectorAll('.dd .fchip').forEach(function(b){ b.setAttribute('aria-expanded','false'); });
+  });
+</script>

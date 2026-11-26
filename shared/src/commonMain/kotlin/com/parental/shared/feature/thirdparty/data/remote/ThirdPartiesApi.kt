@@ -42,6 +42,10 @@ private suspend fun HttpResponse.toApiError(): ApiResult.Error {
  */
 internal fun CreateThirdPartyAccessRequest.toCreateBody(): JsonObject = buildJsonObject {
     put("email", email.trim())
+    put("firstName", firstName.trim())
+    put("lastName", lastName.trim())
+    phone?.takeIf { it.isNotBlank() }?.let { put("phone", it.trim()) }
+    document?.takeIf { it.isNotBlank() }?.let { put("document", it.trim()) }
     put("relationship", relationship)
     put("accessEnd", accessEnd.trim())
     note?.takeIf { it.isNotBlank() }?.let { put("note", it) }
@@ -58,6 +62,12 @@ internal fun UpdateThirdPartyAccessRequest.toPatchBody(): JsonObject = buildJson
     relationship?.let { put("relationship", it) }
     accessEnd?.let { put("accessEnd", it.trim()) }
     note?.let { put("note", it) }
+    // S9: sólo los campos presentes viajan (PATCH parcial del back); phone/document
+    // con "" limpian a propósito.
+    firstName?.let { put("firstName", it) }
+    lastName?.let { put("lastName", it) }
+    phone?.let { put("phone", it) }
+    document?.let { put("document", it) }
 }
 
 /**

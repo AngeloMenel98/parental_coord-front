@@ -146,6 +146,10 @@ fun ThirdPartiesScreen(
             },
             onClose = viewModel::closeWizard,
             onEmail = viewModel::setEmail,
+            onFirstName = viewModel::setFirstName,
+            onLastName = viewModel::setLastName,
+            onPhone = viewModel::setPhone,
+            onDocument = viewModel::setDocument,
             onRelationship = viewModel::setRelationship,
             onDuration = viewModel::setDuration,
             onAccessEnd = viewModel::setAccessEnd,
@@ -228,6 +232,10 @@ fun ThirdPartiesScreen(
             edit = edit,
             isSaving = state.isSaving,
             onRelationship = viewModel::setEditRelationship,
+            onFirstName = viewModel::setEditFirstName,
+            onLastName = viewModel::setEditLastName,
+            onPhone = viewModel::setEditPhone,
+            onDocument = viewModel::setEditDocument,
             onAccessEnd = viewModel::setEditAccessEnd,
             onNote = viewModel::setEditNote,
             onSave = viewModel::saveEdit,
@@ -783,6 +791,10 @@ private fun ThirdPartiesWizard(
     onBack: () -> Unit,
     onClose: () -> Unit,
     onEmail: (String) -> Unit,
+    onFirstName: (String) -> Unit,
+    onLastName: (String) -> Unit,
+    onPhone: (String) -> Unit,
+    onDocument: (String) -> Unit,
     onRelationship: (String) -> Unit,
     onDuration: (ThirdPartyDuration) -> Unit,
     onAccessEnd: (String) -> Unit,
@@ -880,6 +892,40 @@ private fun ThirdPartiesWizard(
                     singleLine = true,
                     isError = wizard.error != null,
                 )
+                // S1 (thirdparty-identity): la identidad declarada se captura acá, no en
+                // el paso 2, porque el paso HASTA_CUANDO ya carga la vigencia + permisos.
+                OutlinedTextField(
+                    value = wizard.firstName,
+                    onValueChange = onFirstName,
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Nombre") },
+                    placeholder = { Text("Pablo") },
+                    singleLine = true,
+                    isError = wizard.error == THIRD_PARTY_FIRST_NAME_MISSING,
+                )
+                OutlinedTextField(
+                    value = wizard.lastName,
+                    onValueChange = onLastName,
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Apellido") },
+                    placeholder = { Text("Charles") },
+                    singleLine = true,
+                    isError = wizard.error == THIRD_PARTY_LAST_NAME_MISSING,
+                )
+                OutlinedTextField(
+                    value = wizard.phone,
+                    onValueChange = onPhone,
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Teléfono (opcional)") },
+                    singleLine = true,
+                )
+                OutlinedTextField(
+                    value = wizard.document,
+                    onValueChange = onDocument,
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Documento (opcional)") },
+                    singleLine = true,
+                )
                 Text(
                     text = "Si no tiene cuenta, la creamos con una contraseña provisoria y le mandamos los datos por mail.",
                     style = MaterialTheme.typography.bodySmall,
@@ -888,7 +934,12 @@ private fun ThirdPartiesWizard(
                 RelationshipChips(selected = wizard.relationship, onSelect = onRelationship)
                 wizard.error?.let { FormError(it) }
             } else {
-                WizardChosenPerson(email = wizard.email, relationship = wizard.relationship)
+                WizardChosenPerson(
+                    email = wizard.email,
+                    firstName = wizard.firstName,
+                    lastName = wizard.lastName,
+                    relationship = wizard.relationship,
+                )
                 RelationshipChips(selected = wizard.relationship, onSelect = onRelationship)
 
                 Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
@@ -1057,7 +1108,12 @@ private fun StepBadge(number: String, label: String, done: Boolean, current: Boo
 }
 
 @Composable
-private fun WizardChosenPerson(email: String, relationship: String?) {
+private fun WizardChosenPerson(
+    email: String,
+    firstName: String,
+    lastName: String,
+    relationship: String?,
+) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = ParentalShapes.medium,
@@ -1071,16 +1127,42 @@ private fun WizardChosenPerson(email: String, relationship: String?) {
             modifier = Modifier.fillMaxWidth().padding(Spacing.md),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Avatar(initials = initialsOf(email.substringBefore('@')), active = true)
+            // S1: las iniciales salen del NOMBRE declarado; sin identidad, del email.
+            val personName = listOfNotNull(
+                firstName.trim().takeIf { it.isNotEmpty() },
+                lastName.trim().takeIf { it.isNotEmpty() },
+            ).joinToString(" ")
+            val avatarSeed = personName.takeIf { it.isNotEmpty() } ?: email.substringBefore('@')
+            Avatar(initials = initialsOf(avatarSeed), active = true)
             Spacer(modifier = Modifier.width(Spacing.md))
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = email,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Medium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                // S1: una vez declarada la identidad, es EL NOMBRE lo que se muestra;
+                // el email queda como dato secundario de contacto. La variable vive en el
+                // scope del Row (la calcula el bloque del Avatar).
+                if (personName.isNotEmpty()) {
+                    Text(
+                        text = personName,
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        text = email,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                } else {
+                    Text(
+                        text = email,
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
                 ThirdPartyRelationshipOption.fromValue(relationship)?.let { option ->
                     Text(
                         text = option.label,
@@ -1219,6 +1301,10 @@ private fun ThirdPartyEditSheet(
     edit: ThirdPartyEditState,
     isSaving: Boolean,
     onRelationship: (String) -> Unit,
+    onFirstName: (String) -> Unit,
+    onLastName: (String) -> Unit,
+    onPhone: (String) -> Unit,
+    onDocument: (String) -> Unit,
     onAccessEnd: (String) -> Unit,
     onNote: (String) -> Unit,
     onSave: () -> Unit,
@@ -1243,6 +1329,38 @@ private fun ThirdPartyEditSheet(
                 style = MaterialTheme.typography.titleMedium,
             )
             RelationshipChips(selected = edit.relationship, onSelect = onRelationship)
+
+            // S9 (thirdparty-identity): identidad precargada del grant; NaN = el grant
+            // previo a la feature no la tiene y el campo nace vacío para completarla.
+            OutlinedTextField(
+                value = edit.firstName.orEmpty(),
+                onValueChange = onFirstName,
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("Nombre") },
+                singleLine = true,
+            )
+            OutlinedTextField(
+                value = edit.lastName.orEmpty(),
+                onValueChange = onLastName,
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("Apellido") },
+                singleLine = true,
+            )
+            OutlinedTextField(
+                value = edit.phone.orEmpty(),
+                onValueChange = onPhone,
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("Teléfono (opcional)") },
+                singleLine = true,
+            )
+            OutlinedTextField(
+                value = edit.document.orEmpty(),
+                onValueChange = onDocument,
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("Documento (opcional)") },
+                singleLine = true,
+            )
+
             OutlinedTextField(
                 value = edit.accessEnd,
                 onValueChange = onAccessEnd,

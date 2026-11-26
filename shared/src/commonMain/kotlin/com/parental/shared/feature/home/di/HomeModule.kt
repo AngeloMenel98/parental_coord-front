@@ -19,6 +19,7 @@ val homeModule = module {
             activitiesApi = get(),
             expensesApi = get(),
             categoriesApi = get(),
+            complianceClient = get(),
             tokenProvider = { get<SessionManager>().token.orEmpty() },
         )
     }

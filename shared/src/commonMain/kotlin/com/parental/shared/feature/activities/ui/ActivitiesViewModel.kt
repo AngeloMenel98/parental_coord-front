@@ -183,6 +183,14 @@ class ActividadesViewModel(
     private val activitiesApi: ActivitiesApi,
     private val categoriesApi: CategoriesApi,
     private val bondsApi: BondsApi,
+    /**
+     * S2 (thirdparty-identity): la consola de grants del VISOR. Los terciarios que
+     * el propio visor otorgó y siguen activos entran al dropdown de asignatarios con
+     * su nombre REAL declarado en el alta. El servidor ya filtra por dueño — un
+     * visor que no otorgó nada recibe lista vacía y la identidad ajena NUNCA viaja
+     * (S7). Nullable con default `null`: los tests existentes no lo pasan (S6).
+     */
+    private val thirdPartiesApi: com.parental.shared.feature.thirdparty.data.remote.ThirdPartiesApi? = null,
     private val token: String,
     private val bondId: String,
     /** userId del usuario autenticado (non-null: la pantalla está gated por login). */
@@ -319,10 +327,16 @@ private val httpClient: HttpClient by lazy { HttpClient(Platform.createHttpEngin
             val listDeferred = async { activitiesApi.listActividades(bondId) }
             val categoriesDeferred = async { categoriesApi.getCategories() }
             val bondsDeferred = async { bondsApi.getMyBonds() }
+            // S2: los grants del visor deciden qué terciarios son asignables. Fallar
+            // no bloquea la lista (S6): sin grants, el dropdown queda como siempre.
+            val thirdPartiesDeferred = async {
+                thirdPartiesApi?.listForBond(token, bondId)
+            }
 
             val listResult = listDeferred.await()
             val categoriesResult = categoriesDeferred.await()
             val bondsResult = bondsDeferred.await()
+            val thirdPartiesResult = thirdPartiesDeferred.await()
 
             // Fallas de categorías/miembros no bloquean la lista:
             // categorías desconocidas → chip neutral; asignatario → "Sin asignar".
@@ -349,7 +363,12 @@ private val httpClient: HttpClient by lazy { HttpClient(Platform.createHttpEngin
             // "inactivo/pending" (`VinculoMember` no trae `leftAt` ni `user.isActive`), así que
             // el desplegable ofrece TODOS los miembros, incluido el propio, SIN inventar un
             // estado `pending`. Es la degradación declarada, no un olvido.
-            val candidates = bond
+            // S2: los terciarios NO entran por `members` genérico — para un visor que
+            // no los autorizó esa fila viene enmascarada ("Autorizado por …"), y como
+            // opción de asignación sería un label confuso que además depende de quién
+            // mira. Sólo los grants ACTIVOS del propio visor agregan su candidato, con
+            // el nombre declarado en el alta (firstName+lastName, fallback displayName).
+            val memberCandidates = bond
                 ?.members
                 ?.mapNotNull { member ->
                     val user = member.user ?: return@mapNotNull null
@@ -359,6 +378,20 @@ private val httpClient: HttpClient by lazy { HttpClient(Platform.createHttpEngin
                     if (name.isBlank()) null else MemberCandidate(user.id, name)
                 }
                 .orEmpty()
+            val thirdPartyCandidates = (thirdPartiesResult as? ApiResult.Success)
+                ?.data
+                ?.filter { it.status == "active" }
+                ?.mapNotNull { access ->
+                    val name = access.firstName?.let { first ->
+                        listOfNotNull(first, access.lastName).joinToString(" ").trim()
+                    } ?: access.displayName?.trim().takeIf { !it.isNullOrEmpty() }
+                    if (name.isNullOrBlank()) null else MemberCandidate(access.userId, name)
+                }
+                .orEmpty()
+                .distinctBy { it.id }
+            val thirdPartyIds = thirdPartyCandidates.map { it.id }.toSet()
+            val candidates = memberCandidates.filterNot { it.id in thirdPartyIds } +
+                thirdPartyCandidates
 
             val derived = derivedFromBond(
                 categories = categories,
